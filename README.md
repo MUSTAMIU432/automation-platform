@@ -1,0 +1,2 @@
+# TECHIDEA
+rthis is tech
