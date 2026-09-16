@@ -12,3 +12,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `infrastructure/`, `scripts/` directory boundaries; `.github/` workflow,
   issue, and PR templates; root `.gitignore`, `.env.example`, `README.md`,
   `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`, and `LICENSE`.
+- S0-002: Django backend foundation — bare Django project under
+  `backend/config`, environment-driven settings split into
+  `base`/`local`/`production` via `django-environ`, SQLite placeholder
+  database, and a dependency-free `/health/` endpoint. No business domain
+  apps, authentication, PostgreSQL, or GraphQL yet.
