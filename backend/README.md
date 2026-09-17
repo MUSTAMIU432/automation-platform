@@ -4,10 +4,10 @@ Django backend, organized as a modular monolith around business domains
 (identity, organizations, ideas, reviews, opportunities, proposals,
 developers, projects, tasks, notifications, impact, files, audit).
 
-**Status:** Sprint 0, task S0-004 (PostgreSQL Database Foundation) — a
-bare Django project with environment-driven settings and a PostgreSQL
-database. No business domain apps, authentication, or GraphQL yet; those
-land in later sprints.
+**Status:** Sprint 0, task S0-005 (GraphQL API Foundation) — a bare Django
+project with environment-driven settings, a PostgreSQL database (S0-004),
+and a foundation GraphQL endpoint. No business domain apps or
+authentication yet; those land in later sprints.
 
 See [`/docs/architecture.md`](../docs/architecture.md) for the target
 backend architecture.
@@ -23,10 +23,15 @@ backend/
 │   │   ├── base.py         # shared settings, reads from environment
 │   │   ├── local.py        # development defaults (DEBUG=True)
 │   │   └── production.py   # production overrides
-│   ├── urls.py
+│   ├── urls.py             # mounts /health/ and /graphql/
 │   ├── views.py            # health check
 │   ├── wsgi.py
 │   └── asgi.py
+└── graphql_api/            # GraphQL infrastructure (not a business domain)
+    ├── apps.py
+    ├── schema.py           # root Query/Mutation
+    ├── views.py            # Strawberry Django view, mounted at /graphql/
+    └── tests.py
 ```
 
 ## Setup
@@ -92,3 +97,35 @@ python manage.py shell -c "from django.db import connection; print(connection.ve
 
 `GET /health/` returns `{"status": "ok"}` with no auth and no
 dependencies, for CI and deploy tooling.
+
+## GraphQL API
+
+GraphQL is the primary application API; REST is reserved for
+specialized/infrastructure operations (file uploads, webhooks, health
+checks, OAuth callbacks). See [`/docs/architecture.md`](../docs/architecture.md).
+
+**Endpoint:** `POST /graphql/` (a GraphiQL IDE is also served there in
+development, when `DEBUG=True`).
+
+**Foundation schema only:** `graphql_api/schema.py` currently exposes:
+
+- `Query.apiStatus` — returns `{ status, version, djangoVersion }`, proving
+  the GraphQL layer resolves end to end.
+- `Mutation.ping(message)` — echoes its input, proving the mutation root
+  resolves.
+
+Neither is business-domain functionality. Business-domain schemas
+(identity, organizations, ideas, ...) will be added as their own Django
+apps in later sprints and merged into this root `Query`/`Mutation`, not
+built into separate schema instances.
+
+Built with [Strawberry](https://strawberry.rocks/) (`strawberry-graphql-django`),
+a code-first, type-hint-driven GraphQL library.
+
+Example query:
+
+```bash
+curl -X POST http://localhost:8000/graphql/ \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ apiStatus { status version djangoVersion } }"}'
+```

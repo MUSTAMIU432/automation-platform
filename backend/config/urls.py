@@ -18,8 +18,10 @@ from django.contrib import admin
 from django.urls import path
 
 from config.views import health
+from graphql_api.views import graphql_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('health/', health, name='health'),
+    path('graphql/', graphql_view, name='graphql'),
 ]
