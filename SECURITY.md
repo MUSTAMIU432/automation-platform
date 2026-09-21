@@ -25,7 +25,9 @@ disclosure.
 - No secrets or credentials are committed to this repository.
 - Environment-specific configuration is provided via `.env` files, which
   are excluded from Git (see `.gitignore`) and documented via
-  `.env.example`.
+  `.env.example`. Deployed environments take secrets from secret
+  management, and refuse to start on missing or unsafe configuration
+  (see [`docs/environments.md`](docs/environments.md)).
 - No authentication system exists yet, so there is no login/session
   surface to secure at this stage.
 

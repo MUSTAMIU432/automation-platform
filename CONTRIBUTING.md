@@ -44,6 +44,7 @@ Code quality tooling and commands will be documented once established
 
 ## Environment Variables
 
-Copy `.env.example` to `.env` and fill in values for your environment.
-Never commit `.env` files. See [`docs/architecture.md`](docs/architecture.md)
-for the environment variable strategy.
+Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to
+`frontend/.env`, then fill in values for your environment. Never commit `.env`
+files. See [`docs/environments.md`](docs/environments.md) for the environment
+variable strategy.
