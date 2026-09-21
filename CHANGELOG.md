@@ -39,3 +39,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   a PostgreSQL service) and frontend (Oxlint, oxfmt, `tsc`, Vitest, production
   build) jobs on pull requests to and pushes to `develop`/`main`. Read-only
   permissions, no secrets, no deployment.
+- S0-010: Documentation foundation — new `docs/development.md`,
+  `docs/testing.md` and `docs/git-workflow.md`; `docs/architecture.md`
+  current-implementation status and repository structure brought up to date
+  (target architecture preserved); `docs/environments.md` documents the CI
+  execution context; `README.md` and `CONTRIBUTING.md` corrected for stale
+  Sprint 0 statements and linked to the new guides.
