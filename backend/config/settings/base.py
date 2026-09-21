@@ -147,6 +147,28 @@ STATIC_URL = 'static/'
 # allowed origins themselves come from CORS_ALLOWED_ORIGINS (never a wildcard).
 
 CORS_URLS_REGEX = r'^/graphql/'
+# Explicit so a stray setting elsewhere can never open the API to every origin.
+# Credentialed cross-origin requests stay off until authentication exists.
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = False
+
+
+# Security headers and cookies
+# https://docs.djangoproject.com/en/5.2/ref/middleware/#module-django.middleware.security
+#
+# Browser-protection defaults shared by every environment. They are pinned here
+# (several match Django's own defaults) so they are visible and tested, and so a
+# Django upgrade cannot silently loosen them. Transport security (HTTPS
+# redirect, secure cookies, HSTS) is enforced by production.py.
+
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = 'same-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+# Served by XFrameOptionsMiddleware: the app may not be framed by any site.
+X_FRAME_OPTIONS = 'DENY'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

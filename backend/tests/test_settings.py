@@ -6,44 +6,9 @@ evaluated from scratch, and so backend/.env (which only fills in variables
 that are *unset*) can't leak into a test. No database connection is made.
 """
 
-import os
-import subprocess
-import sys
-from pathlib import Path
-
 import pytest
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
-
-# A syntactically valid, obviously fake production configuration.
-VALID_PRODUCTION_ENV = {
-    'DJANGO_SETTINGS_MODULE': 'config.settings.production',
-    'ENVIRONMENT': 'staging',
-    'DJANGO_SECRET_KEY': 'x7Kp2mQ9vL4nR8tW1yB6cD3fG5hJ0sZaE2uI4oP7qA9wX1eV3b',
-    'DJANGO_DEBUG': 'False',
-    'DJANGO_ALLOWED_HOSTS': 'api.example.test',
-    'DATABASE_URL': 'postgres://app_user:app-password@db.example.test:5432/app',
-    'CORS_ALLOWED_ORIGINS': 'https://app.example.test',
-    'CSRF_TRUSTED_ORIGINS': 'https://app.example.test',
-}
-
-
-def import_settings(module, overrides=None, code=None):
-    """Import `module` in a clean subprocess. An empty override means "unset"."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('DJANGO_', 'CORS_', 'CSRF_'))}
-    env.pop('ENVIRONMENT', None)
-    env.pop('DATABASE_URL', None)
-    env.update(VALID_PRODUCTION_ENV)
-    env['DJANGO_SETTINGS_MODULE'] = module
-    env.update(overrides or {})
-    # Fixed interpreter and a code string built by the tests themselves - no untrusted input.
-    return subprocess.run(  # noqa: S603
-        [sys.executable, '-c', code or f'import {module}'],
-        cwd=BACKEND_DIR,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
+from .settings_helpers import import_settings
 
 
 def assert_rejected(overrides, message):
@@ -100,6 +65,7 @@ def test_local_defaults_allow_vite_dev_server():
         'config.settings.local',
         {
             'DJANGO_SETTINGS_MODULE': 'config.settings.local',
+            'ENVIRONMENT': 'local',
             'DJANGO_SECRET_KEY': 'local-test-key',
             'CORS_ALLOWED_ORIGINS': '',
             'CSRF_TRUSTED_ORIGINS': '',

@@ -25,14 +25,20 @@ GitHub Actions is not one of these environments; see
 
 Settings layout (`backend/config/settings/`):
 
-- `base.py` — common settings, all read from the environment
-- `local.py` — debug on, localhost defaults, Vite dev-server CORS/CSRF origins
+- `base.py` — common settings, all read from the environment, plus browser
+  protections shared by every environment (see
+  [`SECURITY.md`](../SECURITY.md#current-security-foundation))
+- `local.py` — debug on, localhost defaults, Vite dev-server CORS/CSRF origins;
+  **refuses to start** if `ENVIRONMENT` is anything other than `local` or `ci`,
+  so a deployed environment can't run with these permissive settings
 - `production.py` — validates configuration and enables secure defaults;
   **refuses to start** (`ImproperlyConfigured`) if any of these hold:
   `ENVIRONMENT` isn't development/staging/production, the secret key is
   missing, a placeholder, or under 50 characters, `DJANGO_DEBUG` is true,
-  `DJANGO_ALLOWED_HOSTS` is empty or `*`, or a CORS/CSRF origin is not an
-  explicit `https://` origin.
+  `DJANGO_ALLOWED_HOSTS` is empty or `*`, a CORS/CSRF origin is not an
+  explicit `https://` origin, or the HSTS settings are unsafe (negative
+  max-age, or preload without includeSubDomains and a one-year max-age).
+  It always enables secure session and CSRF cookies.
 
 ## CI execution context
 
@@ -53,7 +59,8 @@ What CI actually provides:
 - The Django settings module is the default, `config.settings.local` (chosen
   by `pytest.ini` and `manage.py`); CI does not run the app under
   `config.settings.production`. The production validation rules are covered by
-  tests in `backend/tests/test_settings.py`, not by running CI as production.
+  tests in `backend/tests/test_settings.py` and `test_security.py`, not by
+  running CI as production.
 - The frontend job needs no environment variables: the Vitest config fixes
   `VITE_GRAPHQL_URL`, and building does not read it.
 
@@ -66,9 +73,10 @@ What CI actually provides:
 | `DATABASE_URL` | the CI PostgreSQL service on `localhost:5432` |
 
 `ci` is a label for this context only. It is **not** an accepted value for a
-deployed environment: `config.settings.production` still rejects any
-`ENVIRONMENT` other than `development`, `staging` or `production`, so `ci`
-must never be used to run a deployed instance. What CI runs is described in
+deployed environment: `config.settings.production` rejects any `ENVIRONMENT`
+other than `development`, `staging` or `production`, so `ci` cannot run a
+deployed instance. The reverse also holds: `config.settings.local` accepts
+only `local` and `ci`, so a deployed name can't use the local settings. What CI runs is described in
 [`testing.md`](testing.md#continuous-integration).
 
 ## Backend variables (`backend/.env`)
@@ -86,6 +94,10 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `CORS_ALLOWED_ORIGINS`       |        | deployed          | Browser origins allowed to call `/graphql/`. Local defaults to `http://localhost:5173` |
 | `CSRF_TRUSTED_ORIGINS`       |        | deployed          | Origins trusted for CSRF-protected requests. Local defaults to `http://localhost:5173` |
 | `DJANGO_SECURE_SSL_REDIRECT` |        | no (`True`)       | HTTP→HTTPS redirect (deployed only) |
+| `DJANGO_TRUST_X_FORWARDED_PROTO` |    | no (`False`)      | Trust the proxy's `X-Forwarded-Proto` to detect HTTPS (deployed only). See [HTTPS behind a proxy](#https-behind-a-proxy) |
+| `DJANGO_SECURE_HSTS_SECONDS` |        | no (`31536000` production, `3600` development/staging) | HSTS max-age in seconds; `0` disables (deployed only) |
+| `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` | | no (`False`)   | Extend HSTS to every subdomain (deployed only) |
+| `DJANGO_SECURE_HSTS_PRELOAD` |        | no (`False`)      | Add the HSTS `preload` directive (deployed only). Requires includeSubDomains and a max-age of at least 31536000 |
 
 Notes:
 
@@ -155,9 +167,38 @@ follows.
 - The frontend is built once per environment with that environment's
   `VITE_GRAPHQL_URL`, and the backend's `CORS_ALLOWED_ORIGINS` must list that
   frontend's origin.
-- `SECURE_HSTS_SECONDS` is not set yet (`check --deploy` warns about it).
-  Enable it deliberately once HTTPS is confirmed on the real domains, since
-  browsers cache the policy.
+- HSTS is on in every deployed environment (this host only), so a deployed
+  environment must be reachable over HTTPS before use. Browsers cache the
+  policy, so the default max-age depends on the environment:
+
+  | `ENVIRONMENT` | Default `DJANGO_SECURE_HSTS_SECONDS` |
+  | ------------- | ------------------------------------ |
+  | `production`  | `31536000` (one year) |
+  | `staging`     | `3600` (one hour) |
+  | `development` | `3600` (one hour) |
+
+  Development and staging get a short window so a first rollout or a
+  misconfigured host is quickly forgotten by browsers; set the variable
+  explicitly to raise it (for example, to rehearse the production value on
+  staging). Enable `includeSubDomains` and `preload` (both off by default)
+  only once every subdomain is HTTPS-only; preload is effectively
+  permanent. With those two left off, `manage.py check --deploy` reports
+  warnings `security.W005` and `security.W021`; that is expected.
+
+## HTTPS behind a proxy
+
+Deployed environments redirect HTTP to HTTPS and send HSTS only for requests
+Django recognises as secure. When TLS is terminated by a proxy or load
+balancer, Django sees plain HTTP unless told to trust the proxy's
+`X-Forwarded-Proto` header, and the redirect would loop.
+
+Set `DJANGO_TRUST_X_FORWARDED_PROTO=True` **only** if the proxy sets that
+header itself and strips any value sent by the client; otherwise a client
+could spoof HTTPS. If the proxy already performs the redirect, you may
+instead set `DJANGO_SECURE_SSL_REDIRECT=False`. Session and CSRF cookies stay
+secure-only either way. Platform health checks that call `/health/` over
+plain HTTP will receive the redirect unless the check uses HTTPS or the
+forwarded header.
 
 ## Never commit
 

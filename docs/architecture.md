@@ -98,11 +98,11 @@ ALLOWED_HOSTS, CORS/CSRF strategy, security headers, rate-limiting and audit
 architecture placeholders. Authentication itself is explicitly out of scope
 until Sprint 1 (Identity).
 
-Implemented: environment-driven secrets, the local/production settings
-split with fail-fast validation, `ALLOWED_HOSTS`, and CORS/CSRF
-configuration. Rate limiting, audit logging and authentication are not
-implemented. The rest of the baseline is tracked as S0-011; see
-[`SECURITY.md`](../SECURITY.md).
+Implemented (S0-011): environment-driven secrets, the local/production
+settings split with fail-fast validation, `ALLOWED_HOSTS`, CORS/CSRF
+configuration, secure cookies, HTTPS redirect, HSTS and browser security
+headers, with automated tests. Rate limiting, audit logging and
+authentication are not implemented. See [`SECURITY.md`](../SECURITY.md).
 
 ### Multi-Tenancy (target — not yet implemented)
 
@@ -133,6 +133,7 @@ authentication begin in Sprint 1.
 | Database | PostgreSQL via `DATABASE_URL` (`psycopg`); no SQLite fallback | S0-004 |
 | GraphQL | `/graphql/` via Strawberry Django with a foundation schema (`apiStatus` query, `ping` mutation) | S0-005 |
 | Environment configuration | `ENVIRONMENT` convention, per-app `.env.example`, fail-fast production validation, CORS/CSRF settings | S0-006 |
+| Security foundation | Production HTTPS/HSTS/cookie/header settings, local-vs-production guards, security tests | S0-011 |
 | Testing | Backend pytest + pytest-django + pytest-cov; frontend Vitest + React Testing Library | S0-007 |
 | Code quality | Backend Ruff; frontend Oxlint, oxfmt and TypeScript checking | S0-008 |
 | CI | GitHub Actions workflow validating backend and frontend on pull requests and pushes to `develop`/`main`; no deployment | S0-009 |
@@ -151,7 +152,7 @@ How these are used day to day: [`development.md`](development.md),
 - Redis + Celery background processing
 - AI gateway
 - Object storage
-- Rate limiting and audit logging
+- Rate limiting and audit logging (authentication and authorization also start in Sprint 1)
 - React Query and feature modules in the frontend
 - Deployment automation and any deployed environment (development, staging,
   production)
