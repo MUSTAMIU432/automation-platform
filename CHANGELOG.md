@@ -45,3 +45,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   (target architecture preserved); `docs/environments.md` documents the CI
   execution context; `README.md` and `CONTRIBUTING.md` corrected for stale
   Sprint 0 statements and linked to the new guides.
+- S0-011: Security foundation — explicit shared browser protections in
+  `base.py` (nosniff, referrer policy, COOP, `X-Frame-Options: DENY`,
+  HttpOnly/SameSite cookies, CORS wildcard and credentials off);
+  production HSTS (default one year in production, one hour in
+  development/staging, environment-driven, `includeSubDomains`
+  and `preload` opt-in and validated) and opt-in proxy HTTPS detection
+  (`DJANGO_TRUST_X_FORWARDED_PROTO`); `config.settings.local` now refuses
+  deployed `ENVIRONMENT` names so neither local nor CI can run as production;
+  `tests/test_security.py` (settings invariants, response headers, HTTPS
+  redirect, `check --deploy`); `SECURITY.md` rewritten to match. No
+  authentication or authorization yet (Sprint 1).

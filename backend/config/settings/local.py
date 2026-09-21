@@ -5,8 +5,22 @@ Used when DJANGO_SETTINGS_MODULE is not overridden — the default for
 running the project on a developer machine.
 """
 
+from django.core.exceptions import ImproperlyConfigured
+
 from .base import *  # noqa: F403
-from .base import env
+from .base import ENVIRONMENT, env
+
+# These settings are permissive by design (debug on by default, localhost
+# origins). They serve a developer machine and CI only, so a deployed
+# environment name here means production.py was forgotten - refuse to start.
+_LOCAL_ENVIRONMENTS = ('local', 'ci')
+
+if ENVIRONMENT not in _LOCAL_ENVIRONMENTS:
+    raise ImproperlyConfigured(
+        f'ENVIRONMENT {ENVIRONMENT!r} must not use config.settings.local, which is only '
+        f'for {" and ".join(_LOCAL_ENVIRONMENTS)}. Deployed environments must set '
+        'DJANGO_SETTINGS_MODULE=config.settings.production.'
+    )
 
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
