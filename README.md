@@ -16,15 +16,23 @@ see them through to delivered, measurable impact.
 
 ## Project Status
 
-This repository is currently in **Sprint 0 — Foundation**. The engineering
-foundation (backend, frontend, database, GraphQL, CI/CD, docs, security
-baseline) is being built out before any business functionality — including
-authentication/Identity — is implemented.
+This repository is in **Sprint 0 — Foundation**, and the foundation is
+substantially established:
 
-**What exists today:** repository structure and documentation only. See
-[`docs/architecture.md`](docs/architecture.md) for the full breakdown of
-current vs. target architecture, and [`CHANGELOG.md`](CHANGELOG.md) for
-what has landed so far.
+- Django backend
+- React + TypeScript + Vite frontend
+- PostgreSQL
+- GraphQL (foundation schema only)
+- Environment configuration
+- Testing (backend and frontend)
+- Code quality tooling
+- GitHub Actions CI (validation only, no deployment)
+
+**Business functionality is not yet implemented.** There are no business
+domains, and identity/authentication begins in Sprint 1. The security
+baseline (S0-011) and the branch audit (S0-012) are still to come. See
+[`docs/architecture.md`](docs/architecture.md) for current vs. target
+architecture, and [`CHANGELOG.md`](CHANGELOG.md) for what has landed.
 
 ## Target Architecture (summary)
 
@@ -42,24 +50,34 @@ Full details: [`docs/architecture.md`](docs/architecture.md).
 
 ```
 automation-platform/
-├── frontend/          # React app (not yet scaffolded)
-├── backend/           # Django project (not yet scaffolded)
-├── docs/              # Documentation
-├── infrastructure/    # IaC / deployment config
-├── scripts/           # Developer utility scripts
-├── .github/           # CI workflows, issue/PR templates
-├── .env.example
-└── ...
+├── backend/           # Django project (config, graphql_api, tests)
+├── frontend/          # React + TypeScript + Vite app
+├── docs/              # Architecture, environments, development, testing, Git workflow
+├── infrastructure/    # Placeholder: no infrastructure implemented yet
+├── scripts/           # Placeholder: no scripts yet
+├── .github/           # CI workflow, issue/PR templates
+├── .env.example       # Index of the per-app env templates
+└── ...                # README, CONTRIBUTING, SECURITY, CHANGELOG, LICENSE
 ```
+
+A per-file breakdown is in [`docs/architecture.md`](docs/architecture.md#repository-structure).
 
 ## Getting Started
 
-Local setup instructions will be added as the backend (S0-002) and frontend
-(S0-003) foundations are implemented. There is no runnable application yet.
+The backend and frontend run locally; there is no business functionality to
+use yet.
+
+- [`docs/development.md`](docs/development.md) — prerequisites, setup and
+  running the backend and frontend
+- [`docs/testing.md`](docs/testing.md) — tests, linting, formatting and CI
+- [`docs/git-workflow.md`](docs/git-workflow.md) — branches and pull requests
+- [`docs/environments.md`](docs/environments.md) — environment variables and
+  environments
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching model and PR
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to contribute and
+[`docs/git-workflow.md`](docs/git-workflow.md) for the branching model and PR
 process.
 
 ## Security

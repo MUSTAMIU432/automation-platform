@@ -2,13 +2,13 @@
 
 ## Project Status
 
-This repository is in early foundation stages (Sprint 0). Expect the setup
-instructions in this document to expand as the backend and frontend
-foundations land.
+This repository is in Sprint 0 (foundation). The backend and frontend
+foundations, testing, code quality tooling and CI are in place; no business
+functionality is implemented yet.
 
 ## Git Workflow
 
-Branch flow:
+Branch flow (full details in [`docs/git-workflow.md`](docs/git-workflow.md)):
 
 ```
 feature/<domain>  →  PR  →  develop  →  staging  →  main  →  production
@@ -28,9 +28,8 @@ made, not just what changed.
 
 ## Local Setup
 
-Not yet available — the backend and frontend have not been scaffolded.
-This section will be filled in as Sprint 0 tasks S0-002 (backend) and
-S0-003 (frontend) are completed.
+See [`docs/development.md`](docs/development.md) for prerequisites, backend
+and frontend setup, and running the app locally.
 
 ## Testing
 
@@ -59,6 +58,7 @@ Where tests belong:
 | End-to-end tests | not set up yet; reserved for a later sprint |
 
 Do not add models or fixtures only to have something to test. See
+[`docs/testing.md`](docs/testing.md),
 [`backend/README.md`](backend/README.md#testing) and
 [`frontend/README.md`](frontend/README.md#testing) for details.
 
@@ -101,7 +101,8 @@ npm run lint && npm run typecheck && npm run format:check && npm run test:run &&
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull
 request targeting `develop` or `main`, and on every push to those branches. It
 is validation only: nothing is deployed and no secrets are needed. A PR should
-not be merged until both jobs are green.
+not be merged until both jobs are green. See
+[`docs/testing.md`](docs/testing.md#continuous-integration) for what CI runs.
 
 | Job | Runs (in `backend/` or `frontend/`) |
 | --- | ----------------------------------- |

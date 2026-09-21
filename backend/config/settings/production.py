@@ -28,6 +28,11 @@ DEPLOYED_ENVIRONMENTS = ('development', 'staging', 'production')
 _PLACEHOLDER_SECRET_MARKERS = ('change-me', 'changeme', 'django-insecure')
 # Matches Django's own `check --deploy` threshold.
 _MIN_SECRET_KEY_LENGTH = 50
+# One year: the production default, and the minimum browsers require for HSTS preload.
+_PRODUCTION_HSTS_SECONDS = 31536000
+# One hour: the default for development and staging, so a first rollout or a
+# misconfigured host is forgotten by browsers quickly.
+_SHORT_HSTS_SECONDS = 3600
 
 
 if ENVIRONMENT not in DEPLOYED_ENVIRONMENTS:
@@ -66,9 +71,42 @@ for _setting_name, _origins in (
                 f'without wildcards (got {_origin!r}).'
             )
 
+# Transport security. Cookies are never sent over plain HTTP; this is not
+# configurable so it cannot be turned off by mistake.
 SECURE_SSL_REDIRECT = env.bool('DJANGO_SECURE_SSL_REDIRECT', default=True)
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+
+# Behind a TLS-terminating proxy or load balancer Django only sees plain HTTP,
+# so it would redirect forever and never send HSTS. Opt in ONLY if that proxy
+# always sets X-Forwarded-Proto itself and strips any client-supplied value;
+# otherwise a client could spoof HTTPS.
+if env.bool('DJANGO_TRUST_X_FORWARDED_PROTO', default=False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# HTTP Strict Transport Security. Browsers cache the policy, so production
+# defaults to one year and development/staging to one hour; set
+# DJANGO_SECURE_HSTS_SECONDS to override either. It applies to this host only
+# unless the two opt-ins below are enabled: includeSubDomains affects every
+# subdomain and preload is effectively permanent. Enable them deliberately,
+# once every subdomain is confirmed HTTPS-only.
+SECURE_HSTS_SECONDS = env.int(
+    'DJANGO_SECURE_HSTS_SECONDS',
+    default=_PRODUCTION_HSTS_SECONDS if ENVIRONMENT == 'production' else _SHORT_HSTS_SECONDS,
+)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
+SECURE_HSTS_PRELOAD = env.bool('DJANGO_SECURE_HSTS_PRELOAD', default=False)
+
+if SECURE_HSTS_SECONDS < 0:
+    raise ImproperlyConfigured('DJANGO_SECURE_HSTS_SECONDS must not be negative.')
+
+if SECURE_HSTS_PRELOAD and (
+    not SECURE_HSTS_INCLUDE_SUBDOMAINS or SECURE_HSTS_SECONDS < _PRODUCTION_HSTS_SECONDS
+):
+    raise ImproperlyConfigured(
+        'DJANGO_SECURE_HSTS_PRELOAD requires DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS=True and '
+        f'DJANGO_SECURE_HSTS_SECONDS of at least {_PRODUCTION_HSTS_SECONDS}.'
+    )
 
 # Keep database connections open between requests (seconds).
 DATABASES['default']['CONN_MAX_AGE'] = env.int('DATABASE_CONN_MAX_AGE', default=60)  # noqa: F405
