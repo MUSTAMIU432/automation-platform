@@ -30,7 +30,10 @@ def test_api_status_query_returns_foundation_response(gql):
 
 
 def test_ping_mutation_echoes_message(gql):
-    response = gql('mutation Ping($message: String!) { ping(message: $message) }', {'message': 'hello'})
+    response = gql(
+        'mutation Ping($message: String!) { ping(message: $message) }',
+        {'message': 'hello'},
+    )
 
     assert response.status_code == 200
     body = response.json()

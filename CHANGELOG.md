@@ -28,3 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   React Testing Library + jsdom with V8 coverage (`test`, `test:run`,
   `test:coverage`); existing GraphQL and settings tests migrated to pytest;
   a blank `DATABASE_URL` now fails at startup.
+- S0-008: Code quality foundation — backend Ruff (lint, import sorting,
+  format) configured in `backend/ruff.toml`; frontend Oxlint config expanded
+  (React hooks, a11y, import, vitest rules; warnings fail CI) plus `oxfmt`
+  formatter and `typecheck`/`format`/`format:check`/`lint:fix` scripts;
+  existing code made compliant. No pre-commit hooks: local checks (and CI,
+  once workflows exist) are the quality gate.

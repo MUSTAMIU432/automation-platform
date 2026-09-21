@@ -7,7 +7,9 @@ describe('HomePage', () => {
   it('renders the platform heading and foundation status', () => {
     render(<HomePage />)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Automation Platform' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Automation Platform' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('Frontend foundation is running.')).toBeInTheDocument()
   })
 })

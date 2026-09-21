@@ -10,7 +10,10 @@ describe('graphqlClient', () => {
 
   it('posts operations to the configured GraphQL URL and returns data', async () => {
     const fetchMock = vi.fn(async () =>
-      Response.json({ data: { apiStatus: { status: 'ok' } } }, { headers: { 'content-type': 'application/json' } }),
+      Response.json(
+        { data: { apiStatus: { status: 'ok' } } },
+        { headers: { 'content-type': 'application/json' } },
+      ),
     )
     vi.stubGlobal('fetch', fetchMock)
 

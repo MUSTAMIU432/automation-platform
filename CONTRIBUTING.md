@@ -64,8 +64,42 @@ Do not add models or fixtures only to have something to test. See
 
 ## Linting & Formatting
 
-Code quality tooling and commands will be documented once established
-(Sprint 0, task S0-008).
+One tool per concern: **Ruff** for Python (lint, import sorting, format) and
+**Oxlint + oxfmt** for the frontend, plus the TypeScript compiler for type
+checking. Configuration lives in `backend/ruff.toml`,
+`frontend/.oxlintrc.json` and `frontend/.oxfmtrc.json`.
+
+```bash
+# Backend (from backend/, venv active)
+ruff check .              # lint (add --fix for safe auto-fixes)
+ruff format --check .     # formatting check
+ruff format .             # apply formatting
+
+# Frontend (from frontend/)
+npm run lint              # Oxlint; warnings fail the run
+npm run typecheck         # tsc -b
+npm run format:check      # formatting check
+npm run format            # apply formatting
+```
+
+Recommended workflow: while working, run the formatter and the fast linters
+(`ruff format . && ruff check --fix .`, `npm run format && npm run lint:fix`);
+before opening a PR, run every check below.
+
+**Required before merge:** all checks pass locally (and in CI once workflows
+exist) — lint, format check, type check, tests, and the frontend build:
+
+```bash
+# backend/
+ruff check . && ruff format --check . && python manage.py check && pytest
+# frontend/
+npm run lint && npm run typecheck && npm run format:check && npm run test:run && npm run build
+```
+
+Fix the code rather than disabling a rule. If a suppression is genuinely
+justified (`# noqa: <code>`, `// oxlint-disable-next-line <rule>`), scope it to
+one line and say why. There are no pre-commit hooks by design; these
+commands are the quality gate.
 
 ## Environment Variables
 

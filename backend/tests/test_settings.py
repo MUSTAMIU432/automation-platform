@@ -36,7 +36,8 @@ def import_settings(module, overrides=None, code=None):
     env.update(VALID_PRODUCTION_ENV)
     env['DJANGO_SETTINGS_MODULE'] = module
     env.update(overrides or {})
-    return subprocess.run(
+    # Fixed interpreter and a code string built by the tests themselves - no untrusted input.
+    return subprocess.run(  # noqa: S603
         [sys.executable, '-c', code or f'import {module}'],
         cwd=BACKEND_DIR,
         env=env,
@@ -103,7 +104,10 @@ def test_local_defaults_allow_vite_dev_server():
             'CORS_ALLOWED_ORIGINS': '',
             'CSRF_TRUSTED_ORIGINS': '',
         },
-        code='from config.settings import local as s; print(s.CORS_ALLOWED_ORIGINS, s.CSRF_TRUSTED_ORIGINS)',
+        code=(
+            'from config.settings import local as s; '
+            'print(s.CORS_ALLOWED_ORIGINS, s.CSRF_TRUSTED_ORIGINS)'
+        ),
     )
 
     assert result.returncode == 0, result.stderr

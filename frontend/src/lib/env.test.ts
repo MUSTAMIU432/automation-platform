@@ -22,6 +22,8 @@ describe('env', () => {
   it('fails clearly when VITE_GRAPHQL_URL is missing', async () => {
     vi.stubEnv('VITE_GRAPHQL_URL', '')
 
-    await expect(loadEnv()).rejects.toThrow('Missing required environment variable: VITE_GRAPHQL_URL')
+    await expect(loadEnv()).rejects.toThrow(
+      'Missing required environment variable: VITE_GRAPHQL_URL',
+    )
   })
 })

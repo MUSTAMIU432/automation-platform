@@ -1,7 +1,6 @@
-from strawberry.django.views import GraphQLView
-
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
+from strawberry.django.views import GraphQLView
 
 from .schema import schema
 

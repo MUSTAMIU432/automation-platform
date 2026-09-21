@@ -18,8 +18,9 @@ backend architecture.
 backend/
 ├── manage.py
 ├── requirements.txt        # runtime dependencies
-├── requirements-dev.txt    # + test tooling (pytest, pytest-django, pytest-cov)
+├── requirements-dev.txt    # + test and lint tooling (pytest, pytest-django, pytest-cov, ruff)
 ├── pytest.ini
+├── ruff.toml               # lint + format configuration (Ruff)
 ├── .coveragerc
 ├── tests/                  # pytest suite (see Testing below)
 ├── config/
@@ -128,6 +129,21 @@ has it). No test settings or credentials are committed.
 `production.py` is exercised in subprocesses (each case imports it with a
 different environment), so it shows 0% in the coverage report even though
 its validation rules are tested.
+
+## Code quality
+
+[Ruff](https://docs.astral.sh/ruff/) is the only Python linter, import sorter
+and formatter; it is configured in [`ruff.toml`](ruff.toml) and installed with
+`requirements-dev.txt`. Rules cover pyflakes (unused imports/variables),
+pycodestyle, isort, bugbear, pyupgrade, simplify, flake8-django, pytest style,
+bandit security checks, no stray `print`, and a McCabe complexity limit of 10.
+Migrations are excluded; code style is single quotes, 100 columns.
+
+```bash
+ruff check .              # lint (add --fix for safe auto-fixes)
+ruff format --check .     # formatting check (CI-friendly)
+ruff format .             # apply formatting
+```
 
 ## Health check
 

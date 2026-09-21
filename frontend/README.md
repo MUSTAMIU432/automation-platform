@@ -42,12 +42,24 @@ npm run build   # runs `tsc -b` then `vite build`, output in dist/
 npm run preview # serve the production build locally
 ```
 
-## Type checking & lint
+## Code quality
+
+Oxlint (lint), the TypeScript compiler (types, including unused
+locals/parameters) and oxfmt (formatting, the Oxc formatter that pairs with
+Oxlint) are the only quality tools. Config: [`.oxlintrc.json`](.oxlintrc.json),
+[`.oxfmtrc.json`](.oxfmtrc.json), `tsconfig.*.json`.
 
 ```bash
-npx tsc -b --noEmit
-npm run lint    # oxlint
+npm run lint           # Oxlint; warnings fail the run (CI-friendly)
+npm run lint:fix       # apply safe auto-fixes
+npm run typecheck      # tsc -b
+npm run format:check   # formatting check for src/ and vite.config.ts
+npm run format         # apply formatting
 ```
+
+Oxlint enables the correctness rules plus React hooks, accessibility
+(`jsx-a11y`), import, TypeScript and Vitest rules. `format` covers source code
+only (`src/`, `vite.config.ts`), not JSON or Markdown.
 
 ## Testing
 
