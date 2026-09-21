@@ -13,8 +13,15 @@ configuration fails at startup with ImproperlyConfigured.
 
 from django.core.exceptions import ImproperlyConfigured
 
-from .base import *  # noqa: F401,F403
-from .base import ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS, CSRF_TRUSTED_ORIGINS, ENVIRONMENT, SECRET_KEY, env
+from .base import *  # noqa: F403
+from .base import (
+    ALLOWED_HOSTS,
+    CORS_ALLOWED_ORIGINS,
+    CSRF_TRUSTED_ORIGINS,
+    ENVIRONMENT,
+    SECRET_KEY,
+    env,
+)
 
 DEPLOYED_ENVIRONMENTS = ('development', 'staging', 'production')
 
