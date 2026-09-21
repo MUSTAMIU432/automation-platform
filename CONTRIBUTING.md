@@ -86,8 +86,8 @@ Recommended workflow: while working, run the formatter and the fast linters
 (`ruff format . && ruff check --fix .`, `npm run format && npm run lint:fix`);
 before opening a PR, run every check below.
 
-**Required before merge:** all checks pass locally (and in CI once workflows
-exist) — lint, format check, type check, tests, and the frontend build:
+**Required before merge:** all checks pass locally and in CI — lint, format
+check, type check, tests, and the frontend build:
 
 ```bash
 # backend/
@@ -95,6 +95,30 @@ ruff check . && ruff format --check . && python manage.py check && pytest
 # frontend/
 npm run lint && npm run typecheck && npm run format:check && npm run test:run && npm run build
 ```
+
+## Continuous Integration
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on every pull
+request targeting `develop` or `main`, and on every push to those branches. It
+is validation only: nothing is deployed and no secrets are needed. A PR should
+not be merged until both jobs are green.
+
+| Job | Runs (in `backend/` or `frontend/`) |
+| --- | ----------------------------------- |
+| Backend (Python 3.12, PostgreSQL 16 service) | `ruff check .`, `ruff format --check .`, `python manage.py check`, `python manage.py makemigrations --check --dry-run`, `python manage.py migrate`, `pytest --cov` |
+| Frontend (Node.js 22) | `npm ci`, `npm run lint`, `npm run format:check`, `npm run typecheck`, `npm run test:run`, `npm run build` |
+
+To reproduce a run locally, use the commands above, plus the missing-migrations
+check the backend job adds:
+
+```bash
+# backend/ (PostgreSQL running, venv active)
+python manage.py makemigrations --check --dry-run
+```
+
+CI uses throwaway, non-secret values for `DJANGO_SECRET_KEY`, `DATABASE_URL`
+and the other backend variables; they live in the workflow file. Keep new
+required settings covered there rather than adding repository secrets.
 
 Fix the code rather than disabling a rule. If a suppression is genuinely
 justified (`# noqa: <code>`, `// oxlint-disable-next-line <rule>`), scope it to
