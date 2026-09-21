@@ -11,7 +11,7 @@ CODE → ENVIRONMENT VARIABLES → ENVIRONMENT-SPECIFIC SETTINGS → APPLICATION
 | Environment   | Purpose                                                    | Django settings module         | `ENVIRONMENT` |
 | ------------- | ---------------------------------------------------------- | ------------------------------ | ------------- |
 | `local`       | Developer machine: development, debugging, local PostgreSQL and React | `config.settings.local` (default) | `local`       |
-| `development` | Shared dev environment: integration, developer testing, CI validation | `config.settings.production`   | `development` |
+| `development` | Shared dev environment: integration, developer testing     | `config.settings.production`   | `development` |
 | `staging`     | Production-like: QA, UAT, release validation               | `config.settings.production`   | `staging`     |
 | `production`  | Live: real users and data, strict security, no debug       | `config.settings.production`   | `production`  |
 
@@ -19,7 +19,9 @@ Only `local` has a dedicated settings module. Every deployed environment
 uses `config.settings.production`, so shared environments get the same
 security posture as production; `ENVIRONMENT` just names which one it is.
 No infrastructure for development, staging or production exists yet — this
-is the configuration convention they will follow.
+is the configuration convention they will follow. Automated validation in
+GitHub Actions is not one of these environments; see
+[CI execution context](#ci-execution-context).
 
 Settings layout (`backend/config/settings/`):
 
@@ -32,13 +34,50 @@ Settings layout (`backend/config/settings/`):
   `DJANGO_ALLOWED_HOSTS` is empty or `*`, or a CORS/CSRF origin is not an
   explicit `https://` origin.
 
+## CI execution context
+
+GitHub Actions ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) runs
+the backend and frontend checks on pull requests and on pushes to `develop`
+and `main`. It is a **testing execution context, not a deployed
+environment**, and is not equivalent to staging or production: nothing is
+deployed, no real users or data exist, and it has no persistent
+infrastructure.
+
+What CI actually provides:
+
+- The backend job starts a throwaway `postgres:16` service container for the
+  duration of the run. It is not a shared or persistent database.
+- Backend variables are set in the workflow file itself, with throwaway,
+  non-secret values that have no use outside the job. No repository secrets
+  are used.
+- The Django settings module is the default, `config.settings.local` (chosen
+  by `pytest.ini` and `manage.py`); CI does not run the app under
+  `config.settings.production`. The production validation rules are covered by
+  tests in `backend/tests/test_settings.py`, not by running CI as production.
+- The frontend job needs no environment variables: the Vitest config fixes
+  `VITE_GRAPHQL_URL`, and building does not read it.
+
+| Variable | CI value |
+| -------- | -------- |
+| `ENVIRONMENT` | `ci` |
+| `DJANGO_SECRET_KEY` | a fixed CI-only placeholder |
+| `DJANGO_DEBUG` | `False` |
+| `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` |
+| `DATABASE_URL` | the CI PostgreSQL service on `localhost:5432` |
+
+`ci` is a label for this context only. It is **not** an accepted value for a
+deployed environment: `config.settings.production` still rejects any
+`ENVIRONMENT` other than `development`, `staging` or `production`, so `ci`
+must never be used to run a deployed instance. What CI runs is described in
+[`testing.md`](testing.md#continuous-integration).
+
 ## Backend variables (`backend/.env`)
 
 Template: [`backend/.env.example`](../backend/.env.example).
 
 | Variable                     | Secret | Required          | Purpose |
 | ---------------------------- | :----: | ----------------- | ------- |
-| `ENVIRONMENT`                |        | no (`local`)      | Environment name (see table above) |
+| `ENVIRONMENT`                |        | no (`local`)      | Environment name (see table above). CI sets `ci`; see [CI execution context](#ci-execution-context) |
 | `DJANGO_SECRET_KEY`          | **yes**| **always**        | Django signing key. No default |
 | `DJANGO_DEBUG`               |        | no                | Default `True` locally; rejected if true when deployed |
 | `DJANGO_ALLOWED_HOSTS`       |        | deployed          | Comma-separated hostnames |
@@ -84,7 +123,8 @@ cp frontend/.env.example frontend/.env
 ```
 
 See [`backend/README.md`](../backend/README.md) for creating the local
-PostgreSQL role and database.
+PostgreSQL role and database, and [`development.md`](development.md) for the
+full setup.
 
 ## Env file convention
 
