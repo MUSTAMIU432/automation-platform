@@ -8,7 +8,6 @@ production) import from this module and override only what differs.
 from pathlib import Path
 
 import environ
-from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR is backend/ (three levels up from this file: settings/base.py).
@@ -93,11 +92,6 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # DATABASE_URL is required and has no fallback, so credentials only ever come
 # from the environment. Driver options such as TLS go in the URL query string,
 # e.g. ?sslmode=require.
-if not env('DATABASE_URL'):
-    # Blank is treated as missing; django-environ would only warn and Django
-    # would fail later, on first use, with a much less helpful error.
-    raise ImproperlyConfigured('DATABASE_URL must be set (see backend/.env.example).')
-
 DATABASES = {
     'default': env.db('DATABASE_URL'),
 }

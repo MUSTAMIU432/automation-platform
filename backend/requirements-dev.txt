@@ -1,5 +1,0 @@
-# Development / CI-only dependencies. Not installed in deployed environments.
--r requirements.txt
-pytest==9.1.1
-pytest-django==4.14.0
-pytest-cov==7.1.0

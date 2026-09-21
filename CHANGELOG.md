@@ -23,8 +23,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and CSRF trusted origins; fail-fast validation in
   `config.settings.production`; per-app `.env.example` files
   (`backend/`, `frontend/`); `docs/environments.md`.
-- S0-007: Testing foundation — backend `pytest` + `pytest-django` +
-  `pytest-cov` (`backend/tests/`, `requirements-dev.txt`); frontend Vitest +
-  React Testing Library + jsdom with V8 coverage (`test`, `test:run`,
-  `test:coverage`); existing GraphQL and settings tests migrated to pytest;
-  a blank `DATABASE_URL` now fails at startup.
