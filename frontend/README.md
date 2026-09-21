@@ -42,39 +42,14 @@ npm run build   # runs `tsc -b` then `vite build`, output in dist/
 npm run preview # serve the production build locally
 ```
 
-## Code quality
-
-Oxlint (lint), the TypeScript compiler (types, including unused
-locals/parameters) and oxfmt (formatting, the Oxc formatter that pairs with
-Oxlint) are the only quality tools. Config: [`.oxlintrc.json`](.oxlintrc.json),
-[`.oxfmtrc.json`](.oxfmtrc.json), `tsconfig.*.json`.
+## Type checking & lint
 
 ```bash
-npm run lint           # Oxlint; warnings fail the run (CI-friendly)
-npm run lint:fix       # apply safe auto-fixes
-npm run typecheck      # tsc -b
-npm run format:check   # formatting check for src/ and vite.config.ts
-npm run format         # apply formatting
+npx tsc -b --noEmit
+npm run lint    # oxlint
 ```
 
-Oxlint enables the correctness rules plus React hooks, accessibility
-(`jsx-a11y`), import, TypeScript and Vitest rules. `format` covers source code
-only (`src/`, `vite.config.ts`), not JSON or Markdown.
-
-## Testing
-
-Vitest + React Testing Library + jsdom, configured in `vite.config.ts`.
-
-```bash
-npm run test           # watch mode (development)
-npm run test:run       # single non-interactive run (CI, pre-PR)
-npm run test:coverage  # single run with V8 coverage; report in coverage/
-```
-
-Tests sit next to the code they cover (`Foo.tsx` → `Foo.test.tsx`).
-Shared helpers live in `src/test/`. Tests never call a real backend:
-`VITE_GRAPHQL_URL` is fixed in the Vitest config and network calls are
-stubbed, so results don't depend on `frontend/.env`.
+No test runner is configured yet.
 
 ## Environment configuration
 

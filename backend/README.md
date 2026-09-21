@@ -17,12 +17,7 @@ backend architecture.
 ```
 backend/
 ├── manage.py
-├── requirements.txt        # runtime dependencies
-├── requirements-dev.txt    # + test and lint tooling (pytest, pytest-django, pytest-cov, ruff)
-├── pytest.ini
-├── ruff.toml               # lint + format configuration (Ruff)
-├── .coveragerc
-├── tests/                  # pytest suite (see Testing below)
+├── requirements.txt
 ├── config/
 │   ├── settings/
 │   │   ├── base.py         # shared settings, reads from environment
@@ -30,12 +25,14 @@ backend/
 │   │   └── production.py   # deployed envs: validates config, secure defaults
 │   ├── urls.py             # mounts /health/ and /graphql/
 │   ├── views.py            # health check
+│   ├── tests.py            # settings validation tests
 │   ├── wsgi.py
 │   └── asgi.py
 └── graphql_api/            # GraphQL infrastructure (not a business domain)
     ├── apps.py
     ├── schema.py           # root Query/Mutation
-    └── views.py            # Strawberry Django view, mounted at /graphql/
+    ├── views.py            # Strawberry Django view, mounted at /graphql/
+    └── tests.py
 ```
 
 ## Setup
@@ -98,51 +95,6 @@ wired up correctly. You can also confirm the active backend directly:
 ```bash
 python manage.py shell -c "from django.db import connection; print(connection.vendor)"
 # postgresql
-```
-
-## Testing
-
-```bash
-pip install -r requirements-dev.txt   # once; adds pytest, pytest-django, pytest-cov
-pytest                                # run the whole suite
-pytest --cov                          # with coverage (config in .coveragerc)
-pytest --cov --cov-report=html        # browsable report in htmlcov/
-pytest tests/test_graphql.py -k ping  # a single file / test
-```
-
-Tests run against `config.settings.local` and the same `DATABASE_URL` as
-development. pytest-django creates a separate, disposable `test_<name>`
-database for the run and drops it afterwards, so no data in your
-development database is touched. The database role therefore needs
-`CREATEDB` (the role created in [Setup](#1-create-the-postgresql-database)
-has it). No test settings or credentials are committed.
-
-| Test file                   | Covers |
-| --------------------------- | ------ |
-| `tests/test_configuration.py` | Django loads and passes system checks |
-| `tests/test_health.py`      | `GET /health/` |
-| `tests/test_graphql.py`     | `/graphql/`: `apiStatus`, `ping`, GraphQL errors |
-| `tests/test_database.py`    | PostgreSQL-backed test database lifecycle |
-| `tests/test_cors.py`        | CORS allowed on `/graphql/` only |
-| `tests/test_settings.py`    | Production settings reject unsafe configuration |
-
-`production.py` is exercised in subprocesses (each case imports it with a
-different environment), so it shows 0% in the coverage report even though
-its validation rules are tested.
-
-## Code quality
-
-[Ruff](https://docs.astral.sh/ruff/) is the only Python linter, import sorter
-and formatter; it is configured in [`ruff.toml`](ruff.toml) and installed with
-`requirements-dev.txt`. Rules cover pyflakes (unused imports/variables),
-pycodestyle, isort, bugbear, pyupgrade, simplify, flake8-django, pytest style,
-bandit security checks, no stray `print`, and a McCabe complexity limit of 10.
-Migrations are excluded; code style is single quotes, 100 columns.
-
-```bash
-ruff check .              # lint (add --fix for safe auto-fixes)
-ruff format --check .     # formatting check (CI-friendly)
-ruff format .             # apply formatting
 ```
 
 ## Health check

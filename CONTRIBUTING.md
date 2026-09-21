@@ -34,72 +34,13 @@ S0-003 (frontend) are completed.
 
 ## Testing
 
-Tests must pass locally before a PR is opened and before it is merged.
-
-```bash
-# Backend (PostgreSQL must be running; see backend/README.md)
-cd backend && pip install -r requirements-dev.txt
-pytest                # add --cov for coverage
-
-# Frontend
-cd frontend
-npm run test:run      # non-interactive; `npm run test` watches
-npm run test:coverage
-```
-
-Where tests belong:
-
-| Kind | Location |
-| ---- | -------- |
-| Backend unit tests | `backend/tests/test_*.py` (pytest functions, no DB unless needed) |
-| Backend integration tests (database, HTTP) | `backend/tests/`, using the `db` / `client` fixtures |
-| GraphQL tests | `backend/tests/test_graphql.py`, through the real `/graphql/` endpoint |
-| Frontend component tests | beside the component: `Foo.test.tsx` |
-| Frontend utility / client tests | beside the module: `env.test.ts` |
-| End-to-end tests | not set up yet; reserved for a later sprint |
-
-Do not add models or fixtures only to have something to test. See
-[`backend/README.md`](backend/README.md#testing) and
-[`frontend/README.md`](frontend/README.md#testing) for details.
+Testing conventions will be documented once the testing foundation
+(Sprint 0, task S0-007) is in place.
 
 ## Linting & Formatting
 
-One tool per concern: **Ruff** for Python (lint, import sorting, format) and
-**Oxlint + oxfmt** for the frontend, plus the TypeScript compiler for type
-checking. Configuration lives in `backend/ruff.toml`,
-`frontend/.oxlintrc.json` and `frontend/.oxfmtrc.json`.
-
-```bash
-# Backend (from backend/, venv active)
-ruff check .              # lint (add --fix for safe auto-fixes)
-ruff format --check .     # formatting check
-ruff format .             # apply formatting
-
-# Frontend (from frontend/)
-npm run lint              # Oxlint; warnings fail the run
-npm run typecheck         # tsc -b
-npm run format:check      # formatting check
-npm run format            # apply formatting
-```
-
-Recommended workflow: while working, run the formatter and the fast linters
-(`ruff format . && ruff check --fix .`, `npm run format && npm run lint:fix`);
-before opening a PR, run every check below.
-
-**Required before merge:** all checks pass locally (and in CI once workflows
-exist) — lint, format check, type check, tests, and the frontend build:
-
-```bash
-# backend/
-ruff check . && ruff format --check . && python manage.py check && pytest
-# frontend/
-npm run lint && npm run typecheck && npm run format:check && npm run test:run && npm run build
-```
-
-Fix the code rather than disabling a rule. If a suppression is genuinely
-justified (`# noqa: <code>`, `// oxlint-disable-next-line <rule>`), scope it to
-one line and say why. There are no pre-commit hooks by design; these
-commands are the quality gate.
+Code quality tooling and commands will be documented once established
+(Sprint 0, task S0-008).
 
 ## Environment Variables
 

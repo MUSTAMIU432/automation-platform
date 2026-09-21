@@ -8,6 +8,7 @@ separate schema instances.
 """
 
 import django
+
 import strawberry
 
 
@@ -22,11 +23,7 @@ class ApiStatus:
 
 @strawberry.type
 class Query:
-    @strawberry.field(
-        description=(
-            'Infrastructure check: proves the GraphQL endpoint is reachable and resolving.'
-        )
-    )
+    @strawberry.field(description='Infrastructure check: proves the GraphQL endpoint is reachable and resolving.')
     def api_status(self) -> ApiStatus:
         return ApiStatus(
             status='ok',
@@ -37,9 +34,7 @@ class Query:
 
 @strawberry.type
 class Mutation:
-    @strawberry.mutation(
-        description=('Infrastructure check: echoes the input to prove the mutation root resolves.')
-    )
+    @strawberry.mutation(description='Infrastructure check: echoes the input to prove the mutation root resolves.')
     def ping(self, message: str) -> str:
         return message
 
