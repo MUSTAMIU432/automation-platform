@@ -34,8 +34,33 @@ S0-003 (frontend) are completed.
 
 ## Testing
 
-Testing conventions will be documented once the testing foundation
-(Sprint 0, task S0-007) is in place.
+Tests must pass locally before a PR is opened and before it is merged.
+
+```bash
+# Backend (PostgreSQL must be running; see backend/README.md)
+cd backend && pip install -r requirements-dev.txt
+pytest                # add --cov for coverage
+
+# Frontend
+cd frontend
+npm run test:run      # non-interactive; `npm run test` watches
+npm run test:coverage
+```
+
+Where tests belong:
+
+| Kind | Location |
+| ---- | -------- |
+| Backend unit tests | `backend/tests/test_*.py` (pytest functions, no DB unless needed) |
+| Backend integration tests (database, HTTP) | `backend/tests/`, using the `db` / `client` fixtures |
+| GraphQL tests | `backend/tests/test_graphql.py`, through the real `/graphql/` endpoint |
+| Frontend component tests | beside the component: `Foo.test.tsx` |
+| Frontend utility / client tests | beside the module: `env.test.ts` |
+| End-to-end tests | not set up yet; reserved for a later sprint |
+
+Do not add models or fixtures only to have something to test. See
+[`backend/README.md`](backend/README.md#testing) and
+[`frontend/README.md`](frontend/README.md#testing) for details.
 
 ## Linting & Formatting
 
