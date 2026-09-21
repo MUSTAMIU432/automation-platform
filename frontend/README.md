@@ -49,7 +49,20 @@ npx tsc -b --noEmit
 npm run lint    # oxlint
 ```
 
-No test runner is configured yet.
+## Testing
+
+Vitest + React Testing Library + jsdom, configured in `vite.config.ts`.
+
+```bash
+npm run test           # watch mode (development)
+npm run test:run       # single non-interactive run (CI, pre-PR)
+npm run test:coverage  # single run with V8 coverage; report in coverage/
+```
+
+Tests sit next to the code they cover (`Foo.tsx` → `Foo.test.tsx`).
+Shared helpers live in `src/test/`. Tests never call a real backend:
+`VITE_GRAPHQL_URL` is fixed in the Vitest config and network calls are
+stubbed, so results don't depend on `frontend/.env`.
 
 ## Environment configuration
 
