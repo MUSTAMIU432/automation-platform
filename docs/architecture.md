@@ -91,7 +91,8 @@ Not present yet.
 ### Environments (target)
 
 LOCAL, DEVELOPMENT, STAGING, PRODUCTION, each configured via environment
-variables rather than source-code branching.
+variables rather than source-code branching. See
+[`environments.md`](environments.md) for the convention.
 
 ## Current Implementation Status
 

@@ -17,3 +17,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   `base`/`local`/`production` via `django-environ`, SQLite placeholder
   database, and a dependency-free `/health/` endpoint. No business domain
   apps, authentication, PostgreSQL, or GraphQL yet.
+- S0-006: Environment configuration — `ENVIRONMENT` convention (local,
+  development, staging, production); required `DJANGO_SECRET_KEY` with no
+  default; environment-driven CORS (`django-cors-headers`, `/graphql/` only)
+  and CSRF trusted origins; fail-fast validation in
+  `config.settings.production`; per-app `.env.example` files
+  (`backend/`, `frontend/`); `docs/environments.md`.

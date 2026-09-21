@@ -6,8 +6,18 @@ running the project on a developer machine.
 """
 
 from .base import *  # noqa: F401,F403
+from .base import env
 
-DEBUG = True
+DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
 if not ALLOWED_HOSTS:  # noqa: F405
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+
+# The Vite dev server (frontend/) runs on :5173 and calls this API.
+_LOCAL_FRONTEND_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173']
+
+if not CORS_ALLOWED_ORIGINS:  # noqa: F405
+    CORS_ALLOWED_ORIGINS = _LOCAL_FRONTEND_ORIGINS
+
+if not CSRF_TRUSTED_ORIGINS:  # noqa: F405
+    CSRF_TRUSTED_ORIGINS = _LOCAL_FRONTEND_ORIGINS

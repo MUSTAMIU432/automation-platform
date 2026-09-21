@@ -58,7 +58,11 @@ put secrets (API keys, credentials, backend secret keys) here.
 
 | Variable            | Purpose                                      |
 | ------------------- | --------------------------------------------- |
-| `VITE_GRAPHQL_URL`  | URL of the Django GraphQL endpoint (not yet implemented on the backend) |
+| `VITE_GRAPHQL_URL`  | Public URL of the Django GraphQL endpoint (required) |
+
+Values are compiled into the bundle at build time. See
+[`/docs/environments.md`](../docs/environments.md) for the environment
+strategy.
 
 See `.env.example`. Access env vars through [`src/lib/env.ts`](src/lib/env.ts)
 rather than reading `import.meta.env` directly in components.

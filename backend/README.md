@@ -21,10 +21,11 @@ backend/
 ├── config/
 │   ├── settings/
 │   │   ├── base.py         # shared settings, reads from environment
-│   │   ├── local.py        # development defaults (DEBUG=True)
-│   │   └── production.py   # production overrides
+│   │   ├── local.py        # development defaults (DEBUG, Vite CORS/CSRF origins)
+│   │   └── production.py   # deployed envs: validates config, secure defaults
 │   ├── urls.py             # mounts /health/ and /graphql/
 │   ├── views.py            # health check
+│   ├── tests.py            # settings validation tests
 │   ├── wsgi.py
 │   └── asgi.py
 └── graphql_api/            # GraphQL infrastructure (not a business domain)
@@ -61,20 +62,23 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp ../.env.example .env   # edit DATABASE_URL and other values as needed
+cp .env.example .env   # set DJANGO_SECRET_KEY, DATABASE_URL and other values
 python manage.py migrate
 python manage.py runserver
 ```
 
-`DJANGO_SETTINGS_MODULE` defaults to `config.settings.local`. For
-production, set it to `config.settings.production` and provide
-`DJANGO_SECRET_KEY` and `DJANGO_ALLOWED_HOSTS` via the environment.
+`DJANGO_SETTINGS_MODULE` defaults to `config.settings.local`. Deployed
+environments (development, staging, production) set it to
+`config.settings.production`, which refuses to start on missing or unsafe
+configuration. See [`/docs/environments.md`](../docs/environments.md) for
+every variable and the environment conventions.
 
-`DATABASE_URL` (in `backend/.env`) is required and must point at the
-database created above, e.g.:
+`DJANGO_SECRET_KEY` and `DATABASE_URL` (in `backend/.env`) are required and
+have no defaults. `DATABASE_URL` must point at the database created above,
+e.g.:
 
 ```
-DATABASE_URL=postgres://automation_platform:change-me@localhost:5432/automation_platform_dev
+DATABASE_URL=postgres://automation_platform:<your-password>@localhost:5432/automation_platform_dev
 ```
 
 ### 3. Verify the connection

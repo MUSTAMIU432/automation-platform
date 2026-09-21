@@ -14,15 +14,30 @@ import environ
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env()
+# backend/.env is a local-development convenience. Variables already set in
+# the real environment (deploy platform, CI, secret manager) take precedence.
 environ.Env.read_env(BASE_DIR / '.env')
 
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env('DJANGO_SECRET_KEY', default='django-insecure-change-me-in-production')
+# Deployment environment label. This is informational (logging, docs, future
+# feature gating); security behavior is selected by DJANGO_SETTINGS_MODULE.
+# local.py serves `local`; production.py serves development/staging/production.
+ENVIRONMENT = env('ENVIRONMENT', default='local')
 
+# Required in every environment - there is deliberately no default, so a
+# missing secret fails at startup instead of falling back to a known value.
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = env('DJANGO_SECRET_KEY')
+
+# Safe by default; local.py opts in to debug behavior.
 DEBUG = env.bool('DJANGO_DEBUG', default=False)
 
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS', default=[])
+
+# Browser origins allowed to call the API cross-origin / submit CSRF-protected
+# requests. Empty by default; local.py supplies the Vite dev server origin.
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
 
 
 # Application definition
@@ -34,12 +49,15 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'corsheaders',
     'strawberry_django',
     'graphql_api',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    # Must sit above any middleware that can generate responses (CommonMiddleware).
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -71,9 +89,14 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# DATABASE_URL is required and has no fallback, so credentials only ever come
+# from the environment. Driver options such as TLS go in the URL query string,
+# e.g. ?sslmode=require.
 DATABASES = {
     'default': env.db('DATABASE_URL'),
 }
+DATABASES['default']['CONN_MAX_AGE'] = env.int('DATABASE_CONN_MAX_AGE', default=0)
+DATABASES['default']['CONN_HEALTH_CHECKS'] = DATABASES['default']['CONN_MAX_AGE'] > 0
 
 
 # Password validation
@@ -111,6 +134,13 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+
+# CORS
+# Only the GraphQL API is meant to be called from the browser app. The
+# allowed origins themselves come from CORS_ALLOWED_ORIGINS (never a wildcard).
+
+CORS_URLS_REGEX = r'^/graphql/'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
