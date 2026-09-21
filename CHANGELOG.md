@@ -34,3 +34,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   formatter and `typecheck`/`format`/`format:check`/`lint:fix` scripts;
   existing code made compliant. No pre-commit hooks: local checks (and CI,
   once workflows exist) are the quality gate.
+- S0-009: GitHub Actions CI foundation — `.github/workflows/ci.yml` runs
+  backend (Ruff, Django checks, migration check, pytest with coverage against
+  a PostgreSQL service) and frontend (Oxlint, oxfmt, `tsc`, Vitest, production
+  build) jobs on pull requests to and pushes to `develop`/`main`. Read-only
+  permissions, no secrets, no deployment.
