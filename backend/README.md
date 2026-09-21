@@ -125,6 +125,7 @@ has it). No test settings or credentials are committed.
 | `tests/test_database.py`    | PostgreSQL-backed test database lifecycle |
 | `tests/test_cors.py`        | CORS allowed on `/graphql/` only |
 | `tests/test_settings.py`    | Production settings reject unsafe configuration |
+| `tests/test_security.py`    | Security invariants: HTTPS, HSTS, cookies, headers, CORS, local/CI vs. production |
 
 `production.py` is exercised in subprocesses (each case imports it with a
 different environment), so it shows 0% in the coverage report even though
