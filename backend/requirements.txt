@@ -13,3 +13,11 @@ django-cors-headers==4.9.0
 # server-side storage) is deliberately hand-rolled in identity/models.py
 # and identity/authentication.py instead of trusted to a token library.
 PyJWT==2.15.0
+# Google ID token (OIDC) verification for "Sign in with Google"
+# (identity/google_oauth.py). Google's own client library, not a generic
+# JWT check: it fetches and caches Google's current signing keys, and
+# `verify_oauth2_token` validates signature, issuer and audience together
+# rather than each being hand-implemented (and hand-verified) here. The
+# [requests] extra provides the HTTP transport the verifier uses to fetch
+# those keys - no other feature of the package is used.
+google-auth[requests]==2.58.0

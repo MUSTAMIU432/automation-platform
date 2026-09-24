@@ -3,15 +3,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
 import { AuthProvider, useAuth } from './AuthContext'
-import { loginRequest, logoutRequest, refreshTokenRequest } from './authApi'
+import { googleLoginRequest, loginRequest, logoutRequest, refreshTokenRequest } from './authApi'
 
 vi.mock('./authApi', () => ({
   loginRequest: vi.fn(),
+  googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
 }))
 
 const mockedLogin = vi.mocked(loginRequest)
+const mockedGoogleLogin = vi.mocked(googleLoginRequest)
 const mockedLogout = vi.mocked(logoutRequest)
 const mockedRefresh = vi.mocked(refreshTokenRequest)
 
@@ -26,12 +28,13 @@ const USER = {
 }
 
 function TestConsumer() {
-  const { status, user, login, logout } = useAuth()
+  const { status, user, login, loginWithGoogle, logout } = useAuth()
   return (
     <div>
       <p data-testid="status">{status}</p>
       <p data-testid="email">{user?.email ?? 'none'}</p>
       <button onClick={() => login('ada@example.com', 'a-strong-unique-pass-1')}>Login</button>
+      <button onClick={() => loginWithGoogle('a-google-credential')}>Google Login</button>
       <button onClick={() => logout()}>Logout</button>
     </div>
   )
@@ -160,6 +163,79 @@ describe('AuthContext', () => {
 
     await act(async () => {
       screen.getByRole('button', { name: 'Login' }).click()
+    })
+
+    expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated')
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('google login success updates status, user, and the shared access token', async () => {
+    mockedGoogleLogin.mockResolvedValue({
+      success: true,
+      message: 'Signed in successfully.',
+      session: { accessToken: 'google-token', accessTokenExpiresAt: '2099-01-01', user: USER },
+    })
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Google Login' }).click()
+    })
+
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(screen.getByTestId('email')).toHaveTextContent('ada@example.com')
+    expect(getAccessToken()).toBe('google-token')
+    expect(mockedGoogleLogin).toHaveBeenCalledWith('a-google-credential')
+  })
+
+  it('google login never writes the access token (or anything else) to localStorage', async () => {
+    mockedGoogleLogin.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      session: { accessToken: 'google-token', accessTokenExpiresAt: '2099-01-01', user: USER },
+    })
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Google Login' }).click()
+    })
+
+    expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+    expect(setItemSpy).not.toHaveBeenCalled()
+    expect(localStorage.length).toBe(0)
+    expect(sessionStorage.length).toBe(0)
+
+    setItemSpy.mockRestore()
+  })
+
+  it('google login failure leaves the user unauthenticated and clears the token', async () => {
+    mockedGoogleLogin.mockResolvedValue({
+      success: false,
+      message: 'Could not sign in with Google.',
+      session: null,
+    })
+
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Google Login' }).click()
     })
 
     expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated')

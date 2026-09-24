@@ -81,6 +81,20 @@ JWT_SIGNING_KEY = env('DJANGO_JWT_SIGNING_KEY')
 ACCESS_TOKEN_LIFETIME = timedelta(minutes=env.int('ACCESS_TOKEN_LIFETIME_MINUTES', default=15))
 REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', default=30))
 
+# Google OAuth/OIDC ("Sign in with Google", S1-004). Optional: unset, the
+# `googleLogin` mutation always fails closed rather than accepting tokens
+# for an unknown audience (see identity/google_oauth.py) - deployments that
+# don't need Google sign-in yet, or local dev without a Google Cloud
+# project, need not set this. Not secret: a Google OAuth client ID is
+# embedded in the frontend bundle by design (it identifies the app, not a
+# credential), so it's also read directly by the frontend as
+# VITE_GOOGLE_OAUTH_CLIENT_ID. There is deliberately no
+# GOOGLE_OAUTH_CLIENT_SECRET: the ID-token flow used here verifies a
+# Google-signed credential against Google's public keys and never
+# exchanges an authorization code, so the backend has no use for a client
+# secret at all (see identity/google_oauth.py's module docstring).
+GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # Must sit above any middleware that can generate responses (CommonMiddleware).

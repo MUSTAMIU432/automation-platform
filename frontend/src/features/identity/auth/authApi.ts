@@ -80,6 +80,18 @@ const LOGOUT_MUTATION = `
   }
 `
 
+const GOOGLE_LOGIN_MUTATION = `
+  mutation GoogleLogin($input: GoogleLoginInput!) {
+    googleLogin(input: $input) {
+      success
+      message
+      accessToken
+      accessTokenExpiresAt
+      user { ${USER_FIELDS} }
+    }
+  }
+`
+
 function toAuthResult(payload: RawAuthPayload): AuthResult {
   if (payload.success && payload.accessToken && payload.accessTokenExpiresAt && payload.user) {
     return {
@@ -115,4 +127,18 @@ export async function refreshTokenRequest(): Promise<AuthResult> {
 
 export async function logoutRequest(): Promise<void> {
   await graphqlClient.request<{ logout: { success: boolean } }>(LOGOUT_MUTATION)
+}
+
+/**
+ * Exchanges a Google ID token (from Google Identity Services, obtained by
+ * `useGoogleSignIn`) for a platform session. The credential is opaque to
+ * this module and to the backend's caller - only `identity.google_oauth`
+ * verifies it; nothing here trusts anything about the signed-in Google
+ * account beyond what that verification returns.
+ */
+export async function googleLoginRequest(credential: string): Promise<AuthResult> {
+  const data = await graphqlClient.request<{ googleLogin: RawAuthPayload }>(GOOGLE_LOGIN_MUTATION, {
+    input: { credential },
+  })
+  return toAuthResult(data.googleLogin)
 }

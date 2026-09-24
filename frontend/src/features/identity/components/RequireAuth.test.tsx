@@ -8,6 +8,7 @@ import { RequireAuth } from './RequireAuth'
 
 vi.mock('../auth/authApi', () => ({
   loginRequest: vi.fn(),
+  googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
 }))

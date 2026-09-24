@@ -4,10 +4,12 @@ React + TypeScript + Vite web application.
 
 **Status:** Sprint 0 (S0-003) delivered the infrastructure foundation.
 Sprint 1 has added the Identity feature: the `/auth` sign in/up/forgot-
-password UI (S1-002) and real email/password authentication - login, an
+password UI (S1-002), real email/password authentication - login, an
 in-memory access token, and session persistence via the backend's refresh
-cookie (S1-003). See [`/docs/architecture.md`](../docs/architecture.md) for
-the target frontend architecture.
+cookie (S1-003) - and Google/OAuth sign-in via Google Identity Services,
+wired into the same `AuthContext`/session mechanics (S1-004). See
+[`/docs/architecture.md`](../docs/architecture.md) for the target frontend
+architecture.
 
 ## Stack
 
@@ -85,6 +87,7 @@ put secrets (API keys, credentials, backend secret keys) here.
 | Variable            | Purpose                                      |
 | ------------------- | --------------------------------------------- |
 | `VITE_GRAPHQL_URL`  | Public URL of the Django GraphQL endpoint (required) |
+| `VITE_GOOGLE_OAUTH_CLIENT_ID` | Google OAuth client id for "Sign in with Google" (optional - the button is disabled, not broken, when unset) |
 
 Values are compiled into the bundle at build time. See
 [`/docs/environments.md`](../docs/environments.md) for the environment
@@ -125,17 +128,33 @@ cross-origin requests) and a `headers` function that reads the current
 access token from [`src/graphql/tokenStore.ts`](src/graphql/tokenStore.ts)
 and attaches `Authorization: Bearer <token>` when one is set.
 
-### Authentication (Sprint 1, S1-003)
+### Authentication (Sprint 1, S1-003/S1-004)
 
 [`src/features/identity/auth/`](src/features/identity/auth) owns all
 authentication state:
 
-- `authApi.ts` — the `login`/`refreshToken`/`logout` GraphQL operations.
+- `authApi.ts` — the `login`/`googleLogin`/`refreshToken`/`logout` GraphQL
+  operations.
 - `AuthContext.tsx` — `AuthProvider` (wraps the router in `App.tsx`) and the
   `useAuth()` hook, exposing `status` (`'loading' | 'authenticated' |
-  'unauthenticated'`), `user`, `login()` and `logout()`. On mount, it
-  silently calls `refreshToken` once to re-establish a session from the
-  backend's cookie (see below) before deciding the status.
+  'unauthenticated'`), `user`, `login()`, `loginWithGoogle()` and
+  `logout()`. On mount, it silently calls `refreshToken` once to
+  re-establish a session from the backend's cookie (see below) before
+  deciding the status. `loginWithGoogle()` and `login()` both funnel into
+  the same `applySession()` - a successful Google sign-in is
+  indistinguishable, from `AuthContext`'s point of view, from a password
+  login.
+- `useGoogleSignIn.ts` — wires the existing, custom-styled
+  `GoogleAuthButton` to Google Identity Services (GIS), loaded dynamically
+  from `accounts.google.com` (never bundled). GIS only issues a credential
+  from a real click on a button *it* rendered, so this renders GIS's own
+  button into a visually hidden container and forwards a click on
+  `GoogleAuthButton` to it - Google's own documented pattern for a
+  custom-styled trigger. Returns `isConfigured` (false, and the button
+  stays inertly disabled, when `VITE_GOOGLE_OAUTH_CLIENT_ID` is unset) and
+  `trigger()`. Used from both `SignInForm` and `SignUpForm` - Google
+  sign-in doesn't distinguish signing up from signing in, so both call the
+  same `loginWithGoogle()`.
 
 **Token storage, deliberately:** the short-lived access token lives only in
 `graphql/tokenStore.ts` - a plain in-memory module variable, never
@@ -180,7 +199,11 @@ Future business domains each get their own route module under
 
 Real product features (organizations, ideas, reviews, projects,
 notifications, ...) don't exist yet - only Identity's sign-in/registration
-UI and authentication. Within Identity itself, Google/OAuth sign-in and the
-forgot-password/reset-password *backend* are not implemented (the UI is
-ready for them); `GoogleAuthButton` and the reset-password form are visual
-placeholders. Those land in later Identity tasks.
+UI and authentication. Within Identity itself, the forgot-password/
+reset-password *backend* is not implemented (the UI is ready for it); the
+reset-password form is a visual placeholder. Those land in later Identity
+tasks. `GoogleAuthButton` is no longer a placeholder (S1-004) - see
+Authentication above - but there is no authenticated "link this Google
+account to my existing session" flow; linking an existing password account
+happens automatically, by verified email, only during a Google sign-in
+attempt.

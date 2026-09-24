@@ -109,6 +109,18 @@ class LoginInput:
     password: str
 
 
+@strawberry.input(
+    description=(
+        "A Google-issued ID token (JWT) from Google Identity Services' Sign "
+        'In With Google flow, to be verified server-side. Never a client-'
+        'supplied email, name, or Google user id - those are only trusted '
+        'once extracted from this verified credential.'
+    )
+)
+class GoogleLoginInput:
+    credential: str
+
+
 @strawberry.type(
     description=(
         'Result of an authentication attempt (login or refresh). On success, '
@@ -194,6 +206,32 @@ class Mutation:
     def login(self, info: strawberry.Info, input: LoginInput) -> AuthPayload:
         try:
             session = auth_service.login(input.email, input.password)
+        except AuthenticationError as exc:
+            return AuthPayload(success=False, message=str(exc))
+
+        _set_refresh_cookie(
+            info.context.response, session.refresh_token, session.refresh_token_expires_at
+        )
+        return AuthPayload(
+            success=True,
+            message='Signed in successfully.',
+            access_token=session.access_token,
+            access_token_expires_at=session.access_token_expires_at.isoformat(),
+            user=UserType.from_model(session.user),
+        )
+
+    @strawberry.mutation(
+        description=(
+            'Sign in (or provision a new account) using a verified Google '
+            "identity. Accepts the ID token issued by Google Identity Services'"
+            ' Sign In With Google flow, verifies it server-side, and on '
+            'success behaves exactly like `login`: sets the HttpOnly '
+            'refresh-session cookie and returns a short-lived access token.'
+        )
+    )
+    def google_login(self, info: strawberry.Info, input: GoogleLoginInput) -> AuthPayload:
+        try:
+            session = auth_service.authenticate_with_google(input.credential)
         except AuthenticationError as exc:
             return AuthPayload(success=False, message=str(exc))
 

@@ -102,7 +102,15 @@ class User(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(max_length=150)
     # String, not an integer field: phone numbers are not numbers you'd do
     # arithmetic on, and a leading '+' / leading zeros must survive storage.
-    phone_number = models.CharField(max_length=20, validators=[validate_phone_number])
+    # `blank=True` at the model level: this field is still required by
+    # registration (identity/services.py checks it explicitly, before this
+    # is ever reached), but a Google-provisioned account (S1-004) has no
+    # phone number available from Google's identity claims and must not
+    # invent one - see identity/authentication.py's `_provision_google_user`.
+    # `blank=True` only tells Django's own full_clean()/forms that an empty
+    # value is acceptable at the schema level; it does not weaken the
+    # `validate_phone_number` validator for any value that IS supplied.
+    phone_number = models.CharField(max_length=20, blank=True, validators=[validate_phone_number])
 
     is_active = models.BooleanField(
         default=True,

@@ -112,12 +112,88 @@ scoped to an explicit, non-wildcard origin allow-list. See
 `backend/identity/` (`models.py`, `services.py`, `authentication.py`,
 `tokens.py`, `schema.py`) for the implementation.
 
-Not yet implemented: Google/OAuth sign-in (only the provider-agnostic
-`ExternalIdentity` table exists so far), email verification (the `User.
-is_verified` flag exists and defaults to `False`, but nothing sets it yet -
-current policy lets an unverified user log in), the forgot-password and
-reset-password *backend* (the frontend UI exists; no mutation backs it
-yet), rate limiting, and audit logging. See [`SECURITY.md`](../SECURITY.md).
+Implemented (S1-004): Google/OAuth sign-in via Google Identity Services'
+ID-token (OIDC) flow, not the classic authorization-code exchange - the
+backend never needs a client secret, since a Google-signed credential is
+verified directly against Google's public keys
+(`backend/identity/google_oauth.py`) rather than exchanged for one. The
+existing `ExternalIdentity(provider='google', provider_subject=<sub>)`
+table backs it, unmodified; a successful Google sign-in produces the exact
+same JWT access token + `RefreshSession` as email/password login
+(`identity/authentication.py`'s `authenticate_with_google`).
+
+Account-linking policy (revised after a dedicated security review; this is
+the load-bearing decision in S1-004, not a footnote): the **only** thing
+that ever authenticates into an *existing* account is an exact
+`(provider='google', provider_subject=<sub>)` match. A first-time Google
+identity with no matching `ExternalIdentity` and no existing `User` for its
+email provisions a brand-new account (`phone_number` is left blank -
+Google never provides one, see below - and `is_verified` is set from
+Google's own `email_verified` claim). A first-time Google identity whose
+email matches *any* existing account - a password-registered one, or one
+created earlier by a *different* Google identity - is refused, with the
+same generic message as an invalid credential, **regardless of
+`email_verified`**. Google/OAuth sign-in never auto-links by email.
+
+An earlier version of this design *did* auto-link when `email_verified`
+was true, reasoning it was equivalent to a password-reset-by-email flow's
+trust level. A dedicated review rejected that: `email_verified=true` only
+proves Google confirmed mailbox control *at some point in the past* - not
+that today's Google sign-in is the same person who registered the platform
+account, particularly once an email address can be reassigned outside this
+platform's control (e.g. a company reissuing a departed employee's address
+to someone new, who gets a fresh Google identity with `email_verified=true`
+for it). Auto-linking would have silently and permanently handed that new
+mailbox holder the *old* account - with no consent, no notification to the
+original owner, and no audit trail - and would have done so as this
+platform's first email-provenance-based path into an existing account,
+since no password-reset-by-email flow exists yet to compare the risk
+against. (The earlier reasoning also cited Firebase Authentication's
+default behavior as precedent; that citation was wrong - Firebase's actual
+default for a colliding email is to reject the sign-in and require the
+existing method first, which is this same refuse-first policy.) An
+authenticated "link this Google account to my current session" flow,
+initiated by an already-logged-in user, is the intended way to add Google
+sign-in to an existing password account, and remains out of scope for
+S1-004. See `identity/authentication.py`'s `authenticate_with_google` and
+`_resolve_google_user` docstrings for the full reasoning and for how a
+provisioning race is prevented from re-opening this via a timing window
+(a collision is never resolved by trusting "whichever account has this
+email now" - it re-checks from scratch).
+
+Replay protection: Google ID tokens are also rejected on a second use,
+even if the token itself is still within its lifetime and would otherwise
+still verify (`identity/google_oauth.py`'s `_reject_if_already_used`, keyed
+by the token's SHA-256 hash via Django's cache framework, TTL matching the
+token's own remaining lifetime). This is deliberately a one-time-use check
+rather than a transmitted OIDC `nonce`: GIS's button flow delivers the
+credential directly via a JS callback rather than a browser redirect, so
+the leak vector a nonce exists to close (a captured authorization redirect
+replayed into a different browser session) mostly doesn't apply, and there
+is no pre-existing client-side session to have stored an expected nonce
+value in. See that module's docstring for the full reasoning, and its
+explicit caveat: the default per-process cache backend makes this complete
+for a single-process deployment only - a real multi-process/multi-instance
+deployment needs a shared cache (Redis/Memcached, not yet configured
+anywhere in this project) for the protection to hold across every worker.
+
+A new field-level decision: `User.phone_number` is `blank=True` at the
+model level (`identity/migrations/0003_allow_blank_phone_number.py`) so a
+Google-provisioned account can be created without one; registration's own
+validation (`identity/services.py`) still requires a real phone number for
+that path, unaffected. Collecting a phone number for a Google-provisioned
+account is deferred to a future "complete your profile" step, not built in
+S1-004.
+
+Not yet implemented: email verification (the `User.is_verified` flag
+exists and is now set for Google sign-ins, but registration still leaves
+it `False` and current policy lets an unverified user log in either way),
+the forgot-password and reset-password *backend* (the frontend UI exists;
+no mutation backs it yet), an authenticated "link this Google account to my
+existing session" flow (today's Google sign-in only ever authenticates or
+provisions - it never links to an existing account), a shared cache backend
+for Google ID token replay protection across multiple processes/instances,
+rate limiting, and audit logging. See [`SECURITY.md`](../SECURITY.md).
 
 ### Multi-Tenancy (target — not yet implemented)
 
@@ -135,8 +211,9 @@ infrastructure. See [`environments.md`](environments.md).
 ## Current Implementation Status
 
 Sprint 0 established the engineering foundation. Sprint 1 (Identity) is
-under way: user registration (S1-002) and email/password login (S1-003) are
-implemented; the rest of Identity and every other business domain are not.
+under way: user registration (S1-002), email/password login (S1-003) and
+Google/OAuth sign-in (S1-004) are implemented; the rest of Identity and
+every other business domain are not.
 
 ### Implemented (Sprint 1, in progress)
 
@@ -146,6 +223,7 @@ implemented; the rest of Identity and every other business domain are not.
 | Registration | `register` GraphQL mutation, email normalization, password/phone validation | S1-002 |
 | Authentication | `login`/`refreshToken`/`logout` mutations, JWT access tokens, rotating `RefreshSession` refresh credential in an HttpOnly cookie, `me` query | S1-003 |
 | Frontend auth state | `AuthProvider`/`useAuth()`, in-memory access token, `/app` protected route | S1-003 |
+| Google/OAuth sign-in | `googleLogin` GraphQL mutation, Google ID-token (OIDC) verification, account provisioning/linking policy, `GoogleAuthButton` wired to Google Identity Services | S1-004 |
 
 ### Implemented (Sprint 0)
 
@@ -171,9 +249,11 @@ How these are used day to day: [`development.md`](development.md),
 - Business domain apps other than `identity`: organizations, ideas, reviews,
   opportunities, proposals, developers, projects, tasks, notifications,
   impact, files, audit
-- Google/OAuth sign-in, email verification, and the forgot-password/
-  reset-password backend (frontend UI for these exists; see
-  [Security](#security-target--partly-implemented) above)
+- Email verification and the forgot-password/reset-password backend
+  (frontend UI for these exists; see
+  [Security](#security-target--partly-implemented) above); an
+  authenticated Google-account-linking flow (today's linking is automatic,
+  by verified email, not user-initiated)
 - Authorization (roles/permissions) and multi-tenancy (organizations,
   departments, memberships)
 - Redis + Celery background processing

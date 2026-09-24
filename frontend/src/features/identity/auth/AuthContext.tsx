@@ -9,7 +9,13 @@ import {
 } from 'react'
 
 import { setAccessToken } from '../../../graphql/tokenStore'
-import { loginRequest, logoutRequest, refreshTokenRequest, type AuthUser } from './authApi'
+import {
+  googleLoginRequest,
+  loginRequest,
+  logoutRequest,
+  refreshTokenRequest,
+  type AuthUser,
+} from './authApi'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -22,6 +28,7 @@ interface AuthContextValue {
   status: AuthStatus
   user: AuthUser | null
   login: (email: string, password: string) => Promise<LoginOutcome>
+  loginWithGoogle: (credential: string) => Promise<LoginOutcome>
   logout: () => Promise<void>
 }
 
@@ -87,6 +94,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [applySession],
   )
 
+  const loginWithGoogle = useCallback(
+    async (credential: string): Promise<LoginOutcome> => {
+      const result = await googleLoginRequest(credential)
+      applySession(result.success && result.session ? result.session : null)
+      return { success: result.success, message: result.message }
+    },
+    [applySession],
+  )
+
   const logout = useCallback(async () => {
     // Local state is cleared even if the network call fails - the user
     // asked to log out, and the access token being dropped from memory
@@ -111,7 +127,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // oxlint-disable-next-line react/memo-dependencies
   }, [applySession])
 
-  const value = useMemo(() => ({ status, user, login, logout }), [status, user, login, logout])
+  const value = useMemo(
+    () => ({ status, user, login, loginWithGoogle, logout }),
+    [status, user, login, loginWithGoogle, logout],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

@@ -1,9 +1,11 @@
 import json
+from unittest.mock import patch
 
 import pytest
 from django.test import Client
 
-from identity.models import RefreshSession, User
+from identity.google_oauth import GoogleIdentity, GoogleTokenError
+from identity.models import ExternalIdentity, RefreshSession, User
 
 REGISTER_MUTATION = """
 mutation Register($input: RegisterInput!) {
@@ -37,6 +39,18 @@ mutation Refresh {
 LOGOUT_MUTATION = """
 mutation Logout {
   logout { success }
+}
+"""
+
+GOOGLE_LOGIN_MUTATION = """
+mutation GoogleLogin($input: GoogleLoginInput!) {
+  googleLogin(input: $input) {
+    success
+    message
+    accessToken
+    accessTokenExpiresAt
+    user { id email isVerified }
+  }
 }
 """
 
@@ -298,3 +312,245 @@ def test_refresh_session_row_reflects_revocation_after_logout(gql):
     gql(LOGOUT_MUTATION)
 
     assert RefreshSession.objects.filter(revoked_at__isnull=True).count() == 0
+
+
+# --- googleLogin ---------------------------------------------------------------------
+
+
+def _patched_google_identity(identity=None, error=None):
+    target = 'identity.authentication.verify_google_id_token'
+    if error is not None:
+        return patch(target, side_effect=error)
+    return patch(target, return_value=identity)
+
+
+def _google_login(gql, credential='a-credential'):
+    return gql(GOOGLE_LOGIN_MUTATION, {'input': {'credential': credential}})
+
+
+@pytest.mark.django_db
+def test_google_login_succeeds_for_a_new_user(gql):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+
+    body = response.json()
+    assert 'errors' not in body
+    payload = body['data']['googleLogin']
+    assert payload['success'] is True
+    assert payload['accessToken']
+    assert payload['accessTokenExpiresAt']
+    assert payload['user']['email'] == 'grace@example.com'
+    assert payload['user']['isVerified'] is True
+    assert User.objects.filter(email='grace@example.com').count() == 1
+    assert ExternalIdentity.objects.filter(provider='google').count() == 1
+
+
+@pytest.mark.django_db
+def test_google_login_sets_an_httponly_refresh_cookie(gql, client):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        _google_login(gql)
+
+    cookie = client.cookies.get('refresh_token')
+    assert cookie is not None
+    assert cookie.value
+    assert cookie['httponly'] is True
+    assert cookie['samesite'] == 'Lax'
+
+
+@pytest.mark.django_db
+def test_google_login_response_never_exposes_password_or_hash(gql):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+
+    raw_body = response.content.decode()
+    assert 'password' not in response.json()['data']['googleLogin']
+    user = User.objects.get(email='grace@example.com')
+    assert user.password not in raw_body
+
+
+@pytest.mark.django_db
+def test_google_login_returning_user_authenticates_the_same_account(gql):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        first_response = _google_login(gql)
+    with _patched_google_identity(identity=identity):
+        second_response = _google_login(gql)
+
+    first_id = first_response.json()['data']['googleLogin']['user']['id']
+    second_id = second_response.json()['data']['googleLogin']['user']['id']
+    assert first_id == second_id
+    assert User.objects.filter(email='grace@example.com').count() == 1
+
+
+@pytest.mark.django_db
+def test_google_login_never_auto_links_an_existing_password_account_even_when_verified(gql):
+    # Revised policy (post-review): a verified matching email is not
+    # enough to auto-link - see the security note in
+    # identity/authentication.py's authenticate_with_google docstring.
+    _register(gql, email='grace@example.com')
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+
+    payload = response.json()['data']['googleLogin']
+    assert payload['success'] is False
+    assert payload['user'] is None
+    assert User.objects.filter(email='grace@example.com').count() == 1
+    assert ExternalIdentity.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_google_login_does_not_link_an_unverified_matching_email(gql):
+    _register(gql, email='grace@example.com')
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=False,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+
+    payload = response.json()['data']['googleLogin']
+    assert payload['success'] is False
+    assert payload['user'] is None
+    assert ExternalIdentity.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_google_login_fails_generically_for_an_invalid_credential(gql):
+    with _patched_google_identity(error=GoogleTokenError('bad token')):
+        response = _google_login(gql, credential='not-a-real-token')
+
+    payload = response.json()['data']['googleLogin']
+    assert payload['success'] is False
+    assert payload['accessToken'] is None
+    assert payload['user'] is None
+    # Generic - never a hint about the underlying provider failure.
+    assert payload['message'] == 'Could not sign in with Google.'
+
+
+@pytest.mark.django_db
+def test_google_login_error_message_matches_regardless_of_failure_cause(gql):
+    _register(gql, email='grace@example.com')
+    unverified_identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=False,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=unverified_identity):
+        unverified_response = _google_login(gql)
+    with _patched_google_identity(error=GoogleTokenError('bad token')):
+        invalid_response = _google_login(gql, credential='garbage')
+
+    assert (
+        unverified_response.json()['data']['googleLogin']['message']
+        == invalid_response.json()['data']['googleLogin']['message']
+    )
+
+
+@pytest.mark.django_db
+def test_google_login_for_an_inactive_unlinked_password_account_is_refused(gql):
+    # Refused via the account-linking policy itself here (case 3: an
+    # existing, unlinked account with this email), not the is_active check
+    # specifically - see test_inactive_returning_google_user_cannot_
+    # authenticate in test_authentication.py for the is_active check
+    # against a genuinely *linked* Google user.
+    _register(gql, email='grace@example.com')
+    User.objects.filter(email='grace@example.com').update(is_active=False)
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+
+    assert response.json()['data']['googleLogin']['success'] is False
+
+
+@pytest.mark.django_db
+def test_google_login_provisions_a_user_with_no_phone_number(gql):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        _google_login(gql)
+
+    user = User.objects.get(email='grace@example.com')
+    assert user.phone_number == ''
+
+
+@pytest.mark.django_db
+def test_google_login_provisioned_user_can_be_resolved_via_me(gql, client):
+    identity = GoogleIdentity(
+        subject='google-subject-1',
+        email='grace@example.com',
+        email_verified=True,
+        first_name='Grace',
+        last_name='Hopper',
+    )
+
+    with _patched_google_identity(identity=identity):
+        response = _google_login(gql)
+    access_token = response.json()['data']['googleLogin']['accessToken']
+
+    me_response = client.post(
+        '/graphql/',
+        data=json.dumps({'query': ME_QUERY}),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {access_token}',
+    )
+
+    assert me_response.json()['data']['me']['email'] == 'grace@example.com'

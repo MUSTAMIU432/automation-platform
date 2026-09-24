@@ -101,6 +101,7 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `DJANGO_SECURE_HSTS_SECONDS` |        | no (`31536000` production, `3600` development/staging) | HSTS max-age in seconds; `0` disables (deployed only) |
 | `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` | | no (`False`)   | Extend HSTS to every subdomain (deployed only) |
 | `DJANGO_SECURE_HSTS_PRELOAD` |        | no (`False`)      | Add the HSTS `preload` directive (deployed only). Requires includeSubDomains and a max-age of at least 31536000 |
+| `GOOGLE_OAUTH_CLIENT_ID`     |        | no                | Google OAuth client id for "Sign in with Google" (Sprint 1, S1-004). The `googleLogin` mutation always fails closed if unset - see `backend/identity/google_oauth.py`. Not secret; must match the frontend's `VITE_GOOGLE_OAUTH_CLIENT_ID` |
 
 Notes:
 
@@ -125,9 +126,23 @@ Template: [`frontend/.env.example`](../frontend/.env.example).
 | Variable           | Secret | Required | Purpose |
 | ------------------ | :----: | -------- | ------- |
 | `VITE_GRAPHQL_URL` | no     | yes      | Public URL of the backend GraphQL endpoint |
+| `VITE_GOOGLE_OAUTH_CLIENT_ID` | no | no | Google OAuth client id for "Sign in with Google" (Sprint 1, S1-004). Must match the backend's `GOOGLE_OAUTH_CLIENT_ID`. Leaving it unset disables the Google button rather than breaking the build |
 
 Vite is configured at **build time**: the value is compiled into the
 bundle, so each environment needs its own build (or build-time variable).
+
+### Why there is no Google OAuth client secret
+
+Google OAuth normally involves a client secret for the authorization-code
+flow (exchanging a code for tokens server-side). This project uses Google
+Identity Services' ID-token flow instead ("Sign in with Google"): the
+browser gets a Google-*signed* credential directly from Google, and the
+backend verifies it against Google's public keys
+(`backend/identity/google_oauth.py`) - there is no code-exchange step, so
+no secret is ever needed on either side. `GOOGLE_OAUTH_CLIENT_ID` (and its
+frontend twin) is not secret either: a Google OAuth client id identifies
+the application, not a credential, and Google's own client libraries send
+it from the browser as a matter of course.
 
 ## Backend secrets vs. frontend public configuration
 

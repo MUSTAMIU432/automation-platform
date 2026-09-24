@@ -1,24 +1,49 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderWithProviders } from '../../../test/renderWithRouter'
-import { loginRequest, refreshTokenRequest } from '../auth/authApi'
+import { googleLoginRequest, loginRequest, refreshTokenRequest } from '../auth/authApi'
+import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { SignInForm } from './SignInForm'
 
 vi.mock('../auth/authApi', () => ({
   loginRequest: vi.fn(),
+  googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
 }))
 
+// SignInForm's own responsibility ends at wiring GoogleAuthButton to
+// useGoogleSignIn and reacting to the credential it produces - the GIS
+// script/DOM integration itself is covered by useGoogleSignIn.test.tsx.
+vi.mock('../auth/useGoogleSignIn', () => ({
+  useGoogleSignIn: vi.fn(),
+}))
+
 const mockedLogin = vi.mocked(loginRequest)
+const mockedGoogleLogin = vi.mocked(googleLoginRequest)
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedUseGoogleSignIn = vi.mocked(useGoogleSignIn)
+
+/** Captures the `onCredential` callback SignInForm passes to the hook, so
+ * a test can simulate Google Identity Services returning a credential. */
+function stubGoogleSignIn({ isConfigured = true } = {}) {
+  let capturedOnCredential: (credential: string) => void = () => {}
+  mockedUseGoogleSignIn.mockImplementation((onCredential) => {
+    capturedOnCredential = onCredential
+    return { hiddenButtonContainerId: 'google-button-container', trigger: vi.fn(), isConfigured }
+  })
+  return {
+    emitCredential: (credential: string) => act(() => capturedOnCredential(credential)),
+  }
+}
 
 describe('SignInForm', () => {
   beforeEach(() => {
     // No pre-existing session: every test starts from the sign-in form,
     // not redirected/pre-authenticated by the mount-time silent refresh.
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    stubGoogleSignIn()
   })
 
   it('shows required-field errors when submitted empty', async () => {
@@ -130,5 +155,61 @@ describe('SignInForm', () => {
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'trying-again-1' } })
 
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('the Google button is disabled when Google sign-in is not configured', async () => {
+    stubGoogleSignIn({ isConfigured: false })
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeDisabled()
+  })
+
+  it('navigates to /app on a successful Google credential', async () => {
+    const { emitCredential } = stubGoogleSignIn()
+    mockedGoogleLogin.mockResolvedValue({
+      success: true,
+      message: 'Signed in successfully.',
+      session: {
+        accessToken: 'google-token',
+        accessTokenExpiresAt: '2099-01-01',
+        user: {
+          id: '1',
+          email: 'ada@example.com',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          phoneNumber: '',
+          isActive: true,
+          isVerified: true,
+        },
+      },
+    })
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    await emitCredential('a-google-id-token')
+
+    expect(mockedGoogleLogin).toHaveBeenCalledWith('a-google-id-token')
+    // The success path never sets the form-level error, unlike failure.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows the generic auth error message when Google sign-in fails, without navigating', async () => {
+    const { emitCredential } = stubGoogleSignIn()
+    mockedGoogleLogin.mockResolvedValue({
+      success: false,
+      message: 'Could not sign in with Google.',
+      session: null,
+    })
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    await emitCredential('a-google-id-token')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign in with Google.')
+    expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
   })
 })

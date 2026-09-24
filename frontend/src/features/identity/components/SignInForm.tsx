@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { validateSignIn, hasErrors, type FieldErrors } from '../schemas/authValidation'
 import type { SignInFormValues } from '../types/auth'
 import { GoogleAuthButton } from './GoogleAuthButton'
@@ -19,13 +20,31 @@ const INITIAL_VALUES: SignInFormValues = { email: '', password: '' }
 /** Sign in form: email/password, Google button, and a switch into sign up. */
 export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormProps) {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { login, loginWithGoogle } = useAuth()
   const [values, setValues] = useState<SignInFormValues>(INITIAL_VALUES)
   const [errors, setErrors] = useState<FieldErrors<SignInFormValues>>({})
   const [attempted, setAttempted] = useState(false)
   const [status, setStatus] = useState<'idle' | 'submitting'>('idle')
   const [authError, setAuthError] = useState<string | null>(null)
   const isSubmitting = status === 'submitting'
+
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setAuthError(null)
+      setStatus('submitting')
+      const result = await loginWithGoogle(credential)
+
+      if (result.success) {
+        navigate('/app', { replace: true })
+        return
+      }
+
+      setAuthError(result.message)
+      setStatus('idle')
+    },
+    [loginWithGoogle, navigate],
+  )
+  const googleSignIn = useGoogleSignIn(handleGoogleCredential)
 
   function updateField<K extends keyof SignInFormValues>(field: K, value: SignInFormValues[K]) {
     const next = { ...values, [field]: value }
@@ -69,7 +88,15 @@ export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormPro
       <p className="mt-2 text-sm text-gray-500">Continue to your Automation Platform account.</p>
 
       <div className="mt-7">
-        <GoogleAuthButton disabled={isSubmitting} />
+        <GoogleAuthButton
+          disabled={isSubmitting || !googleSignIn.isConfigured}
+          onClick={googleSignIn.trigger}
+        />
+        {/* Google Identity Services renders its own real button here,
+            visually hidden (not `display: none` - some embedded widgets,
+            this one included, behave unreliably when their container has
+            no layout box) - GoogleAuthButton's onClick forwards to it. */}
+        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
       </div>
 
       <div className="my-6 flex items-center gap-3">

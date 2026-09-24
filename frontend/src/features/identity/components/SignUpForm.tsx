@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
+import { useAuth } from '../auth/AuthContext'
+import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { validateSignUp, hasErrors, type FieldErrors } from '../schemas/authValidation'
 import type { SignUpFormValues } from '../types/auth'
 import { GoogleAuthButton } from './GoogleAuthButton'
@@ -34,11 +36,36 @@ const LEGAL_LINK_CLASSES =
  * are completed later, from the dashboard, after authentication.
  */
 export function SignUpForm({ onSwitchToSignIn }: SignUpFormProps) {
+  const navigate = useNavigate()
+  const { loginWithGoogle } = useAuth()
   const [values, setValues] = useState<SignUpFormValues>(INITIAL_VALUES)
   const [errors, setErrors] = useState<FieldErrors<SignUpFormValues>>({})
   const [attempted, setAttempted] = useState(false)
   const [status, setStatus] = useState<'idle' | 'submitting'>('idle')
+  const [googleError, setGoogleError] = useState<string | null>(null)
   const isSubmitting = status === 'submitting'
+
+  // Google sign-in doesn't distinguish "sign up" from "sign in" - the
+  // googleLogin mutation creates the account on first use and
+  // authenticates it on every return visit - so this button performs
+  // exactly the same operation as the one on SignInForm.
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setGoogleError(null)
+      setStatus('submitting')
+      const result = await loginWithGoogle(credential)
+
+      if (result.success) {
+        navigate('/app', { replace: true })
+        return
+      }
+
+      setGoogleError(result.message)
+      setStatus('idle')
+    },
+    [loginWithGoogle, navigate],
+  )
+  const googleSignIn = useGoogleSignIn(handleGoogleCredential)
 
   function updateField<K extends keyof SignUpFormValues>(field: K, value: SignUpFormValues[K]) {
     const next = { ...values, [field]: value }
@@ -69,7 +96,18 @@ export function SignUpForm({ onSwitchToSignIn }: SignUpFormProps) {
       <p className="mt-2 text-sm text-gray-500">Start turning problems into automation.</p>
 
       <div className="mt-7">
-        <GoogleAuthButton disabled={isSubmitting} />
+        <GoogleAuthButton
+          disabled={isSubmitting || !googleSignIn.isConfigured}
+          onClick={googleSignIn.trigger}
+        />
+        {/* Google Identity Services renders its own real button here,
+            visually hidden - see SignInForm's matching comment. */}
+        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
+        {googleError && (
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            {googleError}
+          </p>
+        )}
       </div>
 
       <div className="my-6 flex items-center gap-3">
