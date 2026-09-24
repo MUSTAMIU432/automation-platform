@@ -1,14 +1,20 @@
 """
 Root GraphQL schema for the Automation Platform API.
 
-This module holds only foundation/infrastructure types. Business-domain
-schemas (identity, organizations, ideas, ...) will be introduced in later
-sprints and merged into this root Query/Mutation, not scattered into
-separate schema instances.
+This module holds only foundation/infrastructure types, plus the merge
+point for business-domain schemas. Each domain (identity, organizations,
+ideas, ...) owns its models and logic in its own Django app and exposes a
+Query/Mutation class of its own (e.g. `identity.schema.Mutation`); this
+module imports and inherits from those rather than the other way around,
+so the dependency runs domain -> GraphQL adapter, never the reverse. There
+is deliberately one `strawberry.Schema` instance for the whole API, not one
+per domain.
 """
 
 import django
 import strawberry
+
+from identity.schema import Mutation as IdentityMutation
 
 
 @strawberry.type
@@ -36,7 +42,7 @@ class Query:
 
 
 @strawberry.type
-class Mutation:
+class Mutation(IdentityMutation):
     @strawberry.mutation(
         description=('Infrastructure check: echoes the input to prove the mutation root resolves.')
     )

@@ -247,7 +247,7 @@ def test_no_credentials_are_hardcoded_in_settings():
     # Every credential must come from the (fake) environment supplied by the test.
     assert values['SECRET_KEY'] == VALID_PRODUCTION_ENV['DJANGO_SECRET_KEY']
     database = values['DATABASES']['default']
-    assert database['PASSWORD'] == 'app-password'  # noqa: S105
+    assert database['PASSWORD'] == 'app-password'
     assert database['USER'] == 'app_user'
 
 

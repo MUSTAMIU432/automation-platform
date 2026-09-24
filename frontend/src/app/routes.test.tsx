@@ -18,4 +18,18 @@ describe('route tree', () => {
     expect(screen.getByText('Page not found.')).toBeInTheDocument()
     expect(screen.getByRole('banner')).toBeInTheDocument()
   })
+
+  it('renders the auth page at /auth, defaulting to sign in', () => {
+    renderRoutes(router.routes, '/auth')
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
+  })
+
+  it('renders the reset password page at /reset-password', () => {
+    renderRoutes(router.routes, '/reset-password?token=sample-token')
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Reset your password' }),
+    ).toBeInTheDocument()
+  })
 })

@@ -1,0 +1,87 @@
+from typing import ClassVar
+
+from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
+
+from identity.forms import UserChangeForm, UserCreationForm
+from identity.models import ExternalIdentity, User
+
+
+@admin.register(User)
+class UserAdmin(DjangoUserAdmin):
+    """
+    Admin for the platform User.
+
+    Subclasses Django's UserAdmin with our own forms/fieldsets (no
+    `username` field exists on this model) rather than building one from
+    scratch. The password is still rendered through Django's masked,
+    non-editable hash widget - `UserChangeForm` never puts the raw hash in
+    an editable input, so it can't be read back out or edited directly.
+    """
+
+    add_form = UserCreationForm
+    form = UserChangeForm
+    model = User
+
+    ordering: ClassVar[list[str]] = ['-created_at']
+    list_display: ClassVar[list[str]] = [
+        'email',
+        'first_name',
+        'last_name',
+        'phone_number',
+        'is_active',
+        'is_verified',
+        'is_staff',
+    ]
+    list_filter: ClassVar[list[str]] = ['is_active', 'is_verified', 'is_staff', 'is_superuser']
+    search_fields: ClassVar[list[str]] = ['email', 'first_name', 'last_name', 'phone_number']
+    readonly_fields: ClassVar[list[str]] = ['last_login', 'created_at', 'updated_at']
+
+    fieldsets = (
+        (None, {'fields': ('email', 'password')}),
+        ('Personal info', {'fields': ('first_name', 'last_name', 'phone_number')}),
+        (
+            'Status',
+            {
+                'fields': (
+                    'is_active',
+                    'is_verified',
+                    'is_staff',
+                    'is_superuser',
+                    'groups',
+                    'user_permissions',
+                )
+            },
+        ),
+        ('Important dates', {'fields': ('last_login', 'created_at', 'updated_at')}),
+    )
+    add_fieldsets = (
+        (
+            None,
+            {
+                'classes': ('wide',),
+                'fields': (
+                    'email',
+                    'first_name',
+                    'last_name',
+                    'phone_number',
+                    'password1',
+                    'password2',
+                ),
+            },
+        ),
+    )
+
+
+@admin.register(ExternalIdentity)
+class ExternalIdentityAdmin(admin.ModelAdmin):
+    list_display: ClassVar[list[str]] = [
+        'user',
+        'provider',
+        'provider_subject',
+        'email',
+        'created_at',
+    ]
+    list_filter: ClassVar[list[str]] = ['provider']
+    search_fields: ClassVar[list[str]] = ['user__email', 'provider_subject', 'email']
+    readonly_fields: ClassVar[list[str]] = ['created_at', 'updated_at']

@@ -52,8 +52,17 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'strawberry_django',
+    # Business domain apps (own their models and logic) before the GraphQL
+    # adapter layer that exposes them.
+    'identity',
     'graphql_api',
 ]
+
+# Sprint 1: the identity app owns the platform's own User model rather than
+# Django's default (which is username/password, not email/password). This
+# must be set before the first `migrate` in any environment - swapping it
+# afterwards is not supported by Django's migration framework.
+AUTH_USER_MODEL = 'identity.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

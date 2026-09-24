@@ -2,6 +2,7 @@
 source =
     config
     graphql_api
+    identity
 omit =
     */tests/*
     */migrations/*
