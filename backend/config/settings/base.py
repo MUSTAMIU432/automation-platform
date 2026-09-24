@@ -5,6 +5,7 @@ Shared by every environment. Environment-specific settings (local,
 production) import from this module and override only what differs.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -63,6 +64,22 @@ INSTALLED_APPS = [
 # must be set before the first `migrate` in any environment - swapping it
 # afterwards is not supported by Django's migration framework.
 AUTH_USER_MODEL = 'identity.User'
+
+# JWT access-token signing (identity/tokens.py). Deliberately a separate
+# secret from DJANGO_SECRET_KEY: SECRET_KEY is used for several unrelated
+# purposes (session/CSRF signing, ...), and rotating it shouldn't force
+# rotating - or be blocked by the need to keep valid - every issued access
+# token, and vice versa. Required everywhere, like SECRET_KEY, so a missing
+# secret fails at startup rather than falling back to a known value.
+JWT_SIGNING_KEY = env('DJANGO_JWT_SIGNING_KEY')
+
+# Access tokens are short-lived and stateless (no DB check to verify one) -
+# that's the whole point of a JWT here, and why it must expire quickly.
+# Refresh credentials are long-lived but server-side (RefreshSession), so
+# they can be individually revoked; a stolen refresh credential is the real
+# exposure window, not the access token.
+ACCESS_TOKEN_LIFETIME = timedelta(minutes=env.int('ACCESS_TOKEN_LIFETIME_MINUTES', default=15))
+REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', default=30))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -157,9 +174,16 @@ STATIC_URL = 'static/'
 
 CORS_URLS_REGEX = r'^/graphql/'
 # Explicit so a stray setting elsewhere can never open the API to every origin.
-# Credentialed cross-origin requests stay off until authentication exists.
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOW_CREDENTIALS = False
+# Sprint 1 (S1-003): the refresh-token cookie requires the browser to send
+# and accept credentials on cross-origin requests (the frontend and backend
+# run on different origins even in local dev - :5173 vs :8000), so this can
+# no longer stay off. This is safe only because CORS_ALLOWED_ORIGINS is - and
+# must remain - an explicit, non-wildcard allow-list (django-cors-headers
+# refuses to combine credentials with a wildcard origin regardless, and
+# production.py separately rejects wildcards); see docs/environments.md and
+# docs/architecture.md for the full authentication cookie/CORS/CSRF design.
+CORS_ALLOW_CREDENTIALS = True
 
 
 # Security headers and cookies

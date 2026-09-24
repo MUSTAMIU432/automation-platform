@@ -19,6 +19,7 @@ from .base import (
     CORS_ALLOWED_ORIGINS,
     CSRF_TRUSTED_ORIGINS,
     ENVIRONMENT,
+    JWT_SIGNING_KEY,
     SECRET_KEY,
     env,
 )
@@ -48,6 +49,20 @@ if len(SECRET_KEY) < _MIN_SECRET_KEY_LENGTH or any(
     raise ImproperlyConfigured(
         'DJANGO_SECRET_KEY must be a real, unique secret of at least '
         f'{_MIN_SECRET_KEY_LENGTH} characters, not a placeholder.'
+    )
+
+if len(JWT_SIGNING_KEY) < _MIN_SECRET_KEY_LENGTH or any(
+    marker in JWT_SIGNING_KEY.lower() for marker in _PLACEHOLDER_SECRET_MARKERS
+):
+    raise ImproperlyConfigured(
+        'DJANGO_JWT_SIGNING_KEY must be a real, unique secret of at least '
+        f'{_MIN_SECRET_KEY_LENGTH} characters, not a placeholder.'
+    )
+
+if JWT_SIGNING_KEY == SECRET_KEY:
+    raise ImproperlyConfigured(
+        'DJANGO_JWT_SIGNING_KEY must not be the same value as DJANGO_SECRET_KEY - '
+        'they protect different things and must be able to rotate independently.'
     )
 
 if env.bool('DJANGO_DEBUG', default=False):

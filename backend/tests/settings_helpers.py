@@ -14,6 +14,7 @@ VALID_PRODUCTION_ENV = {
     'DJANGO_SETTINGS_MODULE': 'config.settings.production',
     'ENVIRONMENT': 'staging',
     'DJANGO_SECRET_KEY': 'x7Kp2mQ9vL4nR8tW1yB6cD3fG5hJ0sZaE2uI4oP7qA9wX1eV3b',
+    'DJANGO_JWT_SIGNING_KEY': 'j9Wq3rT6yU1iO4pL8sD2fG5hJ0kZaE7uI4oP2qA6wX9eV1bN3m',
     'DJANGO_DEBUG': 'False',
     'DJANGO_ALLOWED_HOSTS': 'api.example.test',
     'DATABASE_URL': 'postgres://app_user:app-password@db.example.test:5432/app',

@@ -27,7 +27,13 @@ BROWSER_PROTECTION = {
     'SESSION_COOKIE_SAMESITE': 'Lax',
     'CSRF_COOKIE_SAMESITE': 'Lax',
     'CORS_ALLOW_ALL_ORIGINS': False,
-    'CORS_ALLOW_CREDENTIALS': False,
+    # Sprint 1 (S1-003): the refresh-token cookie requires credentialed
+    # cross-origin requests (frontend and backend are different origins even
+    # in local dev), so this flipped from False to True. Safe only because
+    # CORS_ALLOW_ALL_ORIGINS stays False and CORS_ALLOWED_ORIGINS stays an
+    # explicit, non-wildcard list - see test_cors_credentials_require_an_
+    # explicit_non_wildcard_origin_allowlist below, and config/settings/base.py.
+    'CORS_ALLOW_CREDENTIALS': True,
 }
 
 

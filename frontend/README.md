@@ -1,12 +1,13 @@
 # Frontend
 
-React + TypeScript + Vite web application. This is the Sprint 0
-infrastructure foundation — no authentication or business-domain features
-exist yet.
+React + TypeScript + Vite web application.
 
-**Status:** Sprint 0, task S0-003 (React Frontend Foundation). See
-[`/docs/architecture.md`](../docs/architecture.md) for the target frontend
-architecture.
+**Status:** Sprint 0 (S0-003) delivered the infrastructure foundation.
+Sprint 1 has added the Identity feature: the `/auth` sign in/up/forgot-
+password UI (S1-002) and real email/password authentication - login, an
+in-memory access token, and session persistence via the backend's refresh
+cookie (S1-003). See [`/docs/architecture.md`](../docs/architecture.md) for
+the target frontend architecture.
 
 ## Stack
 
@@ -98,26 +99,57 @@ rather than reading `import.meta.env` directly in components.
 src/
 ├── app/            # App root wiring: route tree (routes.tsx)
 ├── components/     # Shared reusable UI (ErrorBoundary, etc.)
-├── graphql/         # Centralized GraphQL client (client.ts)
+├── features/
+│   └── identity/   # Sign in/up/forgot-password UI, auth state (auth/)
+├── graphql/         # Centralized GraphQL client (client.ts), token store
 ├── layouts/        # Page shells (RootLayout)
 ├── lib/            # Cross-cutting utilities (env access)
-├── routes/         # Route-level page components (HomePage, NotFoundPage)
+├── routes/         # Route-level page components (HomePage, DashboardPage, ...)
 ├── types/          # Ambient TypeScript declarations
-├── App.tsx         # Root component: ErrorBoundary + RouterProvider
+├── App.tsx         # Root component: ErrorBoundary + AuthProvider + RouterProvider
 └── main.tsx        # Entry point
 ```
 
-`features/` and `hooks/` are intentionally not created yet — they'll be
-added when the first business domain (Identity, in Sprint 1) or the first
-shared hook actually needs them.
+`hooks/` is intentionally not created yet — it'll be added when the first
+shared hook (outside a feature) actually needs it.
 
 ### GraphQL client
 
 [`src/graphql/client.ts`](src/graphql/client.ts) exports a single shared
 `graphqlClient` (a `graphql-request` `GraphQLClient`) configured from
-`VITE_GRAPHQL_URL`. Future feature modules import this client rather than
-constructing their own or hardcoding a URL. No queries, auth headers, or
-domain requests are implemented yet — this is infrastructure only.
+`VITE_GRAPHQL_URL`. Feature modules import this client rather than
+constructing their own or hardcoding a URL. Two things make every request
+authenticated automatically, without a second "authenticated client":
+`credentials: 'include'` (so the backend's refresh-token cookie flows with
+cross-origin requests) and a `headers` function that reads the current
+access token from [`src/graphql/tokenStore.ts`](src/graphql/tokenStore.ts)
+and attaches `Authorization: Bearer <token>` when one is set.
+
+### Authentication (Sprint 1, S1-003)
+
+[`src/features/identity/auth/`](src/features/identity/auth) owns all
+authentication state:
+
+- `authApi.ts` — the `login`/`refreshToken`/`logout` GraphQL operations.
+- `AuthContext.tsx` — `AuthProvider` (wraps the router in `App.tsx`) and the
+  `useAuth()` hook, exposing `status` (`'loading' | 'authenticated' |
+  'unauthenticated'`), `user`, `login()` and `logout()`. On mount, it
+  silently calls `refreshToken` once to re-establish a session from the
+  backend's cookie (see below) before deciding the status.
+
+**Token storage, deliberately:** the short-lived access token lives only in
+`graphql/tokenStore.ts` - a plain in-memory module variable, never
+`localStorage`/`sessionStorage`. It does not survive a page reload by
+design; `AuthContext`'s mount-time `refreshToken` call is what re-establishes
+a session afterwards, using the backend's `HttpOnly` refresh-session cookie
+(which JavaScript can't read at all, by design - see `backend/README.md`'s
+GraphQL API section and `docs/architecture.md` for the full cookie/CORS/CSRF
+design).
+
+`src/features/identity/components/RequireAuth.tsx` gates the `/app` route:
+it shows a neutral loading state while the initial `refreshToken` call is in
+flight, redirects to `/auth` if it comes back unauthenticated, and renders
+the protected route otherwise.
 
 ### Error handling
 
@@ -128,13 +160,27 @@ fallback message instead of an uncontrolled blank page.
 ### Routing
 
 [`src/app/routes.tsx`](src/app/routes.tsx) defines the route tree via
-`createBrowserRouter`. Currently only `/` (`HomePage`) and a catch-all
-(`NotFoundPage`) are registered. Future business domains each get their own
-route module under `src/features/<domain>` and are wired into this tree —
-none exist yet.
+`createBrowserRouter`:
+
+- `/` (`HomePage`) and a catch-all (`NotFoundPage`).
+- `/auth` (`AuthPage`) — sign in, sign up and forgot password, combined into
+  one view that swaps in place (see the Identity feature's own docs in
+  `src/features/identity/`).
+- `/reset-password` (`ResetPasswordPage`) — UI only; no backend mutation
+  exists yet (see What this is not).
+- `/app` (`RequireAuth` → `DashboardPage`) — the authenticated area,
+  redirecting to `/auth` when there's no session. `DashboardPage` is a
+  placeholder proving the login/session lifecycle end to end, not a real
+  product surface.
+
+Future business domains each get their own route module under
+`src/features/<domain>` and are wired into this tree.
 
 ## What this is not
 
-No Identity/authentication, organizations, ideas, reviews, projects,
-notifications, dashboards, or any other business-domain feature exists in
-this codebase yet. Those are implemented in later sprints.
+Real product features (organizations, ideas, reviews, projects,
+notifications, ...) don't exist yet - only Identity's sign-in/registration
+UI and authentication. Within Identity itself, Google/OAuth sign-in and the
+forgot-password/reset-password *backend* are not implemented (the UI is
+ready for them); `GoogleAuthButton` and the reset-password form are visual
+placeholders. Those land in later Identity tasks.

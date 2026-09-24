@@ -95,14 +95,29 @@ binary content in PostgreSQL. Not present yet.
 
 Environment-driven secrets, DEBUG/production settings separation,
 ALLOWED_HOSTS, CORS/CSRF strategy, security headers, rate-limiting and audit
-architecture placeholders. Authentication itself is explicitly out of scope
-until Sprint 1 (Identity).
+architecture placeholders, plus authentication (Sprint 1, Identity).
 
 Implemented (S0-011): environment-driven secrets, the local/production
 settings split with fail-fast validation, `ALLOWED_HOSTS`, CORS/CSRF
 configuration, secure cookies, HTTPS redirect, HSTS and browser security
-headers, with automated tests. Rate limiting, audit logging and
-authentication are not implemented. See [`SECURITY.md`](../SECURITY.md).
+headers, with automated tests.
+
+Implemented (S1-002/S1-003): the `identity` app's `User` model (email as the
+login identifier, Django's own password hashing), email/password
+registration and login, short-lived JWT access tokens, and a persistent,
+rotating `RefreshSession` credential delivered as an HttpOnly cookie (never
+`localStorage`). `CORS_ALLOW_CREDENTIALS` is on for this reason, still
+scoped to an explicit, non-wildcard origin allow-list. See
+[`environments.md`](environments.md) for the cookie/CORS/CSRF reasoning and
+`backend/identity/` (`models.py`, `services.py`, `authentication.py`,
+`tokens.py`, `schema.py`) for the implementation.
+
+Not yet implemented: Google/OAuth sign-in (only the provider-agnostic
+`ExternalIdentity` table exists so far), email verification (the `User.
+is_verified` flag exists and defaults to `False`, but nothing sets it yet -
+current policy lets an unverified user log in), the forgot-password and
+reset-password *backend* (the frontend UI exists; no mutation backs it
+yet), rate limiting, and audit logging. See [`SECURITY.md`](../SECURITY.md).
 
 ### Multi-Tenancy (target — not yet implemented)
 
@@ -119,9 +134,18 @@ infrastructure. See [`environments.md`](environments.md).
 
 ## Current Implementation Status
 
-The repository is in **Sprint 0 — Foundation**. The engineering foundation is
-in place; **no business functionality is implemented**, and identity and
-authentication begin in Sprint 1.
+Sprint 0 established the engineering foundation. Sprint 1 (Identity) is
+under way: user registration (S1-002) and email/password login (S1-003) are
+implemented; the rest of Identity and every other business domain are not.
+
+### Implemented (Sprint 1, in progress)
+
+| Area | What exists | Task |
+| ---- | ----------- | ---- |
+| Identity domain | `identity` app: `User` (email login, hashed passwords), `ExternalIdentity` foundation | S1-002 |
+| Registration | `register` GraphQL mutation, email normalization, password/phone validation | S1-002 |
+| Authentication | `login`/`refreshToken`/`logout` mutations, JWT access tokens, rotating `RefreshSession` refresh credential in an HttpOnly cookie, `me` query | S1-003 |
+| Frontend auth state | `AuthProvider`/`useAuth()`, in-memory access token, `/app` protected route | S1-003 |
 
 ### Implemented (Sprint 0)
 
@@ -144,15 +168,18 @@ How these are used day to day: [`development.md`](development.md),
 
 ### Not implemented (planned)
 
-- Business domain apps: identity, organizations, ideas, reviews,
+- Business domain apps other than `identity`: organizations, ideas, reviews,
   opportunities, proposals, developers, projects, tasks, notifications,
   impact, files, audit
-- Authentication and authorization (Sprint 1)
-- Multi-tenancy (organizations, departments, memberships)
+- Google/OAuth sign-in, email verification, and the forgot-password/
+  reset-password backend (frontend UI for these exists; see
+  [Security](#security-target--partly-implemented) above)
+- Authorization (roles/permissions) and multi-tenancy (organizations,
+  departments, memberships)
 - Redis + Celery background processing
 - AI gateway
 - Object storage
-- Rate limiting and audit logging (authentication and authorization also start in Sprint 1)
+- Rate limiting and audit logging
 - React Query and feature modules in the frontend
 - Deployment automation and any deployed environment (development, staging,
   production)

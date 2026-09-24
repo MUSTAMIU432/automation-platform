@@ -1,12 +1,25 @@
 import { fireEvent, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { renderWithRouter } from '../../../test/renderWithRouter'
+import { renderWithProviders } from '../../../test/renderWithRouter'
+import { refreshTokenRequest } from '../auth/authApi'
 import { AuthPage } from './AuthPage'
 
+vi.mock('../auth/authApi', () => ({
+  loginRequest: vi.fn(),
+  logoutRequest: vi.fn(),
+  refreshTokenRequest: vi.fn(),
+}))
+
+const mockedRefresh = vi.mocked(refreshTokenRequest)
+
 describe('AuthPage', () => {
+  beforeEach(() => {
+    mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+  })
+
   it('renders with sign in as the default mode', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Sign In' })).toHaveAttribute('aria-selected', 'true')
@@ -14,20 +27,20 @@ describe('AuthPage', () => {
   })
 
   it('renders a Google button ready for future OAuth integration', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
   })
 
   it('does not expose internal implementation status to the user', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     expect(screen.queryByText(/backend/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/mutation/i)).not.toBeInTheDocument()
   })
 
   it('switches to sign up via the tab and shows the registration fields', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     fireEvent.click(screen.getByRole('tab', { name: 'Sign Up' }))
 
@@ -48,7 +61,7 @@ describe('AuthPage', () => {
   })
 
   it('switches from sign up back to sign in via the "Sign in" link', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     fireEvent.click(screen.getByRole('tab', { name: 'Sign Up' }))
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
@@ -58,7 +71,7 @@ describe('AuthPage', () => {
   })
 
   it('switches from sign in to sign up via the "Create account" link', () => {
-    renderWithRouter(<AuthPage />)
+    renderWithProviders(<AuthPage />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
@@ -70,7 +83,7 @@ describe('AuthPage', () => {
 
   describe('forgot password', () => {
     it('replaces the tabs and sign in form with the forgot-password form in place, not a popup', () => {
-      renderWithRouter(<AuthPage />)
+      renderWithProviders(<AuthPage />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
 
@@ -85,7 +98,7 @@ describe('AuthPage', () => {
     })
 
     it('returns to the Sign In tab (with tabs restored) via "Back to Sign In"', () => {
-      renderWithRouter(<AuthPage />)
+      renderWithProviders(<AuthPage />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
       fireEvent.click(screen.getByRole('button', { name: /Back to Sign In/ }))

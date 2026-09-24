@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 
+import { useAuth } from '../auth/AuthContext'
 import { validateSignIn, hasErrors, type FieldErrors } from '../schemas/authValidation'
 import type { SignInFormValues } from '../types/auth'
 import { GoogleAuthButton } from './GoogleAuthButton'
@@ -16,10 +18,13 @@ const INITIAL_VALUES: SignInFormValues = { email: '', password: '' }
 
 /** Sign in form: email/password, Google button, and a switch into sign up. */
 export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormProps) {
+  const navigate = useNavigate()
+  const { login } = useAuth()
   const [values, setValues] = useState<SignInFormValues>(INITIAL_VALUES)
   const [errors, setErrors] = useState<FieldErrors<SignInFormValues>>({})
   const [attempted, setAttempted] = useState(false)
   const [status, setStatus] = useState<'idle' | 'submitting'>('idle')
+  const [authError, setAuthError] = useState<string | null>(null)
   const isSubmitting = status === 'submitting'
 
   function updateField<K extends keyof SignInFormValues>(field: K, value: SignInFormValues[K]) {
@@ -28,21 +33,34 @@ export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormPro
     if (attempted) {
       setErrors(validateSignIn(next))
     }
+    if (authError) {
+      setAuthError(null)
+    }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAttempted(true)
+    setAuthError(null)
 
     const nextErrors = validateSignIn(values)
     setErrors(nextErrors)
     if (hasErrors(nextErrors)) return
 
     setStatus('submitting')
-    // Placeholder only: wired to the `login` GraphQL mutation once the
-    // Identity backend contract lands. No implementation status is shown to
-    // the user — it just returns the form to its normal, interactive state.
-    window.setTimeout(() => setStatus('idle'), 400)
+    const result = await login(values.email, values.password)
+
+    if (result.success) {
+      navigate('/app', { replace: true })
+      return
+    }
+
+    // The backend deliberately returns one generic message for every
+    // failure (unknown email, wrong password, inactive account) - shown
+    // as a single form-level error, not attached to a field, since there
+    // is nothing field-specific to say without undermining that.
+    setAuthError(result.message)
+    setStatus('idle')
   }
 
   return (
@@ -93,6 +111,12 @@ export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormPro
             </button>
           </div>
         </div>
+
+        {authError && (
+          <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            {authError}
+          </p>
+        )}
 
         <button
           type="submit"

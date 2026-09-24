@@ -26,8 +26,10 @@ Notes:
   `DATABASE_URL` in your environment. pytest-django creates and drops its own
   `test_<name>` database, so your development data is untouched. The database
   role needs `CREATEDB`.
-- Tests live in `backend/tests/` as `test_*.py`. GraphQL tests go through the
-  real `/graphql/` endpoint.
+- Cross-cutting infrastructure tests live in `backend/tests/` as `test_*.py`;
+  each business-domain app owns its own tests under `<app>/tests/` (e.g.
+  `backend/identity/tests/`). GraphQL tests go through the real `/graphql/`
+  endpoint.
 - `config/settings/production.py` is exercised in subprocesses, so it shows
   0% in the coverage report even though its validation rules are tested.
 - Run a subset with `pytest tests/test_graphql.py -k ping`, or get an HTML

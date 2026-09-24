@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
+from django.utils import timezone
 
-from identity.models import ExternalIdentity, User
+from identity.models import ExternalIdentity, RefreshSession, User
 
 VALID_PASSWORD = 'a-strong-unique-pass-1'
 
@@ -225,3 +228,43 @@ class TestExternalIdentityModel:
         )
 
         assert str(identity) == 'google:abc123'
+
+
+@pytest.mark.django_db
+class TestRefreshSessionModel:
+    def _make_session(self, **overrides):
+        fields = {
+            'user': overrides.pop('user', None) or _make_user(),
+            'token_hash': 'a' * 64,
+            'expires_at': timezone.now() + timedelta(days=30),
+        }
+        fields.update(overrides)
+        return RefreshSession.objects.create(**fields)
+
+    def test_str_includes_user_and_created_at(self):
+        session = self._make_session()
+
+        expected = f'RefreshSession(user={session.user_id}, created_at={session.created_at})'
+        assert str(session) == expected
+
+    def test_is_active_when_not_expired_and_not_revoked(self):
+        session = self._make_session()
+
+        assert session.is_active is True
+
+    def test_is_not_active_once_revoked(self):
+        session = self._make_session(revoked_at=timezone.now())
+
+        assert session.is_active is False
+
+    def test_is_not_active_once_expired(self):
+        session = self._make_session(expires_at=timezone.now() - timedelta(seconds=1))
+
+        assert session.is_active is False
+
+    def test_token_hash_is_unique(self):
+        user = _make_user()
+        self._make_session(user=user, token_hash='b' * 64)
+
+        with pytest.raises(IntegrityError):
+            self._make_session(user=user, token_hash='b' * 64)

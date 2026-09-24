@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 
 from identity.forms import UserChangeForm, UserCreationForm
-from identity.models import ExternalIdentity, User
+from identity.models import ExternalIdentity, RefreshSession, User
 
 
 @admin.register(User)
@@ -85,3 +85,34 @@ class ExternalIdentityAdmin(admin.ModelAdmin):
     list_filter: ClassVar[list[str]] = ['provider']
     search_fields: ClassVar[list[str]] = ['user__email', 'provider_subject', 'email']
     readonly_fields: ClassVar[list[str]] = ['created_at', 'updated_at']
+
+
+@admin.register(RefreshSession)
+class RefreshSessionAdmin(admin.ModelAdmin):
+    """
+    Read-only visibility into issued refresh sessions - never a way to read
+    a raw credential back out (only its hash is ever stored, so there's
+    nothing to display even if this were editable).
+    """
+
+    list_display: ClassVar[list[str]] = [
+        'user',
+        'created_at',
+        'expires_at',
+        'revoked_at',
+        'last_used_at',
+    ]
+    list_filter: ClassVar[list[str]] = ['revoked_at']
+    search_fields: ClassVar[list[str]] = ['user__email']
+    readonly_fields: ClassVar[list[str]] = [
+        'user',
+        'token_hash',
+        'created_at',
+        'expires_at',
+        'revoked_at',
+        'last_used_at',
+        'replaced_by',
+    ]
+
+    def has_add_permission(self, request) -> bool:
+        return False

@@ -87,6 +87,9 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | ---------------------------- | :----: | ----------------- | ------- |
 | `ENVIRONMENT`                |        | no (`local`)      | Environment name (see table above). CI sets `ci`; see [CI execution context](#ci-execution-context) |
 | `DJANGO_SECRET_KEY`          | **yes**| **always**        | Django signing key. No default |
+| `DJANGO_JWT_SIGNING_KEY`     | **yes**| **always**        | Signs JWT access tokens (Sprint 1). No default; must differ from `DJANGO_SECRET_KEY` when deployed |
+| `ACCESS_TOKEN_LIFETIME_MINUTES` |     | no (`15`)         | JWT access token lifetime |
+| `REFRESH_TOKEN_LIFETIME_DAYS` |       | no (`30`)         | Refresh session (`RefreshSession`) lifetime |
 | `DJANGO_DEBUG`               |        | no                | Default `True` locally; rejected if true when deployed |
 | `DJANGO_ALLOWED_HOSTS`       |        | deployed          | Comma-separated hostnames |
 | `DATABASE_URL`               | **yes**| **always**        | PostgreSQL URL including the password. No default |
@@ -103,9 +106,15 @@ Notes:
 
 - Real environment variables override `backend/.env`. Deployed
   environments should not use a `.env` file at all.
-- CORS applies only to `/graphql/`. The GraphQL endpoint is CSRF-exempt until
-  authentication exists, so `CSRF_TRUSTED_ORIGINS` currently affects only
-  Django's own forms (e.g. admin).
+- CORS applies only to `/graphql/`. `CORS_ALLOW_CREDENTIALS` is `True`
+  (Sprint 1, S1-003): the refresh-token cookie needs credentialed
+  cross-origin requests, and this is safe only because
+  `CORS_ALLOWED_ORIGINS` stays an explicit, non-wildcard allow-list. The
+  GraphQL endpoint remains CSRF-exempt even with that cookie present - see
+  the comment in `backend/graphql_api/views.py` for the full reasoning
+  (JSON-only requests can't be triggered by a bare HTML form, and the
+  cookie's own `SameSite=Lax` blocks genuinely cross-site attachment).
+  `CSRF_TRUSTED_ORIGINS` still affects only Django's own forms (e.g. admin).
 - The GraphiQL IDE is served only when `DEBUG` is on, so it is never
   exposed in deployed environments.
 

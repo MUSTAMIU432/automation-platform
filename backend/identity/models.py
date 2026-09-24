@@ -5,7 +5,9 @@ Identity domain models.
 and future authentication mechanisms build on top of it, not into it).
 `ExternalIdentity` is the minimal foundation for linking a User to an
 external provider identity (Google now, others later) without putting any
-provider-specific field directly on User.
+provider-specific field directly on User. `RefreshSession` is the
+server-side record backing a refresh credential (see its own docstring for
+why a stateless refresh JWT was deliberately not used instead).
 """
 
 import re
@@ -15,6 +17,7 @@ from django.contrib.auth.base_user import AbstractBaseUser, BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 # E.164-shaped: a leading '+', a non-zero first digit, then more digits,
 # 7-15 digits total (E.164's own maximum). Deliberately not tied to any
@@ -53,6 +56,15 @@ class UserManager(BaseUserManager):
         +tag stripping): only case-folding, which holds for every provider.
         """
         return (email or '').strip().lower()
+
+    def get_by_natural_key(self, email):
+        # Overridden (the default is `self.get(**{USERNAME_FIELD: username})`,
+        # an exact match) so logging in with a different case than you
+        # registered with - e.g. `USER@example.com` after registering as
+        # `user@example.com` - still finds the account. Without this,
+        # `django.contrib.auth.authenticate()` would look up the raw,
+        # un-normalized input and silently fail to find a real user.
+        return self.get(email=self.normalize_email(email))
 
     def _create_user(self, email, password, **extra_fields):
         if not email:
@@ -169,3 +181,70 @@ class ExternalIdentity(models.Model):
 
     def __str__(self) -> str:
         return f'{self.provider}:{self.provider_subject}'
+
+
+class RefreshSession(models.Model):
+    """
+    Server-side record backing one issued refresh credential.
+
+    Deliberately not a second, longer-lived JWT: a stateless refresh JWT
+    can't be individually revoked (logout, a stolen device, detected replay
+    all need to invalidate one specific credential without waiting out its
+    lifetime), so the refresh credential is an opaque random string and
+    this row is the only place its validity is decided. See
+    `identity.authentication` for issuance, rotation and revocation.
+
+    Only a hash of the credential is stored (`token_hash`), the same
+    principle as password hashing: if the database leaked, the raw
+    credential couldn't be reconstructed or replayed from it. Unlike a
+    password, the credential is already high-entropy random data, not a
+    low-entropy human-chosen secret, so it's hashed with a fast
+    cryptographic hash (SHA-256, in `identity.authentication`) rather than
+    a slow, adaptive password hasher - a raw brute-force attack isn't the
+    threat model here the way it is for passwords.
+
+    Rotation: using a credential successfully revokes this row
+    (`revoked_at`) and links to its replacement (`replaced_by`), rather
+    than deleting it. Keeping the revoked row (instead of deleting it) is
+    what makes reuse of an already-rotated credential detectable as a
+    *revoked* lookup rather than simply "not found" - the row is still
+    there to say "this was valid once, and was already used."
+    """
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='refresh_sessions')
+    token_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        help_text='SHA-256 hex digest of the raw refresh credential. Never the credential itself.',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    # Points from the OLD session to the NEW one that replaced it via
+    # rotation. Null for a session that hasn't been rotated (yet).
+    replaced_by = models.OneToOneField(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='replaces',
+    )
+
+    class Meta:
+        ordering: ClassVar[list[str]] = ['-created_at']
+        indexes: ClassVar[list[models.Index]] = [
+            # The hot lookup path: "is this presented credential valid?"
+            # (token_hash is already indexed via its own unique=True, so
+            # this covers the other two: listing/cleaning up a user's
+            # sessions, and expiring old ones.)
+            models.Index(fields=['user', 'revoked_at']),
+            models.Index(fields=['expires_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'RefreshSession(user={self.user_id}, created_at={self.created_at})'
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None and self.expires_at > timezone.now()

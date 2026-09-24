@@ -15,6 +15,7 @@ import django
 import strawberry
 
 from identity.schema import Mutation as IdentityMutation
+from identity.schema import Query as IdentityQuery
 
 
 @strawberry.type
@@ -27,7 +28,7 @@ class ApiStatus:
 
 
 @strawberry.type
-class Query:
+class Query(IdentityQuery):
     @strawberry.field(
         description=(
             'Infrastructure check: proves the GraphQL endpoint is reachable and resolving.'
