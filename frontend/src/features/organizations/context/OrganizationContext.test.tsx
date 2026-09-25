@@ -47,6 +47,29 @@ function organization(id: string, name: string, slug: string) {
   }
 }
 
+function role(id: string, org: ReturnType<typeof organization>, name = 'Owner') {
+  return {
+    id: `role-${id}-${name.toLowerCase()}`,
+    name,
+    slug: name.toLowerCase(),
+    description: `${name} role`,
+    isSystem: name === 'Owner',
+    createdAt: org.createdAt,
+    updatedAt: org.updatedAt,
+    organization: org,
+    permissions: [
+      {
+        id: 'permission-organization-view',
+        code: 'organization.view',
+        name: 'View organization',
+        description: 'View the organization.',
+        createdAt: org.createdAt,
+        updatedAt: org.updatedAt,
+      },
+    ],
+  }
+}
+
 function membershipItem(id: string, name: string, slug: string) {
   const org = organization(id, name, slug)
   return {
@@ -58,6 +81,10 @@ function membershipItem(id: string, name: string, slug: string) {
       updatedAt: org.updatedAt,
       user: USER,
       organization: org,
+      roles:
+        id === 'org-2'
+          ? [role(id, org, 'Owner'), role(id, org, 'Admin')]
+          : [role(id, org, 'Owner')],
     },
   }
 }
@@ -67,6 +94,7 @@ function ContextProbe() {
     status,
     memberships,
     activeOrganization,
+    activeMembership,
     error,
     createOrganization,
     setActiveOrganization,
@@ -78,6 +106,9 @@ function ContextProbe() {
       <p data-testid="status">{status}</p>
       <p data-testid="count">{memberships.length}</p>
       <p data-testid="active">{activeOrganization?.name ?? 'none'}</p>
+      <p data-testid="roles">
+        {activeMembership?.roles.map((item) => item.name).join(', ') ?? 'none'}
+      </p>
       <p data-testid="error">{error ?? ''}</p>
       <button type="button" onClick={() => setActiveOrganization('org-2')}>
         Select second
@@ -134,6 +165,7 @@ describe('OrganizationProvider', () => {
         updatedAt: '2026-01-01T00:00:00Z',
         user: USER,
         organization: organization('org-3', 'New Org', 'new-org'),
+        roles: [role('org-3', organization('org-3', 'New Org', 'new-org'))],
       },
     })
   })
@@ -148,6 +180,7 @@ describe('OrganizationProvider', () => {
     expect(await screen.findByText('ready')).toBeInTheDocument()
     expect(screen.getByTestId('count')).toHaveTextContent('2')
     expect(screen.getByTestId('active')).toHaveTextContent('Acme Labs')
+    expect(screen.getByTestId('roles')).toHaveTextContent('Owner')
     expect(mockedOrganizations).toHaveBeenCalledOnce()
   })
 
@@ -158,6 +191,7 @@ describe('OrganizationProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select second' }))
 
     expect(screen.getByTestId('active')).toHaveTextContent('Beta Works')
+    expect(screen.getByTestId('roles')).toHaveTextContent('Owner, Admin')
     expect(mockedOrganizations).toHaveBeenCalledOnce()
   })
 
@@ -179,6 +213,7 @@ describe('OrganizationProvider', () => {
 
     await waitFor(() => expect(screen.getByTestId('active')).toHaveTextContent('New Org'))
     expect(screen.getByTestId('count')).toHaveTextContent('3')
+    expect(screen.getByTestId('roles')).toHaveTextContent('Owner')
     expect(mockedCreateOrganization).toHaveBeenCalledWith({ name: 'New Org' })
   })
 

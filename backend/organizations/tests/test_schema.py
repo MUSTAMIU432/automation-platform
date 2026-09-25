@@ -5,7 +5,7 @@ from django.test import Client
 
 from graphql_api.schema import schema as root_schema
 from identity.models import User
-from organizations.models import Membership, Organization
+from organizations.models import Membership, Organization, Role
 
 REGISTER_MUTATION = """
 mutation Register($input: RegisterInput!) {
@@ -35,7 +35,10 @@ ME_ORGANIZATIONS_QUERY = """
 query MeOrganizations {
   meOrganizations {
     organization { id name slug }
-    membership { id status user { id email } }
+    membership {
+      id status user { id email }
+      roles { id name slug permissions { code } }
+    }
   }
 }
 """
@@ -56,6 +59,43 @@ ORGANIZATION_MEMBERS_QUERY = """
 query OrganizationMembers($organizationId: ID!) {
   organizationMembers(organizationId: $organizationId) {
     id status user { id email } organization { id slug }
+  }
+}
+"""
+
+MY_ORGANIZATION_ROLES_QUERY = """
+query MyOrganizationRoles {
+  myOrganizationRoles {
+    id name slug isSystem
+    organization { id name slug }
+    permissions { code name }
+  }
+}
+"""
+
+ORGANIZATION_ROLES_QUERY = """
+query OrganizationRoles($organizationId: ID!) {
+  organizationRoles(organizationId: $organizationId) {
+    id name slug isSystem
+    organization { id name slug }
+    permissions { code name }
+  }
+}
+"""
+
+ASSIGN_ROLE_MUTATION = """
+mutation AssignRole($input: MembershipRoleInput!) {
+  assignRoleToMembership(input: $input) {
+    success message field
+    membershipRole { membership { id } role { id slug } }
+  }
+}
+"""
+
+REMOVE_ROLE_MUTATION = """
+mutation RemoveRole($input: MembershipRoleInput!) {
+  removeRoleFromMembership(input: $input) {
+    success message field
   }
 }
 """
@@ -152,6 +192,10 @@ def test_me_organizations_returns_membership_information(gql):
     assert item['organization']['name'] == 'Acme Labs'
     assert item['membership']['status'] == Membership.Status.ACTIVE
     assert item['membership']['user']['email'] == 'ada@example.com'
+    assert item['membership']['roles'][0]['slug'] == 'owner'
+    assert 'organization.view' in {
+        permission['code'] for permission in item['membership']['roles'][0]['permissions']
+    }
 
 
 @pytest.mark.django_db
@@ -256,13 +300,123 @@ def test_duplicate_slug_returns_field_error_without_duplicate_membership(gql):
     assert Membership.objects.count() == 1
 
 
-def test_organization_schema_does_not_add_roles_or_permissions():
-    schema_text = str(root_schema)
-    assert 'Role' not in schema_text
-    assert 'Permission' not in schema_text
+@pytest.mark.django_db
+def test_my_organization_roles_returns_only_current_users_roles(gql):
+    access_token = _register_and_login(gql, 'ada@example.com')
+    gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'Acme Labs'}},
+        access_token=access_token,
+    )
 
-    for type_name in ('OrganizationType', 'MembershipType'):
-        type_definition = root_schema.get_type_by_name(type_name)
-        field_names = {field.name for field in type_definition.fields}
-        assert 'role' not in field_names
-        assert 'permissions' not in field_names
+    response = gql(MY_ORGANIZATION_ROLES_QUERY, access_token=access_token)
+
+    assert 'errors' not in response.json()
+    roles = response.json()['data']['myOrganizationRoles']
+    assert len(roles) == 1
+    assert roles[0]['slug'] == 'owner'
+    assert roles[0]['isSystem'] is True
+    assert {permission['code'] for permission in roles[0]['permissions']} >= {
+        'organization.view',
+        'organization.members.manage',
+    }
+
+
+@pytest.mark.django_db
+def test_organization_roles_are_membership_scoped(gql):
+    ada_token = _register_and_login(gql, 'ada@example.com')
+    grace_token = _register_and_login(gql, 'grace@example.com')
+    created = gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'Acme Labs'}},
+        access_token=ada_token,
+    )
+    organization_id = created.json()['data']['createOrganization']['organization']['id']
+
+    allowed = gql(
+        ORGANIZATION_ROLES_QUERY,
+        {'organizationId': organization_id},
+        access_token=ada_token,
+    )
+    denied = gql(
+        ORGANIZATION_ROLES_QUERY,
+        {'organizationId': organization_id},
+        access_token=grace_token,
+    )
+
+    assert len(allowed.json()['data']['organizationRoles']) == 1
+    assert denied.json()['data']['organizationRoles'] == []
+
+
+@pytest.mark.django_db
+def test_assign_role_rejects_cross_organization_membership(gql):
+    ada_token = _register_and_login(gql, 'ada@example.com')
+    grace_token = _register_and_login(gql, 'grace@example.com')
+    first = gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'First'}},
+        access_token=ada_token,
+    )
+    second = gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'Second'}},
+        access_token=grace_token,
+    )
+    first_organization_id = first.json()['data']['createOrganization']['organization']['id']
+    second_payload = second.json()['data']['createOrganization']
+    second_membership_id = second_payload['membership']['id']
+    role = Role.objects.get(organization_id=first_organization_id, slug='owner')
+
+    response = gql(
+        ASSIGN_ROLE_MUTATION,
+        {'input': {'membershipId': second_membership_id, 'roleId': str(role.pk)}},
+        access_token=grace_token,
+    )
+
+    assert response.json()['data']['assignRoleToMembership']['success'] is False
+    assert 'same organization' in response.json()['data']['assignRoleToMembership']['message']
+
+
+@pytest.mark.django_db
+def test_assign_and_remove_role_for_same_organization_membership(gql):
+    access_token = _register_and_login(gql, 'ada@example.com')
+    created = gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'Acme Labs'}},
+        access_token=access_token,
+    )
+    payload = created.json()['data']['createOrganization']
+    membership_id = payload['membership']['id']
+    role = Role.objects.create(
+        organization_id=payload['organization']['id'],
+        name='Admin',
+        slug='admin',
+    )
+    variables = {'input': {'membershipId': membership_id, 'roleId': str(role.pk)}}
+
+    assigned = gql(ASSIGN_ROLE_MUTATION, variables, access_token=access_token)
+    duplicate = gql(ASSIGN_ROLE_MUTATION, variables, access_token=access_token)
+    removed = gql(REMOVE_ROLE_MUTATION, variables, access_token=access_token)
+
+    assert assigned.json()['data']['assignRoleToMembership']['success'] is True
+    assert duplicate.json()['data']['assignRoleToMembership']['success'] is False
+    assert removed.json()['data']['removeRoleFromMembership']['success'] is True
+
+
+@pytest.mark.django_db
+def test_role_schema_omits_sensitive_fields_and_client_identity(gql):
+    schema_text = str(root_schema)
+    assert 'myOrganizationRoles' in schema_text
+    assert 'organizationRoles' in schema_text
+    assert 'assignRoleToMembership' in schema_text
+
+    role_type = root_schema.get_type_by_name('RoleType')
+    role_fields = {field.name for field in role_type.fields}
+    assert 'user' not in role_fields
+    assert 'membership' not in role_fields
+    assert 'password' not in role_fields
+    assert 'token' not in role_fields
+
+    input_type = root_schema.get_type_by_name('MembershipRoleInput')
+    input_fields = {field.name for field in input_type.fields}
+    assert input_fields == {'membership_id', 'role_id'}

@@ -15,6 +15,27 @@ export interface OrganizationMember {
   lastName: string
 }
 
+export interface Permission {
+  id: string
+  code: string
+  name: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Role {
+  id: string
+  name: string
+  slug: string
+  description: string
+  isSystem: boolean
+  createdAt: string
+  updatedAt: string
+  organization: Organization
+  permissions: Permission[]
+}
+
 export interface Membership {
   id: string
   status: 'active' | 'inactive'
@@ -22,6 +43,7 @@ export interface Membership {
   updatedAt: string
   user: OrganizationMember
   organization: Organization
+  roles: Role[]
 }
 
 export interface OrganizationMembership {
@@ -50,6 +72,27 @@ const ORGANIZATION_FIELDS = `
   updatedAt
 `
 
+const PERMISSION_FIELDS = `
+  id
+  code
+  name
+  description
+  createdAt
+  updatedAt
+`
+
+const ROLE_FIELDS = `
+  id
+  name
+  slug
+  description
+  isSystem
+  createdAt
+  updatedAt
+  organization { ${ORGANIZATION_FIELDS} }
+  permissions { ${PERMISSION_FIELDS} }
+`
+
 const MEMBERSHIP_FIELDS = `
   id
   status
@@ -61,6 +104,7 @@ const MEMBERSHIP_FIELDS = `
     firstName
     lastName
   }
+  roles { ${ROLE_FIELDS} }
 `
 
 const ME_ORGANIZATIONS_QUERY = `

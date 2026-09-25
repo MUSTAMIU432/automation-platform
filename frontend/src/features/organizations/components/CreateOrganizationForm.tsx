@@ -52,7 +52,7 @@ export function CreateOrganizationForm() {
       <div>
         <h2 className="text-base font-semibold text-gray-900">Create an organization</h2>
         <p className="mt-1 text-sm leading-6 text-gray-600">
-          Start a shared workspace for your team. You will be its first member.
+          Start a shared workspace for your team. You will be its first member and owner.
         </p>
       </div>
 

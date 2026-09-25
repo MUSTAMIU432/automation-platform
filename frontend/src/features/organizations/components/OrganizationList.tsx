@@ -77,6 +77,11 @@ export function OrganizationList() {
               <span className="mt-3 block text-xs font-medium text-gray-500">
                 {statusLabel(membership.status)}
               </span>
+              {membership.roles.length > 0 ? (
+                <span className="mt-2 block text-xs font-medium text-brand-700">
+                  Roles: {membership.roles.map((role) => role.name).join(', ')}
+                </span>
+              ) : null}
             </button>
           </li>
         )

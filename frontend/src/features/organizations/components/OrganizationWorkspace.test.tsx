@@ -47,6 +47,29 @@ function makeOrganization(id: string, name: string, slug: string) {
   }
 }
 
+function makeRole(id: string, organization: ReturnType<typeof makeOrganization>, name = 'Owner') {
+  return {
+    id: `role-${id}-${name.toLowerCase()}`,
+    name,
+    slug: name.toLowerCase(),
+    description: `${name} role`,
+    isSystem: name === 'Owner',
+    createdAt: organization.createdAt,
+    updatedAt: organization.updatedAt,
+    organization,
+    permissions: [
+      {
+        id: 'permission-organization-view',
+        code: 'organization.view',
+        name: 'View organization',
+        description: 'View the organization.',
+        createdAt: organization.createdAt,
+        updatedAt: organization.updatedAt,
+      },
+    ],
+  }
+}
+
 function makeItem(id: string, name: string, slug: string) {
   const organization = makeOrganization(id, name, slug)
   return {
@@ -58,6 +81,10 @@ function makeItem(id: string, name: string, slug: string) {
       updatedAt: organization.updatedAt,
       user: USER,
       organization,
+      roles:
+        id === 'org-2'
+          ? [makeRole(id, organization), makeRole(id, organization, 'Admin')]
+          : [makeRole(id, organization)],
     },
   }
 }
@@ -119,6 +146,7 @@ describe('OrganizationWorkspace', () => {
       'aria-pressed',
       'true',
     )
+    expect(screen.getByRole('button', { name: /Acme Labs/ })).toHaveTextContent('Owner')
 
     fireEvent.change(screen.getByRole('combobox', { name: 'Active organization' }), {
       target: { value: 'org-2' },
@@ -128,6 +156,7 @@ describe('OrganizationWorkspace', () => {
       'aria-pressed',
       'true',
     )
+    expect(screen.getByRole('button', { name: /Beta Works/ })).toHaveTextContent('Owner, Admin')
   })
 
   it('shows an error and retries loading organizations', async () => {
@@ -169,6 +198,7 @@ describe('OrganizationWorkspace', () => {
         updatedAt: '2026-01-01T00:00:00Z',
         user: USER,
         organization: makeOrganization('org-3', 'New Org', 'new-org'),
+        roles: [makeRole('org-3', makeOrganization('org-3', 'New Org', 'new-org'))],
       },
     })
 

@@ -49,6 +49,27 @@ const ORGANIZATION = {
   updatedAt: '2026-01-01T00:00:00Z',
 }
 
+const OWNER_ROLE = {
+  id: '30',
+  name: 'Owner',
+  slug: 'owner',
+  description: 'Owner role',
+  isSystem: true,
+  createdAt: ORGANIZATION.createdAt,
+  updatedAt: ORGANIZATION.updatedAt,
+  organization: ORGANIZATION,
+  permissions: [
+    {
+      id: '40',
+      code: 'organization.view',
+      name: 'View organization',
+      description: 'View the organization.',
+      createdAt: ORGANIZATION.createdAt,
+      updatedAt: ORGANIZATION.updatedAt,
+    },
+  ],
+}
+
 function renderDashboard() {
   return render(
     <MemoryRouter initialEntries={['/app']}>
@@ -85,6 +106,7 @@ describe('DashboardPage', () => {
           updatedAt: ORGANIZATION.updatedAt,
           user: USER,
           organization: ORGANIZATION,
+          roles: [OWNER_ROLE],
         },
       },
     ])
@@ -100,6 +122,7 @@ describe('DashboardPage', () => {
         updatedAt: ORGANIZATION.updatedAt,
         user: USER,
         organization: ORGANIZATION,
+        roles: [OWNER_ROLE],
       },
     })
   })
@@ -108,10 +131,11 @@ describe('DashboardPage', () => {
     setAccessToken(null)
   })
 
-  it('shows the signed-in user email', async () => {
+  it('shows the signed-in user email and current organization role', async () => {
     renderDashboard()
 
     expect(await screen.findByText(/ada@example.com/)).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: /Acme Labs/ })).toHaveTextContent('Owner')
   })
 
   it('signing out calls the logout API and navigates back to /auth', async () => {
