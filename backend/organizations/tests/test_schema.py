@@ -5,7 +5,7 @@ from django.test import Client
 
 from graphql_api.schema import schema as root_schema
 from identity.models import User
-from organizations.models import Membership, Organization, Role
+from organizations.models import Membership, MembershipRole, Organization, Role
 
 REGISTER_MUTATION = """
 mutation Register($input: RegisterInput!) {
@@ -260,9 +260,13 @@ def test_organization_members_cannot_be_read_across_membership_boundary(gql):
 def test_unauthenticated_queries_return_empty_membership_data(gql):
     organizations = gql(ME_ORGANIZATIONS_QUERY)
     members = gql(ORGANIZATION_MEMBERS_QUERY, {'organizationId': '1'})
+    roles = gql(MY_ORGANIZATION_ROLES_QUERY)
+    organization_roles = gql(ORGANIZATION_ROLES_QUERY, {'organizationId': '1'})
 
     assert organizations.json()['data']['meOrganizations'] == []
     assert members.json()['data']['organizationMembers'] == []
+    assert roles.json()['data']['myOrganizationRoles'] == []
+    assert organization_roles.json()['data']['organizationRoles'] == []
 
 
 @pytest.mark.django_db
@@ -374,7 +378,7 @@ def test_assign_role_rejects_cross_organization_membership(gql):
     )
 
     assert response.json()['data']['assignRoleToMembership']['success'] is False
-    assert 'same organization' in response.json()['data']['assignRoleToMembership']['message']
+    assert 'not found' in response.json()['data']['assignRoleToMembership']['message']
 
 
 @pytest.mark.django_db
@@ -404,6 +408,51 @@ def test_assign_and_remove_role_for_same_organization_membership(gql):
 
 
 @pytest.mark.django_db
+def test_member_without_permission_cannot_view_members_or_self_escalate(gql):
+    ada_token = _register_and_login(gql, 'ada@example.com')
+    grace_token = _register_and_login(gql, 'grace@example.com')
+    created = gql(
+        CREATE_ORGANIZATION_MUTATION,
+        {'input': {'name': 'Acme Labs'}},
+        access_token=ada_token,
+    )
+    payload = created.json()['data']['createOrganization']
+    organization_id = payload['organization']['id']
+    grace = User.objects.get(email='grace@example.com')
+    grace_membership = Membership.objects.create(
+        user=grace,
+        organization_id=organization_id,
+    )
+    member_role = Role.objects.create(
+        organization_id=organization_id,
+        name='Member',
+        slug='member',
+    )
+    owner_role = Role.objects.get(organization_id=organization_id, slug='owner')
+    MembershipRole.objects.create(membership=grace_membership, role=member_role)
+
+    members = gql(
+        ORGANIZATION_MEMBERS_QUERY,
+        {'organizationId': organization_id},
+        access_token=grace_token,
+    )
+    organization = gql(ORGANIZATION_QUERY, {'id': organization_id}, access_token=grace_token)
+    escalation = gql(
+        ASSIGN_ROLE_MUTATION,
+        {
+            'input': {
+                'membershipId': str(grace_membership.pk),
+                'roleId': str(owner_role.pk),
+            }
+        },
+        access_token=grace_token,
+    )
+
+    assert members.json()['data']['organizationMembers'] == []
+    assert organization.json()['data']['organization'] is None
+    assert escalation.json()['data']['assignRoleToMembership']['success'] is False
+
+
 def test_role_schema_omits_sensitive_fields_and_client_identity(gql):
     schema_text = str(root_schema)
     assert 'myOrganizationRoles' in schema_text

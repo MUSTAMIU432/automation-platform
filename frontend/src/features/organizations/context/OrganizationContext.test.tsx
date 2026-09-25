@@ -66,6 +66,18 @@ function role(id: string, org: ReturnType<typeof organization>, name = 'Owner') 
         createdAt: org.createdAt,
         updatedAt: org.updatedAt,
       },
+      ...(name === 'Owner'
+        ? [
+            {
+              id: 'permission-organization-members-manage',
+              code: 'organization.members.manage',
+              name: 'Manage organization members',
+              description: 'Manage members.',
+              createdAt: org.createdAt,
+              updatedAt: org.updatedAt,
+            },
+          ]
+        : []),
     ],
   }
 }
@@ -83,7 +95,7 @@ function membershipItem(id: string, name: string, slug: string) {
       organization: org,
       roles:
         id === 'org-2'
-          ? [role(id, org, 'Owner'), role(id, org, 'Admin')]
+          ? [role(id, org, 'Admin'), role(id, org, 'Viewer')]
           : [role(id, org, 'Owner')],
     },
   }
@@ -96,6 +108,7 @@ function ContextProbe() {
     activeOrganization,
     activeMembership,
     error,
+    hasPermission,
     createOrganization,
     setActiveOrganization,
     reload,
@@ -110,6 +123,8 @@ function ContextProbe() {
         {activeMembership?.roles.map((item) => item.name).join(', ') ?? 'none'}
       </p>
       <p data-testid="error">{error ?? ''}</p>
+      <p data-testid="can-view">{String(hasPermission('organization.view'))}</p>
+      <p data-testid="can-manage">{String(hasPermission('organization.members.manage'))}</p>
       <button type="button" onClick={() => setActiveOrganization('org-2')}>
         Select second
       </button>
@@ -181,6 +196,8 @@ describe('OrganizationProvider', () => {
     expect(screen.getByTestId('count')).toHaveTextContent('2')
     expect(screen.getByTestId('active')).toHaveTextContent('Acme Labs')
     expect(screen.getByTestId('roles')).toHaveTextContent('Owner')
+    expect(screen.getByTestId('can-view')).toHaveTextContent('true')
+    expect(screen.getByTestId('can-manage')).toHaveTextContent('true')
     expect(mockedOrganizations).toHaveBeenCalledOnce()
   })
 
@@ -191,7 +208,9 @@ describe('OrganizationProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select second' }))
 
     expect(screen.getByTestId('active')).toHaveTextContent('Beta Works')
-    expect(screen.getByTestId('roles')).toHaveTextContent('Owner, Admin')
+    expect(screen.getByTestId('roles')).toHaveTextContent('Admin, Viewer')
+    expect(screen.getByTestId('can-view')).toHaveTextContent('true')
+    expect(screen.getByTestId('can-manage')).toHaveTextContent('false')
     expect(mockedOrganizations).toHaveBeenCalledOnce()
   })
 

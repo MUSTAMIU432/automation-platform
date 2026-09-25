@@ -167,6 +167,13 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
     () => visibleMemberships.find((item) => item.organization.id === activeOrganizationId) ?? null,
     [activeOrganizationId, visibleMemberships],
   )
+  const hasPermission = useCallback(
+    (permissionCode: string) =>
+      activeMembership?.membership.roles.some((role) =>
+        role.permissions.some((permission) => permission.code === permissionCode),
+      ) ?? false,
+    [activeMembership],
+  )
 
   const value = useMemo<OrganizationContextValue>(
     () => ({
@@ -175,6 +182,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       activeOrganization: activeMembership?.organization ?? null,
       activeMembership: activeMembership?.membership ?? null,
       error: hasCurrentSession ? error : null,
+      hasPermission,
       createOrganization,
       setActiveOrganization,
       reload,
@@ -184,6 +192,7 @@ export function OrganizationProvider({ children }: OrganizationProviderProps) {
       createOrganization,
       error,
       hasCurrentSession,
+      hasPermission,
       reload,
       setActiveOrganization,
       visibleMemberships,

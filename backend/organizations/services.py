@@ -4,6 +4,15 @@ from django.db import IntegrityError, transaction
 from django.utils.text import slugify
 
 from identity.models import User
+from organizations import authorization
+from organizations.authorization import (
+    ORGANIZATION_CREATE,
+    ORGANIZATION_MEMBERS_MANAGE,
+    ORGANIZATION_MEMBERS_VIEW,
+    ORGANIZATION_UPDATE,
+    ORGANIZATION_VIEW,
+    AuthorizationError,
+)
 from organizations.models import (
     Membership,
     MembershipRole,
@@ -14,11 +23,14 @@ from organizations.models import (
 )
 
 
-class OrganizationError(Exception):
-    def __init__(self, message: str, field: str | None = None):
-        super().__init__(message)
-        self.message = message
-        self.field = field
+class OrganizationError(AuthorizationError):
+    def __init__(
+        self,
+        message: str,
+        field: str | None = None,
+        reason: str = 'forbidden',
+    ):
+        super().__init__(message, reason=reason, field=field)
 
 
 @dataclass(frozen=True)
@@ -35,27 +47,27 @@ class OrganizationMembership:
 
 PERMISSION_DEFINITIONS = (
     (
-        'organization.view',
+        ORGANIZATION_VIEW,
         'View organization',
         'View the organization workspace and its details.',
     ),
     (
-        'organization.create',
+        ORGANIZATION_CREATE,
         'Create organization',
         'Create a new organization workspace.',
     ),
     (
-        'organization.update',
+        ORGANIZATION_UPDATE,
         'Update organization',
         'Update organization details.',
     ),
     (
-        'organization.members.view',
+        ORGANIZATION_MEMBERS_VIEW,
         'View organization members',
         'View active memberships in the organization.',
     ),
     (
-        'organization.members.manage',
+        ORGANIZATION_MEMBERS_MANAGE,
         'Manage organization members',
         'Manage organization memberships and their roles.',
     ),
@@ -65,7 +77,10 @@ DEFAULT_OWNER_ROLE_SLUG = 'owner'
 
 def _require_active_user(user: User | None) -> User:
     if user is None or not user.is_active:
-        raise OrganizationError('You must be signed in to access organizations.')
+        raise OrganizationError(
+            'You must be signed in to access organizations.',
+            reason='unauthenticated',
+        )
     return user
 
 
@@ -110,6 +125,17 @@ def _role_queryset():
     return Role.objects.select_related('organization').prefetch_related(
         'role_permissions__permission'
     )
+
+
+def _require_permission(
+    user: User | None,
+    organization: Organization | object,
+    permission_code: str,
+) -> Membership:
+    try:
+        return authorization.require_permission(user, organization, permission_code)
+    except AuthorizationError as exc:
+        raise OrganizationError(exc.message, field=exc.field, reason=exc.reason) from None
 
 
 def create_organization_for_user(
@@ -199,16 +225,12 @@ def get_organization_for_user(user: User | None, organization_id: object) -> Org
     except (TypeError, ValueError):
         return None
 
-    membership = (
-        Membership.objects.filter(
-            user=user,
-            organization_id=normalized_id,
-            status=Membership.Status.ACTIVE,
-        )
-        .select_related('organization')
-        .first()
-    )
-    return membership.organization if membership else None
+    membership = authorization.get_membership(user, normalized_id)
+    if membership is None or not authorization.membership_has_permission(
+        membership, ORGANIZATION_VIEW
+    ):
+        return None
+    return membership.organization
 
 
 def list_memberships_for_organization(
@@ -222,6 +244,9 @@ def list_memberships_for_organization(
     except (TypeError, ValueError):
         return []
 
+    if not authorization.has_permission(user, normalized_id, ORGANIZATION_MEMBERS_VIEW):
+        return []
+
     memberships = (
         Membership.objects.filter(
             organization_id=normalized_id,
@@ -232,6 +257,7 @@ def list_memberships_for_organization(
         .select_related('user', 'organization')
         .prefetch_related('membership_roles__role__role_permissions__permission')
         .order_by('user__email')
+        .distinct()
     )
     return list(memberships)
 
@@ -240,17 +266,23 @@ def list_roles_for_user(user: User | None, organization_id: object | None = None
     if user is None or not user.is_active:
         return []
 
-    roles = _role_queryset().filter(
-        organization__memberships__user=user,
-        organization__memberships__status=Membership.Status.ACTIVE,
-    )
     if organization_id is not None:
         try:
             normalized_id = int(str(organization_id))
         except (TypeError, ValueError):
             return []
-        roles = roles.filter(organization_id=normalized_id)
+        if not authorization.has_permission(user, normalized_id, ORGANIZATION_VIEW):
+            return []
+        organization_filter = {'organization_id': normalized_id}
+    else:
+        organization_filter = {}
 
+    roles = _role_queryset().filter(
+        organization__memberships__user=user,
+        organization__memberships__status=Membership.Status.ACTIVE,
+        role_permissions__permission__code=ORGANIZATION_VIEW,
+        **organization_filter,
+    )
     return list(roles.distinct().order_by('organization__name', 'name', 'slug'))
 
 
@@ -263,7 +295,7 @@ def get_role_for_user(user: User | None, role_id: object) -> Role | None:
     except (TypeError, ValueError):
         return None
 
-    return (
+    role = (
         _role_queryset()
         .filter(
             id=normalized_id,
@@ -272,6 +304,9 @@ def get_role_for_user(user: User | None, role_id: object) -> Role | None:
         )
         .first()
     )
+    if role is None or not authorization.has_permission(user, role.organization, ORGANIZATION_VIEW):
+        return None
+    return role
 
 
 def list_permissions_for_role(user: User | None, role_id: object) -> list[Permission]:
@@ -279,6 +314,19 @@ def list_permissions_for_role(user: User | None, role_id: object) -> list[Permis
     if role is None:
         return []
     return [role_permission.permission for role_permission in role.role_permissions.all()]
+
+
+def _membership_in_actor_organization(user: User, membership_id: int) -> Membership | None:
+    return (
+        Membership.objects.filter(
+            id=membership_id,
+            organization__memberships__user=user,
+            organization__memberships__status=Membership.Status.ACTIVE,
+        )
+        .select_for_update()
+        .select_related('organization')
+        .first()
+    )
 
 
 def assign_role_to_membership(
@@ -289,26 +337,22 @@ def assign_role_to_membership(
     normalized_role_id = _normalize_id(role_id, 'roleId')
 
     with transaction.atomic():
-        try:
-            membership = (
-                Membership.objects.select_for_update()
-                .select_related('organization')
-                .get(id=normalized_membership_id)
-            )
-            role = _role_queryset().select_for_update().get(id=normalized_role_id)
-        except (Membership.DoesNotExist, Role.DoesNotExist):
-            raise OrganizationError('Membership or role not found.') from None
+        membership = _membership_in_actor_organization(user, normalized_membership_id)
+        if membership is None:
+            raise OrganizationError('Membership or role not found.')
 
-        if membership.organization_id != role.organization_id:
-            raise OrganizationError('Membership and role must belong to the same organization.')
+        role = (
+            _role_queryset()
+            .filter(id=normalized_role_id, organization_id=membership.organization_id)
+            .select_for_update()
+            .first()
+        )
+        if role is None:
+            raise OrganizationError('Membership or role not found.')
+
+        _require_permission(user, membership.organization, ORGANIZATION_MEMBERS_MANAGE)
         if membership.status != Membership.Status.ACTIVE:
             raise OrganizationError('Roles can only be assigned to active memberships.')
-        if not Membership.objects.filter(
-            user=user,
-            organization_id=membership.organization_id,
-            status=Membership.Status.ACTIVE,
-        ).exists():
-            raise OrganizationError('You must belong to the organization to manage its roles.')
 
         if MembershipRole.objects.filter(membership=membership, role=role).exists():
             raise OrganizationError('This membership already has this role.')
@@ -325,20 +369,32 @@ def remove_role_from_membership(user: User | None, membership_id: object, role_i
     normalized_role_id = _normalize_id(role_id, 'roleId')
 
     with transaction.atomic():
-        try:
-            membership = Membership.objects.select_for_update().get(id=normalized_membership_id)
-            role = Role.objects.get(id=normalized_role_id)
-        except (Membership.DoesNotExist, Role.DoesNotExist):
-            raise OrganizationError('Membership or role not found.') from None
+        membership = _membership_in_actor_organization(user, normalized_membership_id)
+        if membership is None:
+            raise OrganizationError('Membership or role not found.')
 
-        if membership.organization_id != role.organization_id:
-            raise OrganizationError('Membership and role must belong to the same organization.')
-        if not Membership.objects.filter(
-            user=user,
-            organization_id=membership.organization_id,
-            status=Membership.Status.ACTIVE,
-        ).exists():
-            raise OrganizationError('You must belong to the organization to manage its roles.')
+        role = (
+            _role_queryset()
+            .filter(id=normalized_role_id, organization_id=membership.organization_id)
+            .select_for_update()
+            .first()
+        )
+        if role is None:
+            raise OrganizationError('Membership or role not found.')
+
+        _require_permission(user, membership.organization, ORGANIZATION_MEMBERS_MANAGE)
+        if membership.status != Membership.Status.ACTIVE:
+            raise OrganizationError('Roles can only be removed from active memberships.')
+
+        if role.is_system:
+            other_active_holders = MembershipRole.objects.filter(
+                role=role,
+                membership__status=Membership.Status.ACTIVE,
+            ).exclude(membership=membership)
+            if not other_active_holders.exists():
+                raise OrganizationError(
+                    'The last active holder of a system role cannot be removed.'
+                )
 
         deleted, _ = MembershipRole.objects.filter(membership=membership, role=role).delete()
         if not deleted:

@@ -16,6 +16,7 @@ export interface OrganizationContextValue {
   activeOrganization: Organization | null
   activeMembership: OrganizationMembership['membership'] | null
   error: string | null
+  hasPermission: (permissionCode: string) => boolean
   createOrganization: (name: string, slug?: string) => Promise<CreateOrganizationOutcome>
   setActiveOrganization: (organizationId: string) => void
   reload: () => Promise<void>

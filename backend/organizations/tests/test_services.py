@@ -26,6 +26,15 @@ def _make_user(email='ada@example.com', **overrides):
     return User.objects.create_user(email=email, **fields)
 
 
+def _grant_role(user, organization, slug, *permission_codes):
+    membership = Membership.objects.get(user=user, organization=organization)
+    role = Role.objects.create(organization=organization, name=slug.title(), slug=slug)
+    for code in permission_codes:
+        RolePermission.objects.create(role=role, permission=Permission.objects.get(code=code))
+    MembershipRole.objects.create(membership=membership, role=role)
+    return role
+
+
 @pytest.mark.django_db
 class TestCreateOrganizationForUser:
     def test_creates_organization_and_active_creator_membership(self):
@@ -234,6 +243,7 @@ class TestOrganizationAccessServices:
         other_user = _make_user('grace@example.com')
         organization = Organization.objects.create(name='Acme Labs', slug='acme-labs')
         Membership.objects.create(user=other_user, organization=organization)
+        _grant_role(other_user, organization, 'viewer', 'organization.view')
 
         assert services.get_organization_for_user(user, organization.pk) is None
         assert services.get_organization_for_user(other_user, organization.pk) == organization
@@ -243,6 +253,7 @@ class TestOrganizationAccessServices:
         other_user = _make_user('grace@example.com')
         organization = Organization.objects.create(name='Acme Labs', slug='acme-labs')
         membership = Membership.objects.create(user=other_user, organization=organization)
+        _grant_role(other_user, organization, 'member-viewer', 'organization.members.view')
 
         assert services.list_memberships_for_organization(user, organization.pk) == []
         assert services.list_memberships_for_organization(other_user, organization.pk) == [
@@ -342,7 +353,7 @@ class TestRoleServices:
         membership = second.membership
         role = Role.objects.get(organization=first.organization, slug='owner')
 
-        with pytest.raises(services.OrganizationError, match='same organization'):
+        with pytest.raises(services.OrganizationError, match='Membership or role not found'):
             services.assign_role_to_membership(other_owner, membership.pk, role.pk)
 
     def test_rejects_duplicate_role_assignment(self):
@@ -372,13 +383,28 @@ class TestRoleServices:
         created = services.create_organization_for_user(
             owner, services.CreateOrganizationInput(name='Acme Labs')
         )
-        owner_role = Role.objects.get(organization=created.organization, slug='owner')
+        admin_role = Role.objects.create(
+            organization=created.organization,
+            name='Admin',
+            slug='admin',
+        )
+        MembershipRole.objects.create(membership=created.membership, role=admin_role)
 
-        services.remove_role_from_membership(owner, created.membership.pk, owner_role.pk)
+        services.remove_role_from_membership(owner, created.membership.pk, admin_role.pk)
 
         assert not MembershipRole.objects.filter(
             membership=created.membership,
-            role=owner_role,
+            role=admin_role,
         ).exists()
         with pytest.raises(services.OrganizationError, match='does not have this role'):
+            services.remove_role_from_membership(owner, created.membership.pk, admin_role.pk)
+
+    def test_cannot_remove_system_role_from_last_active_holder(self):
+        owner = _make_user()
+        created = services.create_organization_for_user(
+            owner, services.CreateOrganizationInput(name='Acme Labs')
+        )
+        owner_role = Role.objects.get(organization=created.organization, slug='owner')
+
+        with pytest.raises(services.OrganizationError, match='last active holder'):
             services.remove_role_from_membership(owner, created.membership.pk, owner_role.pk)
