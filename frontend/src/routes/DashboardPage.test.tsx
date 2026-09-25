@@ -1,18 +1,22 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setAccessToken } from '../graphql/tokenStore'
 import { AuthProvider } from '../features/identity/auth/AuthContext'
-import { logoutRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
+import { logoutRequest, meRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
 import { DashboardPage } from './DashboardPage'
 
 vi.mock('../features/identity/auth/authApi', () => ({
   loginRequest: vi.fn(),
+  googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
 const mockedLogout = vi.mocked(logoutRequest)
 
 const USER = {
@@ -40,12 +44,19 @@ function renderDashboard() {
 
 describe('DashboardPage', () => {
   beforeEach(() => {
+    vi.resetAllMocks()
+    setAccessToken(null)
     mockedRefresh.mockResolvedValue({
       success: true,
       message: 'ok',
       session: { accessToken: 'token', accessTokenExpiresAt: '2099-01-01', user: USER },
     })
+    mockedMe.mockResolvedValue(USER)
     mockedLogout.mockResolvedValue(undefined)
+  })
+
+  afterEach(() => {
+    setAccessToken(null)
   })
 
   it('shows the signed-in user email', async () => {

@@ -4,15 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react'
 
-import { setAccessToken } from '../../../graphql/tokenStore'
+import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
 import {
   googleLoginRequest,
   loginRequest,
   logoutRequest,
+  meRequest,
   refreshTokenRequest,
   type AuthUser,
 } from './authApi'
@@ -38,6 +40,45 @@ interface AuthProviderProps {
   children: ReactNode
 }
 
+interface ResolvedSession {
+  accessToken: string
+  user: AuthUser
+}
+
+/**
+ * Establishes the current session the way `me` makes authoritative: an
+ * in-memory access token (if any) is confirmed via `me` first, rather than
+ * assumed valid; if that doesn't resolve to a user (no token yet, or an
+ * expired/invalid one), the existing refresh mechanism is tried exactly
+ * once, and `me` is checked again with whatever token that produces. Never
+ * loops beyond that single refresh attempt - a failed refresh (or a `me`
+ * that still fails afterwards) resolves to `null`, not another retry.
+ *
+ * Used for the mount-time bootstrap below. `login`/`loginWithGoogle`
+ * deliberately don't route through this - their own mutation's returned
+ * `user` is already a fresh, server-validated result from the same
+ * request, and re-querying `me` immediately afterwards would just be an
+ * extra round trip proving what the mutation already established.
+ */
+async function resolveSession(isCurrent: () => boolean): Promise<ResolvedSession | null> {
+  const existingToken = getAccessToken()
+  if (existingToken && isCurrent()) {
+    const user = await meRequest().catch(() => null)
+    if (!isCurrent()) return null
+    if (user) return { accessToken: existingToken, user }
+  }
+
+  if (!isCurrent()) return null
+  const refreshResult = await refreshTokenRequest().catch(() => null)
+  if (!isCurrent() || !refreshResult?.success || !refreshResult.session) return null
+
+  setAccessToken(refreshResult.session.accessToken)
+  const user = await meRequest().catch(() => null)
+  if (!isCurrent() || !user) return null
+
+  return { accessToken: refreshResult.session.accessToken, user }
+}
+
 /**
  * Owns the app's authentication state, so it isn't scattered across
  * components - everything else reads it through `useAuth()`.
@@ -51,8 +92,11 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [user, setUser] = useState<AuthUser | null>(null)
+  const authVersionRef = useRef(0)
+  const bootstrapPromiseRef = useRef<Promise<ResolvedSession | null> | null>(null)
 
-  const applySession = useCallback((session: { accessToken: string; user: AuthUser } | null) => {
+  const applySession = useCallback((session: ResolvedSession | null) => {
+    authVersionRef.current += 1
     if (session) {
       setAccessToken(session.accessToken)
       setUser(session.user)
@@ -67,17 +111,23 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     // On first load (including a hard refresh) there's no access token in
     // memory yet - only the httpOnly refresh cookie the browser already
-    // holds, if any. Try to exchange it for a fresh access token before
-    // deciding whether the app is authenticated.
+    // holds, if any - so resolveSession()'s own token check is normally a
+    // no-op here and it goes straight to refresh; the check still exists
+    // because this effect is the same bootstrap path a provider remount
+    // within an already-running tab would take, and that case *can* have
+    // a token already in memory.
     let cancelled = false
+    const authVersion = authVersionRef.current
+    const isCurrent = () => authVersionRef.current === authVersion
+    const bootstrapPromise = bootstrapPromiseRef.current ?? resolveSession(isCurrent)
+    bootstrapPromiseRef.current = bootstrapPromise
 
-    refreshTokenRequest()
-      .then((result) => {
-        if (cancelled) return
-        applySession(result.success && result.session ? result.session : null)
+    bootstrapPromise
+      .then((session) => {
+        if (!cancelled && isCurrent()) applySession(session)
       })
       .catch(() => {
-        if (!cancelled) applySession(null)
+        if (!cancelled && isCurrent()) applySession(null)
       })
 
     return () => {
@@ -111,13 +161,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // (if any) is deliberately swallowed, not just ignored via `finally`:
     // callers can treat `logout()` as always succeeding locally, the same
     // way the backend's own logout mutation is designed to never fail.
+    const request = logoutRequest()
+    applySession(null)
     try {
-      await logoutRequest()
+      await request
     } catch {
       // Best-effort: the server-side session may not have been revoked,
       // but there is nothing actionable for the caller to do about it.
-    } finally {
-      applySession(null)
     }
     // react-hooks/exhaustive-deps requires applySession here; oxlint's own
     // react/memo-dependencies flags the same dependency as unnecessary

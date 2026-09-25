@@ -1,17 +1,21 @@
 import { screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { refreshTokenRequest } from '../features/identity/auth/authApi'
+import { setAccessToken } from '../graphql/tokenStore'
+import { meRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
 import { renderRoutes } from '../test/renderWithRouter'
 import { router } from './routes'
 
 vi.mock('../features/identity/auth/authApi', () => ({
   loginRequest: vi.fn(),
+  googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
 
 const USER = {
   id: '1',
@@ -26,7 +30,14 @@ const USER = {
 // Reuse the real route tree with an in-memory router.
 describe('route tree', () => {
   beforeEach(() => {
+    vi.resetAllMocks()
+    setAccessToken(null)
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    mockedMe.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    setAccessToken(null)
   })
 
   it('renders the home page at /', () => {
@@ -70,6 +81,7 @@ describe('route tree', () => {
       message: 'ok',
       session: { accessToken: 'token', accessTokenExpiresAt: '2099-01-01', user: USER },
     })
+    mockedMe.mockResolvedValue(USER)
 
     renderRoutes(router.routes, '/app')
 

@@ -106,6 +106,21 @@ class TestDecodeAccessToken:
         with pytest.raises(TokenError):
             decode_access_token(token)
 
+    @pytest.mark.parametrize('missing_claim', ['iat', 'exp'])
+    def test_rejects_a_token_missing_a_timestamp_claim(self, missing_claim):
+        payload = {
+            'sub': '42',
+            'type': ACCESS_TOKEN_TYPE,
+            'jti': 'x',
+            'iat': int(time.time()),
+            'exp': int(time.time()) + 3600,
+        }
+        payload.pop(missing_claim)
+        token = jwt.encode(payload, settings.JWT_SIGNING_KEY, algorithm='HS256')
+
+        with pytest.raises(TokenError):
+            decode_access_token(token)
+
     def test_rejects_the_none_algorithm(self):
         # Classic JWT attack: set alg=none and strip the signature, hoping a
         # lenient decoder accepts it unsigned. Pinning `algorithms=['HS256']`

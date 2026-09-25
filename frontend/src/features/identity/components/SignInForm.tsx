@@ -13,12 +13,17 @@ import { TextField } from './TextField'
 interface SignInFormProps {
   onSwitchToSignUp: () => void
   onForgotPassword: () => void
+  returnTo?: string
 }
 
 const INITIAL_VALUES: SignInFormValues = { email: '', password: '' }
 
 /** Sign in form: email/password, Google button, and a switch into sign up. */
-export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormProps) {
+export function SignInForm({
+  onSwitchToSignUp,
+  onForgotPassword,
+  returnTo = '/app',
+}: SignInFormProps) {
   const navigate = useNavigate()
   const { login, loginWithGoogle } = useAuth()
   const [values, setValues] = useState<SignInFormValues>(INITIAL_VALUES)
@@ -35,14 +40,14 @@ export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormPro
       const result = await loginWithGoogle(credential)
 
       if (result.success) {
-        navigate('/app', { replace: true })
+        navigate(returnTo, { replace: true })
         return
       }
 
       setAuthError(result.message)
       setStatus('idle')
     },
-    [loginWithGoogle, navigate],
+    [loginWithGoogle, navigate, returnTo],
   )
   const googleSignIn = useGoogleSignIn(handleGoogleCredential)
 
@@ -70,7 +75,7 @@ export function SignInForm({ onSwitchToSignUp, onForgotPassword }: SignInFormPro
     const result = await login(values.email, values.password)
 
     if (result.success) {
-      navigate('/app', { replace: true })
+      navigate(returnTo, { replace: true })
       return
     }
 

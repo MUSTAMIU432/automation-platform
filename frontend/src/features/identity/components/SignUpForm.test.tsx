@@ -1,8 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setAccessToken } from '../../../graphql/tokenStore'
 import { renderWithProviders } from '../../../test/renderWithRouter'
-import { refreshTokenRequest } from '../auth/authApi'
+import { meRequest, refreshTokenRequest } from '../auth/authApi'
 import { SignUpForm } from './SignUpForm'
 
 vi.mock('../auth/authApi', () => ({
@@ -10,9 +11,11 @@ vi.mock('../auth/authApi', () => ({
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
 
 function fillMinimumValidFields() {
   fireEvent.change(screen.getByLabelText('First name'), { target: { value: 'Ada' } })
@@ -31,9 +34,17 @@ const TERMS_LABEL = 'I agree to the Terms of Service and Privacy Policy.'
 
 describe('SignUpForm', () => {
   beforeEach(() => {
+    setAccessToken(null)
     // No pre-existing session: every test starts unauthenticated, not
     // redirected/pre-authenticated by the mount-time silent refresh.
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    mockedMe.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    // Isolation: a previous test's session must not leak into the next
+    // one's mount-time bootstrap via the shared in-memory token store.
+    setAccessToken(null)
   })
 
   it('shows required-field errors when submitted empty', async () => {

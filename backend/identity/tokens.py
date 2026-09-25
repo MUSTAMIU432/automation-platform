@@ -80,9 +80,15 @@ def decode_access_token(token: str) -> AccessTokenClaims:
     except (KeyError, TypeError, ValueError) as exc:
         raise TokenError('Invalid or expired access token.') from exc
 
+    try:
+        issued_at = datetime.fromtimestamp(payload['iat'], tz=UTC)
+        expires_at = datetime.fromtimestamp(payload['exp'], tz=UTC)
+    except (KeyError, TypeError, ValueError, OverflowError, OSError) as exc:
+        raise TokenError('Invalid or expired access token.') from exc
+
     return AccessTokenClaims(
         user_id=user_id,
         token_id=payload.get('jti', ''),
-        issued_at=datetime.fromtimestamp(payload['iat'], tz=UTC),
-        expires_at=datetime.fromtimestamp(payload['exp'], tz=UTC),
+        issued_at=issued_at,
+        expires_at=expires_at,
     )

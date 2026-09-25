@@ -1,8 +1,24 @@
 from django.conf import settings
+from django.http import HttpRequest, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from strawberry.django.views import GraphQLView
 
+from .context import AuthenticatedGraphQLContext
 from .schema import schema
+
+
+class _AuthenticatedGraphQLView(GraphQLView):
+    """
+    The only change from Strawberry's own `GraphQLView`: the request
+    context is `AuthenticatedGraphQLContext` (adds `user`, cached) instead
+    of the base `StrawberryDjangoContext` - see `graphql_api/context.py`.
+    """
+
+    def get_context(
+        self, request: HttpRequest, response: HttpResponse
+    ) -> AuthenticatedGraphQLContext:
+        return AuthenticatedGraphQLContext(request=request, response=response)
+
 
 # CSRF-exempt, revisited for Sprint 1 (S1-003): a cookie now flows through
 # this endpoint (the HttpOnly refresh-token cookie - see identity/schema.py),
@@ -19,7 +35,7 @@ from .schema import schema
 # browser from attaching it to a genuinely cross-site POST at all,
 # independent of CORS. See docs/architecture.md for the full writeup.
 graphql_view = csrf_exempt(
-    GraphQLView.as_view(
+    _AuthenticatedGraphQLView.as_view(
         schema=schema,
         graphql_ide='graphiql' if settings.DEBUG else None,
     )

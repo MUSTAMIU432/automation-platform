@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom'
+import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
 
@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext'
  */
 export function RequireAuth() {
   const { status } = useAuth()
+  const location = useLocation()
 
   if (status === 'loading') {
     return (
@@ -20,7 +21,7 @@ export function RequireAuth() {
   }
 
   if (status === 'unauthenticated') {
-    return <Navigate to="/auth" replace />
+    return <Navigate to="/auth" replace state={{ from: location }} />
   }
 
   return <Outlet />

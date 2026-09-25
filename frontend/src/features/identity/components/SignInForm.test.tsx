@@ -1,8 +1,9 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setAccessToken } from '../../../graphql/tokenStore'
 import { renderWithProviders } from '../../../test/renderWithRouter'
-import { googleLoginRequest, loginRequest, refreshTokenRequest } from '../auth/authApi'
+import { googleLoginRequest, loginRequest, meRequest, refreshTokenRequest } from '../auth/authApi'
 import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { SignInForm } from './SignInForm'
 
@@ -11,6 +12,7 @@ vi.mock('../auth/authApi', () => ({
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 // SignInForm's own responsibility ends at wiring GoogleAuthButton to
@@ -23,6 +25,7 @@ vi.mock('../auth/useGoogleSignIn', () => ({
 const mockedLogin = vi.mocked(loginRequest)
 const mockedGoogleLogin = vi.mocked(googleLoginRequest)
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
 const mockedUseGoogleSignIn = vi.mocked(useGoogleSignIn)
 
 /** Captures the `onCredential` callback SignInForm passes to the hook, so
@@ -40,10 +43,18 @@ function stubGoogleSignIn({ isConfigured = true } = {}) {
 
 describe('SignInForm', () => {
   beforeEach(() => {
+    setAccessToken(null)
     // No pre-existing session: every test starts from the sign-in form,
     // not redirected/pre-authenticated by the mount-time silent refresh.
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    mockedMe.mockResolvedValue(null)
     stubGoogleSignIn()
+  })
+
+  afterEach(() => {
+    // Isolation: a previous test's session must not leak into the next
+    // one's mount-time bootstrap via the shared in-memory token store.
+    setAccessToken(null)
   })
 
   it('shows required-field errors when submitted empty', async () => {

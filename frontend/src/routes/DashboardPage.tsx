@@ -11,8 +11,8 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
 
-  async function handleLogout() {
-    await logout()
+  function handleLogout() {
+    void logout()
     navigate('/auth', { replace: true })
   }
 

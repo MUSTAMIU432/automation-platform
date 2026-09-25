@@ -92,6 +92,12 @@ const GOOGLE_LOGIN_MUTATION = `
   }
 `
 
+const ME_QUERY = `
+  query Me {
+    me { ${USER_FIELDS} }
+  }
+`
+
 function toAuthResult(payload: RawAuthPayload): AuthResult {
   if (payload.success && payload.accessToken && payload.accessTokenExpiresAt && payload.user) {
     return {
@@ -141,4 +147,20 @@ export async function googleLoginRequest(credential: string): Promise<AuthResult
     input: { credential },
   })
   return toAuthResult(data.googleLogin)
+}
+
+/**
+ * The one query AuthContext uses to confirm "who is the currently
+ * authenticated user" for whatever access token is currently in
+ * `tokenStore` - the canonical source of truth for bootstrapping a session
+ * (see AuthContext's mount-time logic), not the `user` object embedded in
+ * a login/refresh mutation's own response (which is a same-request
+ * convenience, not re-checked independently). Returns `null` for the same
+ * reason the backend's `me` resolver does - a missing, invalid, expired,
+ * wrong-type, or inactive-user token - never throws for that; a thrown
+ * error here means something else went wrong (network, transport).
+ */
+export async function meRequest(): Promise<AuthUser | null> {
+  const data = await graphqlClient.request<{ me: AuthUser | null }>(ME_QUERY)
+  return data.me
 }

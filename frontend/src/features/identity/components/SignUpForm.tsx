@@ -14,6 +14,7 @@ import { TextField } from './TextField'
 
 interface SignUpFormProps {
   onSwitchToSignIn: () => void
+  returnTo?: string
 }
 
 const INITIAL_VALUES: SignUpFormValues = {
@@ -35,7 +36,7 @@ const LEGAL_LINK_CLASSES =
  * details (photo, country/city, bio, job title, organization, skills, etc.)
  * are completed later, from the dashboard, after authentication.
  */
-export function SignUpForm({ onSwitchToSignIn }: SignUpFormProps) {
+export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormProps) {
   const navigate = useNavigate()
   const { loginWithGoogle } = useAuth()
   const [values, setValues] = useState<SignUpFormValues>(INITIAL_VALUES)
@@ -56,14 +57,14 @@ export function SignUpForm({ onSwitchToSignIn }: SignUpFormProps) {
       const result = await loginWithGoogle(credential)
 
       if (result.success) {
-        navigate('/app', { replace: true })
+        navigate(returnTo, { replace: true })
         return
       }
 
       setGoogleError(result.message)
       setStatus('idle')
     },
-    [loginWithGoogle, navigate],
+    [loginWithGoogle, navigate, returnTo],
   )
   const googleSignIn = useGoogleSignIn(handleGoogleCredential)
 

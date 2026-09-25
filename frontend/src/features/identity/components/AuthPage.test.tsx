@@ -1,8 +1,11 @@
-import { fireEvent, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setAccessToken } from '../../../graphql/tokenStore'
 import { renderWithProviders } from '../../../test/renderWithRouter'
-import { refreshTokenRequest } from '../auth/authApi'
+import { AuthProvider } from '../auth/AuthContext'
+import { loginRequest, meRequest, refreshTokenRequest } from '../auth/authApi'
 import { AuthPage } from './AuthPage'
 
 vi.mock('../auth/authApi', () => ({
@@ -10,13 +13,28 @@ vi.mock('../auth/authApi', () => ({
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
+const mockedLogin = vi.mocked(loginRequest)
 
 describe('AuthPage', () => {
   beforeEach(() => {
+    vi.resetAllMocks()
+    setAccessToken(null)
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    mockedMe.mockResolvedValue(null)
+    mockedLogin.mockResolvedValue({
+      success: false,
+      message: 'Invalid email or password.',
+      session: null,
+    })
+  })
+
+  afterEach(() => {
+    setAccessToken(null)
   })
 
   it('renders with sign in as the default mode', () => {
@@ -31,6 +49,53 @@ describe('AuthPage', () => {
     renderWithProviders(<AuthPage />)
 
     expect(screen.getByRole('button', { name: 'Continue with Google' })).toBeInTheDocument()
+  })
+
+  it('returns to the protected location after sign in', async () => {
+    mockedLogin.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      session: {
+        accessToken: 'login-token',
+        accessTokenExpiresAt: '2099-01-01',
+        user: {
+          id: '1',
+          email: 'ada@example.com',
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          phoneNumber: '',
+          isActive: true,
+          isVerified: true,
+        },
+      },
+    })
+
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/auth',
+            state: { from: { pathname: '/app/settings', search: '?tab=activity' } },
+          },
+        ]}
+      >
+        <AuthProvider>
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/app/settings" element={<p>Settings destination</p>} />
+          </Routes>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@example.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), {
+      target: { value: 'a-strong-unique-pass-1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    expect(await screen.findByText('Settings destination')).toBeInTheDocument()
   })
 
   it('does not expose internal implementation status to the user', () => {

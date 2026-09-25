@@ -1,9 +1,12 @@
 import json
 from unittest.mock import patch
 
+import jwt
 import pytest
+from django.conf import settings
 from django.test import Client
 
+from graphql_api.schema import schema as root_schema
 from identity.google_oauth import GoogleIdentity, GoogleTokenError
 from identity.models import ExternalIdentity, RefreshSession, User
 
@@ -221,6 +224,149 @@ def test_me_returns_the_authenticated_user(gql, client):
     )
 
     assert response.json()['data']['me']['email'] == EMAIL
+
+
+def _me_with_header(client, header_value):
+    kwargs = {}
+    if header_value is not None:
+        kwargs['HTTP_AUTHORIZATION'] = header_value
+    return client.post(
+        '/graphql/',
+        data=json.dumps({'query': ME_QUERY}),
+        content_type='application/json',
+        **kwargs,
+    )
+
+
+@pytest.mark.django_db
+def test_me_returns_null_for_an_expired_access_token(gql, client):
+    login_response = _register_and_login(gql)
+    user_id = User.objects.get(email=EMAIL).pk
+    expired_token = jwt.encode(
+        {'sub': str(user_id), 'type': 'access', 'jti': 'x', 'iat': 0, 'exp': 1},
+        settings.JWT_SIGNING_KEY,
+        algorithm='HS256',
+    )
+
+    response = _me_with_header(client, f'Bearer {expired_token}')
+
+    assert response.json()['data']['me'] is None
+    assert login_response.status_code == 200  # sanity: login itself succeeded
+
+
+@pytest.mark.django_db
+def test_me_returns_null_for_a_token_of_the_wrong_type(gql, client):
+    _register_and_login(gql)
+    user_id = User.objects.get(email=EMAIL).pk
+    wrong_type_token = jwt.encode(
+        {'sub': str(user_id), 'type': 'refresh', 'jti': 'x', 'iat': 0, 'exp': 9999999999},
+        settings.JWT_SIGNING_KEY,
+        algorithm='HS256',
+    )
+
+    response = _me_with_header(client, f'Bearer {wrong_type_token}')
+
+    assert response.json()['data']['me'] is None
+
+
+@pytest.mark.django_db
+def test_me_returns_null_for_a_token_signed_with_a_different_key(gql, client):
+    _register_and_login(gql)
+    user_id = User.objects.get(email=EMAIL).pk
+    forged_token = jwt.encode(
+        {'sub': str(user_id), 'type': 'access', 'jti': 'x', 'iat': 0, 'exp': 9999999999},
+        'not-the-real-signing-key',
+        algorithm='HS256',
+    )
+
+    response = _me_with_header(client, f'Bearer {forged_token}')
+
+    assert response.json()['data']['me'] is None
+
+
+@pytest.mark.django_db
+def test_me_returns_null_for_an_inactive_user(gql, client):
+    login_response = _register_and_login(gql)
+    access_token = login_response.json()['data']['login']['accessToken']
+    User.objects.filter(email=EMAIL).update(is_active=False)
+
+    response = _me_with_header(client, f'Bearer {access_token}')
+
+    assert response.json()['data']['me'] is None
+
+
+@pytest.mark.django_db
+def test_me_identity_comes_from_the_token_not_from_client_supplied_values(gql, client):
+    # `me` takes no arguments at all - there is no id/email/role/organization
+    # a client could pass in to influence which user is returned. Sending
+    # extra, unexpected GraphQL variables must not change the result: the
+    # access token is the only input that determines the identity.
+    login_response = _register_and_login(gql)
+    access_token = login_response.json()['data']['login']['accessToken']
+    other_user = User.objects.create_user(
+        email='someone-else@example.com',
+        first_name='Someone',
+        last_name='Else',
+        phone_number='+255700000123',
+        password='another-strong-pass-1',
+    )
+
+    response = client.post(
+        '/graphql/',
+        data=json.dumps(
+            {
+                'query': ME_QUERY,
+                # A resolver that (incorrectly) read identity from client
+                # input would need something like this to be tricked by it;
+                # `me` accepts no arguments, so this is simply ignored.
+                'variables': {'id': str(other_user.pk), 'email': other_user.email},
+            }
+        ),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {access_token}',
+    )
+
+    assert response.json()['data']['me']['email'] == EMAIL
+    assert response.json()['data']['me']['email'] != other_user.email
+
+
+@pytest.mark.django_db
+def test_me_response_never_exposes_password_or_hash(gql, client):
+    login_response = _register_and_login(gql)
+    access_token = login_response.json()['data']['login']['accessToken']
+
+    full_query = """
+    query Me {
+      me {
+        id email firstName lastName phoneNumber isActive isVerified
+      }
+    }
+    """
+    response = client.post(
+        '/graphql/',
+        data=json.dumps({'query': full_query}),
+        content_type='application/json',
+        HTTP_AUTHORIZATION=f'Bearer {access_token}',
+    )
+
+    raw_body = response.content.decode()
+    user = User.objects.get(email=EMAIL)
+    assert user.password not in raw_body
+    assert 'password' not in response.json()['data']['me']
+
+
+@pytest.mark.django_db
+def test_me_schema_has_no_password_or_secret_fields():
+    # Defense in depth at the schema level, not just the response: the
+    # UserType GraphQL type itself must never *declare* a field that could
+    # leak a secret, regardless of what any particular query selects.
+    user_type = root_schema.get_type_by_name('UserType')
+    field_names = {field.name for field in user_type.fields}  # type: ignore[union-attr]
+
+    forbidden_substrings = ('password', 'secret', 'token', 'credential', 'hash')
+    for field_name in field_names:
+        lowered = field_name.lower()
+        assert not any(bad in lowered for bad in forbidden_substrings), field_name
 
 
 # --- refreshToken ------------------------------------------------------------------

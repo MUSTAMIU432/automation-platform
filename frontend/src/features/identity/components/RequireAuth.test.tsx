@@ -1,9 +1,10 @@
 import { render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { setAccessToken } from '../../../graphql/tokenStore'
 import { AuthProvider } from '../auth/AuthContext'
-import { refreshTokenRequest } from '../auth/authApi'
+import { meRequest, refreshTokenRequest } from '../auth/authApi'
 import { RequireAuth } from './RequireAuth'
 
 vi.mock('../auth/authApi', () => ({
@@ -11,9 +12,11 @@ vi.mock('../auth/authApi', () => ({
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
   refreshTokenRequest: vi.fn(),
+  meRequest: vi.fn(),
 }))
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
+const mockedMe = vi.mocked(meRequest)
 
 const USER = {
   id: '1',
@@ -25,12 +28,17 @@ const USER = {
   isVerified: false,
 }
 
+function SignInPage() {
+  const location = useLocation()
+  return <p>Sign-in page{location.state?.from?.pathname === '/app' ? ' from /app' : ''}</p>
+}
+
 function renderProtectedRoute() {
   return render(
     <MemoryRouter initialEntries={['/app']}>
       <AuthProvider>
         <Routes>
-          <Route path="/auth" element={<p>Sign-in page</p>} />
+          <Route path="/auth" element={<SignInPage />} />
           <Route path="/app" element={<RequireAuth />}>
             <Route index element={<p>Protected content</p>} />
           </Route>
@@ -41,6 +49,17 @@ function renderProtectedRoute() {
 }
 
 describe('RequireAuth', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    setAccessToken(null)
+    mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
+    mockedMe.mockResolvedValue(null)
+  })
+
+  afterEach(() => {
+    setAccessToken(null)
+  })
+
   it('shows a non-committal loading state before the session check resolves', () => {
     mockedRefresh.mockReturnValue(new Promise(() => {})) // never resolves in this test
 
@@ -56,7 +75,7 @@ describe('RequireAuth', () => {
 
     renderProtectedRoute()
 
-    expect(await screen.findByText('Sign-in page')).toBeInTheDocument()
+    expect(await screen.findByText('Sign-in page from /app')).toBeInTheDocument()
     expect(screen.queryByText('Protected content')).not.toBeInTheDocument()
   })
 
@@ -66,6 +85,7 @@ describe('RequireAuth', () => {
       message: 'ok',
       session: { accessToken: 'token', accessTokenExpiresAt: '2099-01-01', user: USER },
     })
+    mockedMe.mockResolvedValue(USER)
 
     renderProtectedRoute()
 

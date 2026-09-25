@@ -18,7 +18,7 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 import identity.authentication as auth_service
-from identity.authentication import AuthenticationError, get_authenticated_user
+from identity.authentication import AuthenticationError
 from identity.models import User
 from identity.services import RegistrationError, RegistrationInput, register_user
 
@@ -163,7 +163,11 @@ class Query:
         )
     )
     def me(self, info: strawberry.Info) -> UserType | None:
-        user = get_authenticated_user(info.context.request)
+        # `info.context.user` (graphql_api/context.py) is the one place a
+        # resolver gets the authenticated user from - this resolver never
+        # decodes a token or reads a header itself, and neither should any
+        # future one (S1-006+).
+        user = info.context.user
         return UserType.from_model(user) if user else None
 
 
