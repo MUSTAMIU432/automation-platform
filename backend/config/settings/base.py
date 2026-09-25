@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     # Business domain apps (own their models and logic) before the GraphQL
     # adapter layer that exposes them.
     'identity',
+    'organizations',
     'graphql_api',
 ]
 

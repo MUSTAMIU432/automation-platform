@@ -3,6 +3,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { AuthPage } from '../features/identity/components/AuthPage'
 import { RequireAuth } from '../features/identity/components/RequireAuth'
 import { ResetPasswordPage } from '../features/identity/components/ResetPasswordPage'
+import { OrganizationProvider } from '../features/organizations/context/OrganizationProvider'
 import { RootLayout } from '../layouts/RootLayout'
 import { DashboardPage } from '../routes/DashboardPage'
 import { HomePage } from '../routes/HomePage'
@@ -34,6 +35,15 @@ export const router = createBrowserRouter([
   {
     path: '/app',
     element: <RequireAuth />,
-    children: [{ index: true, element: <DashboardPage /> }],
+    children: [
+      {
+        index: true,
+        element: (
+          <OrganizationProvider>
+            <DashboardPage />
+          </OrganizationProvider>
+        ),
+      },
+    ],
   },
 ])

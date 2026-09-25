@@ -16,6 +16,8 @@ import strawberry
 
 from identity.schema import Mutation as IdentityMutation
 from identity.schema import Query as IdentityQuery
+from organizations.schema import Mutation as OrganizationsMutation
+from organizations.schema import Query as OrganizationsQuery
 
 
 @strawberry.type
@@ -28,7 +30,7 @@ class ApiStatus:
 
 
 @strawberry.type
-class Query(IdentityQuery):
+class Query(IdentityQuery, OrganizationsQuery):
     @strawberry.field(
         description=(
             'Infrastructure check: proves the GraphQL endpoint is reachable and resolving.'
@@ -43,7 +45,7 @@ class Query(IdentityQuery):
 
 
 @strawberry.type
-class Mutation(IdentityMutation):
+class Mutation(IdentityMutation, OrganizationsMutation):
     @strawberry.mutation(
         description=('Infrastructure check: echoes the input to prove the mutation root resolves.')
     )

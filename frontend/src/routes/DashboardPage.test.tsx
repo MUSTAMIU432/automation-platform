@@ -4,8 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from '../graphql/tokenStore'
 import { AuthProvider } from '../features/identity/auth/AuthContext'
+import { OrganizationProvider } from '../features/organizations/context/OrganizationProvider'
+import {
+  createOrganizationRequest,
+  organizationsRequest,
+} from '../features/organizations/api/organizationApi'
 import { logoutRequest, meRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
 import { DashboardPage } from './DashboardPage'
+
+vi.mock('../features/organizations/api/organizationApi', () => ({
+  organizationsRequest: vi.fn(),
+  createOrganizationRequest: vi.fn(),
+}))
 
 vi.mock('../features/identity/auth/authApi', () => ({
   loginRequest: vi.fn(),
@@ -18,6 +28,8 @@ vi.mock('../features/identity/auth/authApi', () => ({
 const mockedRefresh = vi.mocked(refreshTokenRequest)
 const mockedMe = vi.mocked(meRequest)
 const mockedLogout = vi.mocked(logoutRequest)
+const mockedOrganizations = vi.mocked(organizationsRequest)
+const mockedCreateOrganization = vi.mocked(createOrganizationRequest)
 
 const USER = {
   id: '1',
@@ -29,14 +41,24 @@ const USER = {
   isVerified: false,
 }
 
+const ORGANIZATION = {
+  id: '10',
+  name: 'Acme Labs',
+  slug: 'acme-labs',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+}
+
 function renderDashboard() {
   return render(
     <MemoryRouter initialEntries={['/app']}>
       <AuthProvider>
-        <Routes>
-          <Route path="/auth" element={<p>Sign-in page</p>} />
-          <Route path="/app" element={<DashboardPage />} />
-        </Routes>
+        <OrganizationProvider>
+          <Routes>
+            <Route path="/auth" element={<p>Sign-in page</p>} />
+            <Route path="/app" element={<DashboardPage />} />
+          </Routes>
+        </OrganizationProvider>
       </AuthProvider>
     </MemoryRouter>,
   )
@@ -53,6 +75,33 @@ describe('DashboardPage', () => {
     })
     mockedMe.mockResolvedValue(USER)
     mockedLogout.mockResolvedValue(undefined)
+    mockedOrganizations.mockResolvedValue([
+      {
+        organization: ORGANIZATION,
+        membership: {
+          id: '20',
+          status: 'active',
+          createdAt: ORGANIZATION.createdAt,
+          updatedAt: ORGANIZATION.updatedAt,
+          user: USER,
+          organization: ORGANIZATION,
+        },
+      },
+    ])
+    mockedCreateOrganization.mockResolvedValue({
+      success: true,
+      message: 'Organization created successfully.',
+      field: null,
+      organization: ORGANIZATION,
+      membership: {
+        id: '20',
+        status: 'active',
+        createdAt: ORGANIZATION.createdAt,
+        updatedAt: ORGANIZATION.updatedAt,
+        user: USER,
+        organization: ORGANIZATION,
+      },
+    })
   })
 
   afterEach(() => {

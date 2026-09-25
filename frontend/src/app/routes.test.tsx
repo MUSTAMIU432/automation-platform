@@ -3,8 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from '../graphql/tokenStore'
 import { meRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
+import { organizationsRequest } from '../features/organizations/api/organizationApi'
 import { renderRoutes } from '../test/renderWithRouter'
 import { router } from './routes'
+
+vi.mock('../features/organizations/api/organizationApi', () => ({
+  organizationsRequest: vi.fn(),
+  createOrganizationRequest: vi.fn(),
+}))
 
 vi.mock('../features/identity/auth/authApi', () => ({
   loginRequest: vi.fn(),
@@ -16,6 +22,7 @@ vi.mock('../features/identity/auth/authApi', () => ({
 
 const mockedRefresh = vi.mocked(refreshTokenRequest)
 const mockedMe = vi.mocked(meRequest)
+const mockedOrganizations = vi.mocked(organizationsRequest)
 
 const USER = {
   id: '1',
@@ -34,6 +41,7 @@ describe('route tree', () => {
     setAccessToken(null)
     mockedRefresh.mockResolvedValue({ success: false, message: 'no session', session: null })
     mockedMe.mockResolvedValue(null)
+    mockedOrganizations.mockResolvedValue([])
   })
 
   afterEach(() => {
