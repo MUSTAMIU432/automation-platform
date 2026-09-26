@@ -16,11 +16,13 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *  # noqa: F403
 from .base import (
     ALLOWED_HOSTS,
+    CACHES,
     CORS_ALLOWED_ORIGINS,
     CSRF_TRUSTED_ORIGINS,
     ENVIRONMENT,
     JWT_SIGNING_KEY,
     SECRET_KEY,
+    SHARED_CACHE_ALIASES,
     env,
 )
 
@@ -69,6 +71,32 @@ if env.bool('DJANGO_DEBUG', default=False):
     raise ImproperlyConfigured('DJANGO_DEBUG must not be enabled in a deployed environment.')
 
 DEBUG = False
+
+# Shared cache. Two things in this project are *state the whole deployment
+# has to agree on*: `identity.google_oauth`'s replay protection (a Google ID
+# token already spent) and `identity.throttling`'s rate-limit counters (an
+# account or client already over its limit). Both are only correct across
+# more than one process if every process shares one cache - a per-process
+# in-memory backend is not a cache in that situation, it is a per-process
+# copy, and the second worker would not see what the first one recorded. A
+# deployed environment is exactly the situation where more than one process
+# runs, so this is required here rather than merely recommended.
+# See config/settings/base.py's cache section for the alias split.
+if not env('CACHE_URL', default=''):
+    raise ImproperlyConfigured(
+        'CACHE_URL must be set in a deployed environment (e.g. '
+        'redis://localhost:6379/1). A per-process cache is not usable for the '
+        'Google ID-token replay protection or authentication throttling once the '
+        'app runs as more than one process. See config/settings/base.py.'
+    )
+
+for _alias in SHARED_CACHE_ALIASES:
+    if 'locmem' in CACHES[_alias]['BACKEND'].lower():
+        raise ImproperlyConfigured(
+            f'CACHE_URL must not point at a local in-memory cache in a deployed '
+            f'environment: security state recorded by one process (the '
+            f'{_alias!r} cache) would be invisible to every other process.'
+        )
 
 if not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS:
     raise ImproperlyConfigured(

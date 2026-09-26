@@ -20,6 +20,11 @@ VALID_PRODUCTION_ENV = {
     'DATABASE_URL': 'postgres://app_user:app-password@db.example.test:5432/app',
     'CORS_ALLOWED_ORIGINS': 'https://app.example.test',
     'CSRF_TRUSTED_ORIGINS': 'https://app.example.test',
+    # Required in every deployed environment: a per-process cache is not
+    # usable for cross-process security state (Google ID-token replay
+    # protection, authentication rate limits). See
+    # tests/test_cache_configuration.py.
+    'CACHE_URL': 'redis://cache.example.test:6379/1',
 }
 
 

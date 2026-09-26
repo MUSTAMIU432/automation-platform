@@ -29,12 +29,28 @@ from identity.tokens import TokenError, decode_access_token, issue_access_token
 GENERIC_LOGIN_ERROR = 'Invalid email or password.'
 GENERIC_REFRESH_ERROR = 'Your session has expired. Please sign in again.'
 
-# Shown for every Google sign-in failure, for the same reason as
-# GENERIC_LOGIN_ERROR: an invalid/expired/replayed credential, Google
-# sign-in not being configured, an inactive account, and an email that
-# already belongs to some other account (see `authenticate_with_google`'s
-# account-linking policy) must all look identical to the caller.
+# Shown for every Google sign-in failure. An invalid/expired/replayed
+# credential, Google sign-in not being configured, an inactive account, and
+# a refused account-linking collision all collapse into this, so the caller
+# cannot tell them apart - see `authenticate_with_google`'s docstring.
 GENERIC_GOOGLE_LOGIN_ERROR = 'Could not sign in with Google.'
+
+# Shown instead of GENERIC_GOOGLE_LOGIN_ERROR, and *only* to a caller who has
+# just proven they control this exact mailbox, when the collision is refused.
+# See `GoogleEmailInUseError` for why that disclosure is safe here and why it
+# is the one exception to the rule above.
+#
+# The wording is deliberately neutral about *how* the existing account is
+# used: it does not say "sign in with your password", because the account may
+# equally belong to a different Google identity reporting the same address
+# (see `_resolve_google_user`'s collision branch), and saying so would leak
+# the existing account's history to a second party. Both actions offered are
+# correct whichever it is.
+GOOGLE_EMAIL_IN_USE_ERROR = (
+    'An account already exists for this email. '
+    'Sign in with the account you already use for this email address, '
+    'or sign up with a different email address.'
+)
 
 GOOGLE_PROVIDER = 'google'
 
@@ -48,9 +64,50 @@ class AuthenticationError(Exception):
     """
     Raised for any login/refresh/logout failure.
 
-    The message is always the generic, pre-written text above - never a
-    field name, never a distinguishing detail - so it's always safe to
-    show the caller verbatim.
+    The message is always safe to show the caller verbatim: either the
+    generic, pre-written text above, or - for the single, narrowly gated
+    exception below - text that discloses nothing to a caller who has not
+    already proven control of the mailbox in question.
+    """
+
+
+class GoogleEmailInUseError(AuthenticationError):
+    """
+    A refused account-linking collision, reported specifically.
+
+    **This is a deliberate, load-bearing exception to the generic-message
+    rule, and the gate that makes it safe is the point.**
+
+    Telling a caller "an account already exists for this email" is only safe
+    when the caller has *already* proven they control that exact mailbox -
+    and here they have. Reaching this point means the request presented a
+    Google-issued ID token that passed signature, issuer, audience and
+    expiry verification, and that its own `email_verified` claim is true.
+    Google asserts that claim only after confirming control of the mailbox,
+    so the caller could have established this fact themselves by checking
+    their own inbox.
+
+    The disclosure is therefore not an enumeration oracle, and the asymmetry
+    is worth stating plainly because it is what makes the whole difference:
+
+    - An attacker who wants to know whether `victim@example.com` has an
+      account **cannot** use this to find out. They cannot mint a Google
+      credential for an address they do not control, so the only addresses
+      they can ever get an answer about are their own - which they can
+      already check.
+    - Someone holding a stolen or phished credential for the address is, at
+      that point, already inside the mailbox this message is about.
+
+    Without that gate the change *would* be a serious regression, which is
+    why `email_verified` is checked rather than assumed. An unverified
+    credential proves nothing, and gets GENERIC_GOOGLE_LOGIN_ERROR like
+    every other failure.
+
+    What this class must never be used for: distinguishing *which kind* of
+    collision occurred (a password account vs a different Google identity),
+    revealing anything about the existing account beyond its existence, or
+    being raised for any failure other than the email collision. See
+    `_resolve_google_user`, which is the only place that raises it.
     """
 
 
@@ -198,15 +255,34 @@ def authenticate_with_google(raw_id_token: str) -> AuthenticatedSession:
     3. No such ExternalIdentity, but a User already exists with that
        email (registered with a password, or created earlier by a
        *different* Google identity reporting the same email) -> refused,
-       with the same generic message as an invalid credential. This
-       platform never links a new identity to an existing account by email
-       match alone, regardless of `email_verified` - see the security
-       note below. Only an exact `(provider, provider_subject)` match
-       (case 1) ever authenticates into an account that already exists;
-       an authenticated "link this Google account to my current session"
-       flow, initiated by an already-logged-in user, is the intended way
-       to add a second sign-in method to an existing account, and is out
-       of scope for S1-004 - see docs/architecture.md.
+       and reported specifically as `GOOGLE_EMAIL_IN_USE_ERROR` when - and
+       only when - the credential's own `email_verified` claim is true.
+       This platform never links a new identity to an existing account by
+       email match alone, regardless of `email_verified` - see the
+       security note below. Only an exact `(provider, provider_subject)`
+       match (case 1) ever authenticates into an account that already
+       exists; an authenticated "link this Google account to my current
+       session" flow, initiated by an already-logged-in user, is the
+       intended way to add a second sign-in method to an existing
+       account, and is out of scope - see docs/architecture.md.
+
+       What changed, and why only the message: the *refusal* is
+       unconditional, but the generic message for it was a usability dead
+       end - someone whose address is already registered was told
+       "Could not sign in with Google." with nothing to act on, having
+       correctly refused to be told why. Disclosing the collision to a
+       caller who has just presented a credential Google verified as
+       `email_verified` is safe, because reaching that point means they
+       have already proven control of this exact mailbox and could
+       therefore have established the fact themselves. It is not an
+       enumeration oracle: nobody can present a Google credential for an
+       address they do not control, so the only addresses anyone can get
+       an answer about are their own. The gate is enforced in
+       `_email_collision_error`, and every other failure - invalid,
+       expired, replayed or unverified credential, unconfigured client id,
+       inactive account - still answers GENERIC_GOOGLE_LOGIN_ERROR, so the
+       response still cannot be used to find out whether an arbitrary
+       address has an account. See `GoogleEmailInUseError`.
 
        Security note (revised after a dedicated review; this is a
        deliberate, load-bearing decision, not the original design):
@@ -233,10 +309,14 @@ def authenticate_with_google(raw_id_token: str) -> AuthenticatedSession:
        an argument for the opposite.)
 
     Every failure - an invalid or replayed token, Google sign-in not
-    configured, an inactive user, or an email match in case 3 - raises the
-    same AuthenticationError with the same generic message, so an
-    unauthenticated caller learns nothing about which case occurred or
-    whether an account for that email exists at all.
+    configured, an inactive user, or an email match in case 3 - raises an
+    `AuthenticationError` and every one of them is safe to show verbatim. All
+    but the last carry the single generic message, so an unauthenticated
+    caller learns nothing about which case occurred. The one exception is a
+    case-3 collision reported by an `email_verified` credential, which is
+    told the address is taken; that caller has already proven control of the
+    mailbox, so it discloses nothing about anyone else's account. See
+    `GoogleEmailInUseError`.
     """
     try:
         identity = verify_google_id_token(raw_id_token)
@@ -286,10 +366,24 @@ def _resolve_google_user(identity: GoogleIdentity, *, allow_retry: bool) -> User
     normalized_email = User.objects.normalize_email(identity.email)
     if User.objects.filter(email=normalized_email).exists():
         # Never auto-link - see the security note in
-        # authenticate_with_google's docstring. Same generic message as
-        # any other failure; this must not confirm that an account exists
-        # for this email either.
-        raise AuthenticationError(GENERIC_GOOGLE_LOGIN_ERROR)
+        # authenticate_with_google's docstring. The *refusal* is unconditional.
+        #
+        # The message is not, and that is the whole of the change: a caller
+        # who has just presented a credential Google verified as
+        # `email_verified` has already proven they control this mailbox, so
+        # telling them the address is taken discloses nothing they could not
+        # establish themselves, and turns a dead end into a next step. Anyone
+        # else - an invalid, expired or replayed credential, an unverified
+        # one, an unconfigured client, a deactivated account - still gets the
+        # single generic answer, so the response never distinguishes "this
+        # address has an account" from "this credential is no good" for
+        # anyone who has not earned it.
+        #
+        # One message for the whole collision class, deliberately: the
+        # existing account might be password-registered or belong to a
+        # *different* Google identity reporting the same address, and a
+        # caller must not be able to tell which.
+        raise _email_collision_error(identity)
 
     try:
         with transaction.atomic():
@@ -302,10 +396,30 @@ def _resolve_google_user(identity: GoogleIdentity, *, allow_retry: bool) -> User
             )
     except IntegrityError:
         if not allow_retry:
+            # The retry bound has been reached. This is a genuine database
+            # failure rather than a clean collision, so it stays generic even
+            # for a verified caller: an attacker who can provoke a unique
+            # violation would otherwise learn from a specific message that a
+            # row for this address exists.
             raise AuthenticationError(GENERIC_GOOGLE_LOGIN_ERROR) from None
         return _resolve_google_user(identity, allow_retry=False)
 
     return user
+
+
+def _email_collision_error(identity: GoogleIdentity) -> AuthenticationError:
+    """
+    The error for a refused account-linking collision.
+
+    `GoogleEmailInUseError` only when Google's own credential asserts mailbox
+    control for this address, and the generic error otherwise - see that
+    class's docstring for why that gate is what keeps the disclosure from
+    being an enumeration oracle. Returned rather than raised so the decision
+    is made in exactly one place and cannot drift between call sites.
+    """
+    if identity.email_verified:
+        return GoogleEmailInUseError(GOOGLE_EMAIL_IN_USE_ERROR)
+    return AuthenticationError(GENERIC_GOOGLE_LOGIN_ERROR)
 
 
 def refresh(raw_refresh_token: str) -> AuthenticatedSession:

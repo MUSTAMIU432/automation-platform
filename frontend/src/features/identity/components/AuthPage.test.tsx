@@ -8,7 +8,14 @@ import { AuthProvider } from '../auth/AuthContext'
 import { loginRequest, meRequest, refreshTokenRequest } from '../auth/authApi'
 import { AuthPage } from './AuthPage'
 
-vi.mock('../auth/authApi', () => ({
+import type * as AuthApiModule from '../auth/authApi'
+// Only the request functions are stubbed; the module's real constants and
+// types are kept. A bare factory object also replaces NETWORK_ERROR_MESSAGE
+// with `undefined`, which would make a component set its error to undefined
+// and render nothing - invisible to every assertion except one that happens
+// to look for the message.
+vi.mock('../auth/authApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof AuthApiModule>()),
   loginRequest: vi.fn(),
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),

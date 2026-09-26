@@ -561,9 +561,13 @@ def test_google_login_returning_user_authenticates_the_same_account(gql):
 
 @pytest.mark.django_db
 def test_google_login_never_auto_links_an_existing_password_account_even_when_verified(gql):
-    # Revised policy (post-review): a verified matching email is not
-    # enough to auto-link - see the security note in
-    # identity/authentication.py's authenticate_with_google docstring.
+    # Revised policy (post-review): a verified matching email is not enough
+    # to auto-link - see the security note in
+    # identity/authentication.py's authenticate_with_google docstring. It is
+    # enough to be *told* the address is taken, though: this caller proved
+    # they control the mailbox, so the refusal comes with an explanation
+    # rather than a bare generic error. The link is still refused either
+    # way, which is what this test is really about.
     _register(gql, email='grace@example.com')
     identity = GoogleIdentity(
         subject='google-subject-1',

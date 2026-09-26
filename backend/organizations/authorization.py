@@ -1,9 +1,38 @@
+"""
+Organization-scoped authorization.
+
+Every check in this module is scoped to an organization: the question is
+never "may this user do X" but "may this user do X *in this organization*",
+and the answer is derived from the user's ACTIVE membership of that
+organization and the permissions on the roles attached to that membership.
+
+Two things this module deliberately does NOT do:
+
+1. **No organization-level permission for creating an organization.** See
+   `create_organization_for_user`'s docstring for the full bootstrap
+   argument. `ORGANIZATION_CREATE` exists as a permission *record* and is
+   granted to the Owner role for display and completeness, but it is never
+   used as a gate - requiring it would be circular, since the membership
+   that carries it cannot exist until the organization does.
+
+2. **No client-supplied identity.** Nothing here reads a role, an
+   organization or a user from a request. Callers pass the authenticated
+   `User` (resolved once, from the access token, by
+   `identity.authentication.get_authenticated_user`) and the organization or
+   ids that the operation is about; this module decides whether that pair is
+   allowed. A resolver that wanted to authorize differently would have to
+   bypass all of it.
+"""
+
 from typing import Literal
 
 from identity.models import User
 from organizations.models import Membership, MembershipRole, Organization
 
 ORGANIZATION_VIEW = 'organization.view'
+# Defined, granted to the Owner role, and never used as a gate - see this
+# module's docstring. Kept as a code so the Owner role's permission set
+# describes the organization surface completely.
 ORGANIZATION_CREATE = 'organization.create'
 ORGANIZATION_UPDATE = 'organization.update'
 ORGANIZATION_MEMBERS_VIEW = 'organization.members.view'

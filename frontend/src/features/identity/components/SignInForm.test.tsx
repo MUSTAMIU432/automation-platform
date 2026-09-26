@@ -3,11 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { setAccessToken } from '../../../graphql/tokenStore'
 import { renderWithProviders } from '../../../test/renderWithRouter'
-import { googleLoginRequest, loginRequest, meRequest, refreshTokenRequest } from '../auth/authApi'
+import {
+  NETWORK_ERROR_MESSAGE,
+  googleLoginRequest,
+  loginRequest,
+  meRequest,
+  refreshTokenRequest,
+} from '../auth/authApi'
 import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { SignInForm } from './SignInForm'
 
-vi.mock('../auth/authApi', () => ({
+import type * as AuthApiModule from '../auth/authApi'
+// Only the request functions are stubbed; the module's real constants and
+// types are kept. A bare factory object also replaces NETWORK_ERROR_MESSAGE
+// with `undefined`, which would make a component set its error to undefined
+// and render nothing - invisible to every assertion except one that happens
+// to look for the message.
+vi.mock('../auth/authApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof AuthApiModule>()),
   loginRequest: vi.fn(),
   googleLoginRequest: vi.fn(),
   logoutRequest: vi.fn(),
@@ -222,5 +235,61 @@ describe('SignInForm', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not sign in with Google.')
     expect(screen.getByRole('heading', { name: 'Welcome back' })).toBeInTheDocument()
+  })
+  // --- the backend is unreachable ------------------------------------------
+  //
+  // Regression cover for a real failure: with the Django server not running,
+  // Google delivered a perfectly valid credential, `googleLogin` rejected
+  // with `TypeError: Failed to fetch`, the rejection was uncaught, and the
+  // form was left stuck on its spinner with the button disabled - no error,
+  // no way to retry. `AuthContext` now folds a transport failure into an
+  // ordinary outcome, so both symptoms are the form's to show or not show.
+
+  it('re-enables the form and reports a network error when the backend is down', async () => {
+    const { emitCredential } = stubGoogleSignIn()
+    mockedGoogleLogin.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    await emitCredential('a-google-id-token')
+
+    // Back to its normal label and clickable: the spinner the user was
+    // stuck on is gone and the form can be used again.
+    expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE)
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+  })
+
+  it('re-enables the form and reports a network error when a password submit fails', async () => {
+    mockedLogin.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@example.com' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-strong-pass-1' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+
+    // Back to its normal label and clickable: the spinner the user was
+    // stuck on is gone and the form can be used again.
+    expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE)
+    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+  })
+
+  it('does not show the generic invalid-credentials message for a network error', async () => {
+    const { emitCredential } = stubGoogleSignIn()
+    mockedGoogleLogin.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
+    await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+    await emitCredential('a-google-id-token')
+    const alert = await screen.findByRole('alert')
+
+    // "Could not sign in with Google." reports an authentication decision the
+    // request never reached, and would leave the user retyping a correct
+    // password.
+    expect(alert).not.toHaveTextContent('Could not sign in with Google.')
+    expect(alert).not.toHaveTextContent('Invalid email or password.')
   })
 })

@@ -30,6 +30,23 @@ export interface AuthResult {
   session: AuthSession | null
 }
 
+/**
+ * Shown when the request could not be made at all — the server is down, DNS
+ * failed, CORS or a preflight blocked it — rather than when it was made and
+ * refused.
+ *
+ * Deliberately different from every authentication-failure message, and not
+ * a weakening of it. The backend collapses unknown email, wrong password,
+ * inactive account, refused Google link and throttling into one generic
+ * answer so nothing about the account can be inferred; that reasoning is
+ * untouched. A transport failure is a different fact: the request never
+ * reached an authentication decision, so answering "Invalid email or
+ * password" would be reporting a verdict that was never given, and would
+ * send the user off to re-type a password that was correct all along. It
+ * also says nothing about the account either way.
+ */
+export const NETWORK_ERROR_MESSAGE = 'We could not reach the server. Please try again.'
+
 interface RawAuthPayload {
   success: boolean
   message: string
@@ -163,4 +180,54 @@ export async function googleLoginRequest(credential: string): Promise<AuthResult
 export async function meRequest(): Promise<AuthUser | null> {
   const data = await graphqlClient.request<{ me: AuthUser | null }>(ME_QUERY)
   return data.me
+}
+
+/** The fields the backend's `RegisterInput` requires. */
+export interface RegisterInput {
+  firstName: string
+  lastName: string
+  email: string
+  phoneNumber: string
+  password: string
+}
+
+export interface RegisterResult {
+  success: boolean
+  message: string
+  /**
+   * The `RegisterInput` field a failure applies to, in the same camelCase
+   * naming the schema uses, or `null` for a whole-form failure. Lets the
+   * form show a backend validation error next to the field that caused it,
+   * exactly where it shows its own client-side ones.
+   */
+  field: string | null
+}
+
+const REGISTER_MUTATION = `
+  mutation Register($input: RegisterInput!) {
+    register(input: $input) {
+      success
+      message
+      field
+    }
+  }
+`
+
+/**
+ * Creates an account. The backend's `register` mutation creates the User
+ * record only - it does not authenticate, so this returns no session and
+ * the caller still has to sign in (see `SignUpForm`).
+ *
+ * A GraphQL-level `errors` array is *not* a registration failure: the
+ * backend reports every input problem as `success: false` with a `field`,
+ * so it is returned like any other outcome. A thrown error here therefore
+ * means something the mutation never got to - a network failure, an
+ * unreachable server - and callers must treat it as a distinct, whole-form
+ * error rather than a validation result.
+ */
+export async function registerRequest(input: RegisterInput): Promise<RegisterResult> {
+  const data = await graphqlClient.request<{ register: RegisterResult }>(REGISTER_MUTATION, {
+    input,
+  })
+  return data.register
 }

@@ -63,7 +63,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from django.conf import settings
-from django.core.cache import cache
+from django.core.cache import caches
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
@@ -77,6 +77,25 @@ _GOOGLE_REQUEST = google_requests.Request()
 # _reject_if_already_used). A prefix, not a secret - ruff's hardcoded-
 # password heuristic just pattern-matches the word "token".
 _REPLAY_CACHE_KEY_PREFIX = 'identity:google_id_token_used:'
+
+
+def _replay_cache():
+    """
+    The cache backing consumed-token tracking.
+
+    Resolved per call rather than captured at import time so the alias comes
+    from settings, and named explicitly (`replay_protection`, not `default`)
+    so this security state can never silently share a namespace with
+    general-purpose caching that something else is free to flush.
+
+    The alias is configured in config/settings/base.py: a per-process
+    in-memory backend for local development, and a shared server (Redis,
+    Memcached, ...) in every deployed environment, where
+    `config/settings/production.py` refuses to start otherwise. That is the
+    whole requirement replay protection has: a token consumed by *any* process
+    must be seen as consumed by every other one.
+    """
+    return caches[settings.REPLAY_PROTECTION_CACHE_ALIAS]
 
 
 class GoogleTokenError(Exception):
@@ -118,16 +137,16 @@ def _reject_if_already_used(raw_token: str, claims: dict) -> None:
     genuinely concurrent double-submission of the same token, not just a
     later sequential replay.
 
-    Deployment caveat, stated plainly: this uses Django's cache framework
-    with whatever backend `CACHES` configures, which defaults to a
-    per-process in-memory cache when unset (as it currently is everywhere
-    in this project). That is complete protection for a single-process
-    deployment, but a real multi-process or multi-instance deployment needs
-    a shared backend (e.g. Redis or Memcached, configured via `CACHES`) for
-    this check to see a token already consumed by a different worker or
-    instance. Not configured as part of S1-004 - Redis is listed as
-    not-yet-implemented in docs/architecture.md - so treat this as complete
-    only until this project actually runs as more than one process.
+    Which cache: the dedicated `replay_protection` alias
+    (`settings.REPLAY_PROTECTION_CACHE_ALIAS`, see `_replay_cache`). A
+    per-process in-memory backend is complete for a single-process
+    deployment and is what local development uses; every deployed environment
+    is required to configure a backend all of its processes share, and
+    `config/settings/production.py` refuses to start if it does not - which
+    is what makes this a real control rather than a single-process
+    convenience. `cache.add` is an atomic "set if absent" on Redis,
+    Memcached and the database backend, so a concurrent double-submission
+    still loses for exactly one of the two callers.
     """
     expires_at = datetime.fromtimestamp(claims['exp'], tz=UTC)
     ttl_seconds = int((expires_at - datetime.now(tz=UTC)).total_seconds())
@@ -138,7 +157,7 @@ def _reject_if_already_used(raw_token: str, claims: dict) -> None:
         raise GoogleTokenError('Invalid or expired Google credential.')
 
     cache_key = _REPLAY_CACHE_KEY_PREFIX + hashlib.sha256(raw_token.encode('utf-8')).hexdigest()
-    if not cache.add(cache_key, True, timeout=ttl_seconds):
+    if not _replay_cache().add(cache_key, True, timeout=ttl_seconds):
         raise GoogleTokenError('This Google credential has already been used.')
 
 

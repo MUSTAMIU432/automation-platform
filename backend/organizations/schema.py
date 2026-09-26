@@ -209,6 +209,14 @@ class Mutation:
     def create_organization(
         self, info: strawberry.Info, input: CreateOrganizationInput
     ) -> CreateOrganizationPayload:
+        # The one mutation that is gated on authentication alone rather than
+        # on a permission: creating an organization is the bootstrap step
+        # that precedes any membership, so there is no permission set that
+        # could authorize it. See
+        # organizations/services.create_organization_for_user's docstring for
+        # the full argument - the short version is that requiring
+        # `organization.create` here would be circular, since the grant that
+        # would satisfy it is created by this very call.
         user = info.context.user
         if user is None:
             return CreateOrganizationPayload(

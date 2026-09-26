@@ -9,6 +9,19 @@ each business domain contributing a slice of it.
 Resolvers here stay thin: they translate between GraphQL types and
 `identity.services`/`identity.authentication`, which own the actual
 validation and business logic.
+
+Two cross-cutting concerns are applied in the resolvers rather than in the
+services, because both are properties of *this HTTP entry point* rather than
+of the business operation, and because both need the raw request/response
+the services deliberately never see:
+
+- Authentication throttling (`identity.throttling`), checked *before* the
+  underlying work so an over-limit request never reaches a password hash or
+  a Google signature verification. The services stay usable from a
+  management command or a future non-HTTP adapter without a request to
+  throttle against.
+- The HttpOnly refresh-cookie lifecycle, which is a browser concern (its
+  Path/SameSite/Secure attributes) and meaningless anywhere else.
 """
 
 from datetime import datetime
@@ -18,9 +31,15 @@ from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 import identity.authentication as auth_service
+import identity.throttling as throttling
 from identity.authentication import AuthenticationError
 from identity.models import User
-from identity.services import RegistrationError, RegistrationInput, register_user
+from identity.services import (
+    RegistrationError,
+    RegistrationInput,
+    register_user,
+)
+from identity.throttling import ThrottledError
 
 # The refresh credential travels only as an HttpOnly cookie, never as a
 # GraphQL argument or field - so no frontend JavaScript ever holds or
@@ -180,7 +199,18 @@ class Mutation:
             'Identity operations.'
         )
     )
-    def register(self, input: RegisterInput) -> RegisterPayload:
+    def register(self, info: strawberry.Info, input: RegisterInput) -> RegisterPayload:
+        try:
+            # Throttled before any validation, so a flood of registration
+            # attempts costs a cache increment each rather than a full Django
+            # password-validator pass. A throttle is not a registration
+            # failure, so it never names a field: no field of the form is at
+            # fault, and attributing it to one would be a lie the frontend
+            # would render as a validation error.
+            throttling.guard_registration(info.context.request)
+        except ThrottledError as exc:
+            return RegisterPayload(success=False, message=str(exc))
+
         try:
             user = register_user(
                 RegistrationInput(
@@ -209,9 +239,22 @@ class Mutation:
     )
     def login(self, info: strawberry.Info, input: LoginInput) -> AuthPayload:
         try:
+            # Before `auth_service.login`, deliberately: that call verifies a
+            # password hash, and the point of the limit is that a throttled
+            # caller must not be able to make the server do that work for
+            # them.
+            throttling.guard_login(info.context.request, input.email)
             session = auth_service.login(input.email, input.password)
+        except ThrottledError as exc:
+            return AuthPayload(success=False, message=str(exc))
         except AuthenticationError as exc:
             return AuthPayload(success=False, message=str(exc))
+
+        # A correct password clears that account's own counter, so the next
+        # run of mistyped passwords starts from zero rather than from the
+        # accumulated total. Only this account's: the per-client counter is
+        # the spray limit and is left for its window to expire.
+        throttling.clear_login_account(input.email)
 
         _set_refresh_cookie(
             info.context.response, session.refresh_token, session.refresh_token_expires_at
@@ -235,8 +278,13 @@ class Mutation:
     )
     def google_login(self, info: strawberry.Info, input: GoogleLoginInput) -> AuthPayload:
         try:
+            # Before verification, for the same reason `login` throttles
+            # before authenticating: verifying Google's signature is the
+            # expensive part, and an over-limit caller must not be able to
+            # make us perform it on demand.
+            throttling.guard_google_login(info.context.request, input.credential)
             session = auth_service.authenticate_with_google(input.credential)
-        except AuthenticationError as exc:
+        except (AuthenticationError, ThrottledError) as exc:
             return AuthPayload(success=False, message=str(exc))
 
         _set_refresh_cookie(
@@ -260,6 +308,18 @@ class Mutation:
     )
     def refresh_token(self, info: strawberry.Info) -> AuthPayload:
         raw_token = _read_refresh_cookie(info.context.request)
+        try:
+            throttling.guard_refresh(raw_token, info.context.request)
+        except ThrottledError as exc:
+            # Deliberately does NOT clear the cookie, unlike a genuine refresh
+            # failure: this session is fine, it is the request rate that is
+            # not, and clearing it would sign a legitimate user out for being
+            # throttled. The frontend treats an unsuccessful refresh as "sign
+            # me out" (fail closed), which is the intended behaviour here too
+            # - their refresh session is untouched, so signing in again after
+            # the window works normally.
+            return AuthPayload(success=False, message=str(exc))
+
         try:
             session = auth_service.refresh(raw_token)
         except AuthenticationError as exc:

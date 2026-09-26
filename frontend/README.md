@@ -133,8 +133,8 @@ and attaches `Authorization: Bearer <token>` when one is set.
 [`src/features/identity/auth/`](src/features/identity/auth) owns all
 authentication state:
 
-- `authApi.ts` — the `login`/`googleLogin`/`refreshToken`/`logout` GraphQL
-  operations.
+- `authApi.ts` — the `login`/`googleLogin`/`refreshToken`/`logout`/`register`
+  GraphQL operations.
 - `AuthContext.tsx` — `AuthProvider` (wraps the router in `App.tsx`) and the
   `useAuth()` hook, exposing `status` (`'loading' | 'authenticated' |
   'unauthenticated'`), `user`, `login()`, `loginWithGoogle()` and
@@ -156,6 +156,32 @@ authentication state:
   sign-in doesn't distinguish signing up from signing in, so both call the
   same `loginWithGoogle()`.
 
+  **Deployment constraint — do not set COOP on the page that hosts this.**
+  Google Identity Services delivers the credential from a
+  `accounts.google.com` popup back to this page with `window.postMessage`.
+  `Cross-Origin-Opener-Policy: same-origin` severs `window.opener`, so the
+  credential never arrives and sign-in silently does nothing. If whatever
+  serves this app in a deployed environment sets COOP, it must be
+  `same-origin-allow-popups` (Google's documented requirement for this flow)
+  or unset. The backend sets `SECURE_CROSS_ORIGIN_OPENER_POLICY` on *its own*
+  responses, which is inert here - COOP is honoured per-document, and this
+  app's document is the static one - so that setting is unrelated and is
+  deliberately left strict.
+- `tokenRefresh.ts` — keeps the access token alive: schedules a `refreshToken`
+  shortly before `accessTokenExpiresAt` rather than waiting for a request to
+  come back unauthenticated, and holds the *single* in-flight refresh promise
+  every caller shares. That sharing is not an optimisation: the refresh
+  cookie is single-use and `refreshToken` rotates it, so two overlapping
+  refreshes would mean the second one presents an already-revoked credential
+  and fails, signing the user out. A failed refresh is terminal for the
+  session rather than an event to retry - the failure handler signs the user
+  out, the schedule is cancelled, and a latch short-circuits any further
+  call until a real sign-in lifts it, so there is no path from "refresh
+  failed" back to "refresh again". `tokenRefreshState.ts` holds the shared
+  module state, in a dependency-free module so a test setup file can reset it
+  without evaluating `authApi` before a test's own `vi.mock` (see
+  `src/test/setup.ts`).
+
 **Token storage, deliberately:** the short-lived access token lives only in
 `graphql/tokenStore.ts` - a plain in-memory module variable, never
 `localStorage`/`sessionStorage`. It does not survive a page reload by
@@ -164,6 +190,20 @@ a session afterwards, using the backend's `HttpOnly` refresh-session cookie
 (which JavaScript can't read at all, by design - see `backend/README.md`'s
 GraphQL API section and `docs/architecture.md` for the full cookie/CORS/CSRF
 design).
+
+The store holds the token's expiry alongside the token, in the same module
+and cleared by the same call. A client can only refresh *proactively* — before
+a request fails — if it knows when the current token stops working, and
+keeping the two in one place makes it impossible to hold a token without also
+holding its deadline, or to clear one and leave a stale deadline behind to
+schedule a refresh for a session that no longer exists.
+
+`SignUpForm` submits the real `register` mutation (`authApi.registerRequest`)
+and maps the backend's field-level failure onto the matching field, so a
+duplicate email is shown next to the email input exactly like a client-side
+validation error. Registration does not authenticate — the backend's
+`register` mutation creates the account only — so success shows a
+confirmation that leads to sign-in rather than navigating into the app.
 
 `src/features/identity/components/RequireAuth.tsx` gates the `/app` route:
 it shows a neutral loading state while the initial `refreshToken` call is in
@@ -197,13 +237,56 @@ Future business domains each get their own route module under
 
 ## What this is not
 
-Real product features (organizations, ideas, reviews, projects,
-notifications, ...) don't exist yet - only Identity's sign-in/registration
-UI and authentication. Within Identity itself, the forgot-password/
-reset-password *backend* is not implemented (the UI is ready for it); the
-reset-password form is a visual placeholder. Those land in later Identity
-tasks. `GoogleAuthButton` is no longer a placeholder (S1-004) - see
+Real product features (ideas, reviews, projects, notifications, ...) don't
+exist yet. What exists is Identity (sign in, sign up, Google sign-in, session
+lifecycle) and the organizations tier (create an organization, switch
+between them, see members and roles). Within Identity itself, the
+forgot-password/reset-password *backend* is not implemented (the UI is ready
+for it); the reset-password form is a visual placeholder. Those land in later
+Identity tasks.
+
+On organizations specifically: what exists is the data model, the
+authorization rules and a deliberately small UI - there is no
+role-management screen, no permission editor, and no member invitations. The
+create/switch/see surface is enough to exercise the tenant-isolation
+guarantees end to end, and the backend enforces those regardless of what the
+UI does. `GoogleAuthButton` is no longer a placeholder (S1-004) - see
 Authentication above - but there is no authenticated "link this Google
-account to my existing session" flow; linking an existing password account
-happens automatically, by verified email, only during a Google sign-in
-attempt.
+account to my existing session" flow, and the automatic linking that an
+earlier version of this document described is **not** what the backend does.
+
+**Google account-linking policy (Policy B — refuse, never link).** The only
+thing that authenticates into an *existing* account through Google is an
+exact `(provider='google', provider_subject=<sub>)` match on the stable
+Google subject. A first-time Google identity whose email matches an account
+that already exists — a password-registered one, or one created by a
+different Google identity — is **refused**, with the same generic message as
+an invalid credential, and no link is created. This is true *regardless of
+`email_verified`*: Google's `email_verified: true` proves Google confirmed
+mailbox control at some point in the past, not that today's sign-in is the
+person who registered here — and once an address can be reassigned outside
+this platform's control, auto-linking would hand the *old* account to a new
+mailbox holder with no consent, no notification and no audit trail.
+
+The user-visible consequence, and the reason it is called out here rather
+than left to the backend: someone who signed up with a password and then
+tries "Continue with Google" using the same address is **refused** — never
+signed in, never linked. Google sign-in will not adopt the account for them.
+
+The message they get is specific rather than generic: *"An account already
+exists for this email."* followed by the two real next steps. Everyone else —
+invalid, expired, replayed, or unverified credential, Google sign-in not
+configured — still gets the single generic *"Could not sign in with Google."*
+The form renders whatever message comes back, so no special-casing is needed
+on this side.
+
+Why the specific message is safe to send: reaching it means Google verified
+the credential *and* asserted that this person controls that mailbox. They
+could therefore have established the fact themselves. It is not a way to find
+out whether somebody else's address is registered, because nobody can present
+a Google credential for an address they do not control. The intended way to
+add Google sign-in to a password account is an authenticated "link this
+Google account to my current session" flow, which is not implemented yet. The
+reasoning is recorded in full in
+`backend/identity/authentication.py`'s `authenticate_with_google` docstring
+and `GoogleEmailInUseError`, and in `docs/architecture.md`.

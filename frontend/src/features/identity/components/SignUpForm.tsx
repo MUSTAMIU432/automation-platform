@@ -2,6 +2,7 @@ import { useCallback, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
+import { NETWORK_ERROR_MESSAGE, registerRequest } from '../auth/authApi'
 import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { validateSignUp, hasErrors, type FieldErrors } from '../schemas/authValidation'
 import type { SignUpFormValues } from '../types/auth'
@@ -32,6 +33,30 @@ const LEGAL_LINK_CLASSES =
   'font-medium text-brand-700 underline decoration-brand-300 underline-offset-2 hover:text-brand-800'
 
 /**
+ * The `RegisterInput` fields a backend validation error can be attached to.
+ * The schema names them in camelCase (Strawberry's own conversion of the
+ * Python field names), which is exactly how this form's state is keyed, so
+ * a backend message drops straight into the matching field error.
+ *
+ * Restricted to this list rather than trusted blindly: `field` is a string
+ * from the server, and writing it into the error map unchecked would let a
+ * value outside the form's own fields become state.
+ */
+const REGISTRABLE_FIELDS = [
+  'firstName',
+  'lastName',
+  'email',
+  'phoneNumber',
+  'password',
+] as const satisfies readonly (keyof SignUpFormValues)[]
+
+type RegistrableField = (typeof REGISTRABLE_FIELDS)[number]
+
+function isRegistrableField(field: string | null): field is RegistrableField {
+  return field !== null && (REGISTRABLE_FIELDS as readonly string[]).includes(field)
+}
+
+/**
  * Sign up form. Deliberately minimal: it creates the account only. Profile
  * details (photo, country/city, bio, job title, organization, skills, etc.)
  * are completed later, from the dashboard, after authentication.
@@ -44,6 +69,14 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
   const [attempted, setAttempted] = useState(false)
   const [status, setStatus] = useState<'idle' | 'submitting'>('idle')
   const [googleError, setGoogleError] = useState<string | null>(null)
+  // A failure the backend did not attach to any one field (a whole-form
+  // problem, or a transport failure), shown once above the form rather than
+  // next to an arbitrary field.
+  const [formError, setFormError] = useState<string | null>(null)
+  // The account exists. Registration does not authenticate - the backend's
+  // `register` mutation creates the User record only - so this is a
+  // confirmation that leads to sign-in, not a redirect into the app.
+  const [created, setCreated] = useState(false)
   const isSubmitting = status === 'submitting'
 
   // Google sign-in doesn't distinguish "sign up" from "sign in" - the
@@ -76,7 +109,7 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
     }
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setAttempted(true)
 
@@ -84,11 +117,61 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
     setErrors(nextErrors)
     if (hasErrors(nextErrors)) return
 
+    setFormError(null)
     setStatus('submitting')
-    // Placeholder only: wired to the `register` GraphQL mutation once the
-    // Identity backend contract lands. No implementation status is shown to
-    // the user — it just returns the form to its normal, interactive state.
-    window.setTimeout(() => setStatus('idle'), 400)
+    try {
+      const result = await registerRequest({
+        firstName: values.firstName.trim(),
+        lastName: values.lastName.trim(),
+        email: values.email.trim(),
+        // The backend stores one E.164-style string; the form collects the
+        // country code separately only to make the picker convenient.
+        phoneNumber: `${values.countryCode}${values.phoneNumber.replace(/\D/g, '')}`,
+        password: values.password,
+      })
+
+      if (result.success) {
+        setCreated(true)
+        return
+      }
+
+      // A field-level failure (a duplicate email, a password the backend's
+      // own validator rejects, a malformed phone number) replaces that
+      // field's error so it is shown in the same place as a client-side one.
+      if (isRegistrableField(result.field)) {
+        setErrors({ [result.field]: result.message })
+      } else {
+        setFormError(result.message)
+      }
+    } catch {
+      // The mutation never ran, or its response never arrived. There is
+      // nothing to attach to a field, and guessing one would be a lie the
+      // user could act on. The message is shared with the sign-in forms so
+      // "the server is unreachable" reads the same everywhere - and is
+      // deliberately not one of the backend's generic authentication
+      // messages, which report a decision this request never reached.
+      setFormError(NETWORK_ERROR_MESSAGE)
+    } finally {
+      setStatus('idle')
+    }
+  }
+
+  if (created) {
+    return (
+      <div>
+        <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Account created</h1>
+        <output className="mt-2 block text-sm text-gray-500">
+          Your account is ready. Sign in to continue.
+        </output>
+        <button
+          type="button"
+          onClick={onSwitchToSignIn}
+          className="mt-7 flex h-11 w-full items-center justify-center rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2"
+        >
+          <span>Continue to sign in</span>
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -118,6 +201,12 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
       </div>
 
       <form noValidate onSubmit={handleSubmit} aria-busy={isSubmitting} className="space-y-5">
+        {formError && (
+          <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            {formError}
+          </p>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField
             id="signup-first-name"

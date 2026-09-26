@@ -96,6 +96,69 @@ REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', d
 # secret at all (see identity/google_oauth.py's module docstring).
 GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
 
+
+# Cache framework
+# ---------------------------------------------------------------------------------
+# Three aliases, deliberately separated even where they point at the same
+# place:
+#
+#   default           general-purpose caching. Nothing security-critical may
+#                     ever depend on this one.
+#   replay_protection used *only* by identity.google_oauth to record Google ID
+#                     tokens that have already been consumed.
+#   auth_throttle     used *only* by identity.throttling to count
+#                     authentication attempts.
+#
+# The latter two are security-critical and therefore deliberately isolated:
+# each can be pointed at a different shared server than general caching,
+# neither is ever cleared as part of routine cache housekeeping, and
+# production.py refuses to start if either resolves to a per-process backend.
+#
+# In one process, a per-process in-memory cache is complete protection: a
+# replayed token is rejected, and an over-limit request refused, by the very
+# same worker that recorded the state. Across processes it is not - worker 1
+# accepts a Google credential that worker 2 has never seen, and worker 2
+# permits another ten login attempts after worker 1 stopped at five - so
+# anything that runs as more than one process needs a backend every worker
+# shares. CACHE_URL selects it (Redis, Memcached, a database, ...); it is
+# required in every deployed environment precisely because that is where
+# "more than one process" is the norm.
+REPLAY_PROTECTION_CACHE_ALIAS = 'replay_protection'
+AUTH_THROTTLE_CACHE_ALIAS = 'auth_throttle'
+
+# The aliases whose contents decide a security outcome. A deployed
+# environment may not let any of them resolve to a per-process backend - see
+# config/settings/production.py, which enforces exactly this list.
+SHARED_CACHE_ALIASES = (REPLAY_PROTECTION_CACHE_ALIAS, AUTH_THROTTLE_CACHE_ALIAS)
+
+_DEFAULT_CACHE = {
+    'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    'LOCATION': 'automation-platform-default',
+}
+_LOCAL_SECURITY_CACHE = {
+    'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    'LOCATION': 'automation-platform-security',
+}
+
+_cache_url = env('CACHE_URL', default='')
+if _cache_url:
+    # django-environ parses a URL into a cache config (e.g.
+    # redis://localhost:6379/1). All aliases share the server but keep
+    # separate key namespaces, so a `cache.clear()` aimed at one can never
+    # wipe another's records.
+    CACHES = {
+        'default': env.cache_url('CACHE_URL'),
+        REPLAY_PROTECTION_CACHE_ALIAS: env.cache_url('CACHE_URL'),
+        AUTH_THROTTLE_CACHE_ALIAS: env.cache_url('CACHE_URL'),
+    }
+else:
+    CACHES = {
+        'default': _DEFAULT_CACHE,
+        REPLAY_PROTECTION_CACHE_ALIAS: _LOCAL_SECURITY_CACHE,
+        AUTH_THROTTLE_CACHE_ALIAS: _LOCAL_SECURITY_CACHE,
+    }
+
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # Must sit above any middleware that can generate responses (CommonMiddleware).

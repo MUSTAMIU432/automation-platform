@@ -101,7 +101,8 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `DJANGO_SECURE_HSTS_SECONDS` |        | no (`31536000` production, `3600` development/staging) | HSTS max-age in seconds; `0` disables (deployed only) |
 | `DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS` | | no (`False`)   | Extend HSTS to every subdomain (deployed only) |
 | `DJANGO_SECURE_HSTS_PRELOAD` |        | no (`False`)      | Add the HSTS `preload` directive (deployed only). Requires includeSubDomains and a max-age of at least 31536000 |
-| `GOOGLE_OAUTH_CLIENT_ID`     |        | no                | Google OAuth client id for "Sign in with Google" (Sprint 1, S1-004). The `googleLogin` mutation always fails closed if unset - see `backend/identity/google_oauth.py`. Not secret; must match the frontend's `VITE_GOOGLE_OAUTH_CLIENT_ID` |
+| `GOOGLE_OAUTH_CLIENT_ID`     |        | no                | Google OAuth client id for "Sign in with Google" (Sprint 1, S1-004). The `googleLogin` mutation always fails closed if unset - see `backend/identity/google_oauth.py`. Not secret; must match the frontend's `VITE_GOOGLE_OAUTH_CLIENT_ID`. The name is exact and nothing is inferred from any other name: a differently-named variable is silently ignored, and Google sign-in then fails closed at runtime rather than at startup |
+| `CACHE_URL`                  | **yes**| **deployed**       | Shared cache backend, e.g. `redis://localhost:6379/1`. Required in every deployed environment: the Google ID-token replay check and the authentication rate limits record state that every process must agree on, and a per-process cache is a per-process *copy*. Must not resolve to a local in-memory backend - `config.settings.production` refuses to start if it does. Local development may leave it unset (in-process cache is correct there: there is one process). See [Caching](architecture.md#caching-target--implemented) |
 
 Notes:
 
@@ -118,6 +119,13 @@ Notes:
   `CSRF_TRUSTED_ORIGINS` still affects only Django's own forms (e.g. admin).
 - The GraphiQL IDE is served only when `DEBUG` is on, so it is never
   exposed in deployed environments.
+- `CACHE_URL` configures three cache aliases at once: `default` for
+  general-purpose caching, and `replay_protection` and `auth_throttle` for
+  the two that decide a security outcome. The latter two are kept separate
+  so routine cache housekeeping can never wipe them. Both fail **closed** if
+  the cache is unreachable - the alternative is a silent, invisible removal
+  of a security control - so a cache outage takes authentication down with
+  it. That is a deliberate trade-off, not an oversight.
 
 ## Frontend variables (`frontend/.env`)
 

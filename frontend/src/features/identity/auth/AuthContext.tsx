@@ -9,15 +9,28 @@ import {
   type ReactNode,
 } from 'react'
 
-import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
 import {
+  getAccessToken,
+  getAccessTokenExpiresAtIso,
+  setAccessToken,
+} from '../../../graphql/tokenStore'
+import {
+  NETWORK_ERROR_MESSAGE,
   googleLoginRequest,
   loginRequest,
   logoutRequest,
   meRequest,
-  refreshTokenRequest,
+  type AuthResult,
+  type AuthSession,
   type AuthUser,
 } from './authApi'
+import {
+  beginSession,
+  cancelProactiveRefresh,
+  refreshAccessToken,
+  scheduleProactiveRefresh,
+  setAuthenticationFailureHandler,
+} from './tokenRefresh'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -42,6 +55,7 @@ interface AuthProviderProps {
 
 interface ResolvedSession {
   accessToken: string
+  accessTokenExpiresAt: string | null
   user: AuthUser
 }
 
@@ -54,6 +68,12 @@ interface ResolvedSession {
  * loops beyond that single refresh attempt - a failed refresh (or a `me`
  * that still fails afterwards) resolves to `null`, not another retry.
  *
+ * Uses `refreshAccessToken` rather than `refreshTokenRequest` so this
+ * mount-time attempt shares its one-in-flight promise with any proactive
+ * refresh already running or about to: the refresh cookie is single-use, so
+ * two overlapping refreshes would make the second one fail on an
+ * already-revoked credential and sign the user out for no reason.
+ *
  * Used for the mount-time bootstrap below. `login`/`loginWithGoogle`
  * deliberately don't route through this - their own mutation's returned
  * `user` is already a fresh, server-validated result from the same
@@ -61,22 +81,37 @@ interface ResolvedSession {
  * extra round trip proving what the mutation already established.
  */
 async function resolveSession(isCurrent: () => boolean): Promise<ResolvedSession | null> {
+  // Mounting the app *is* a fresh sign-in attempt, so any failure latch
+  // left by a previous session is lifted here - the only place that may do
+  // so. Inside a session, a failed refresh stays failed; this is not a
+  // retry loop, it is the first attempt.
+  beginSession()
+
   const existingToken = getAccessToken()
   if (existingToken && isCurrent()) {
     const user = await meRequest().catch(() => null)
     if (!isCurrent()) return null
-    if (user) return { accessToken: existingToken, user }
+    if (user) {
+      return {
+        accessToken: existingToken,
+        accessTokenExpiresAt: getAccessTokenExpiresAtIso(),
+        user,
+      }
+    }
   }
 
   if (!isCurrent()) return null
-  const refreshResult = await refreshTokenRequest().catch(() => null)
-  if (!isCurrent() || !refreshResult?.success || !refreshResult.session) return null
+  const session = await refreshAccessToken()
+  if (!isCurrent() || !session) return null
 
-  setAccessToken(refreshResult.session.accessToken)
   const user = await meRequest().catch(() => null)
   if (!isCurrent() || !user) return null
 
-  return { accessToken: refreshResult.session.accessToken, user }
+  return {
+    accessToken: session.accessToken,
+    accessTokenExpiresAt: session.accessTokenExpiresAt,
+    user,
+  }
 }
 
 /**
@@ -88,6 +123,10 @@ async function resolveSession(isCurrent: () => boolean): Promise<ResolvedSession
  * in-memory token store (graphql/tokenStore.ts) and attached automatically
  * to outgoing requests. This context only ever hands components `status`
  * and `user`.
+ *
+ * A session established here also starts the proactive refresh cycle
+ * (see `tokenRefresh.ts`), and one that ends cancels it - so a signed-out
+ * app has no timer running against it.
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   const [status, setStatus] = useState<AuthStatus>('loading')
@@ -98,13 +137,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const applySession = useCallback((session: ResolvedSession | null) => {
     authVersionRef.current += 1
     if (session) {
-      setAccessToken(session.accessToken)
+      setAccessToken(session.accessToken, session.accessTokenExpiresAt)
       setUser(session.user)
       setStatus('authenticated')
+      // Keep the session alive before it lapses. `tokenRefresh` replaces any
+      // pending schedule, so re-establishing a session cannot leave two
+      // timers running (and cannot double-rotate the single-use cookie).
+      scheduleProactiveRefresh(session.accessTokenExpiresAt)
     } else {
       setAccessToken(null)
       setUser(null)
       setStatus('unauthenticated')
+      cancelProactiveRefresh()
     }
   }, [])
 
@@ -135,22 +179,52 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [applySession])
 
-  const login = useCallback(
-    async (email: string, password: string): Promise<LoginOutcome> => {
-      const result = await loginRequest(email, password)
-      applySession(result.success && result.session ? result.session : null)
-      return { success: result.success, message: result.message }
+  /**
+   * Runs one authentication attempt and folds a transport failure into a
+   * normal outcome, so `login`/`loginWithGoogle` never reject.
+   *
+   * The context is the right place for this rather than each form: it is the
+   * component that owns the session lifecycle, so it is the one that must
+   * guarantee a consistent state afterwards. Letting the request reject
+   * meant that a backend that was simply not running left the sign-in button
+   * spinning forever (the caller's `setStatus('idle')` was never reached),
+   * logged an unhandled rejection, and - for a Google sign-in that had
+   * already delivered a valid credential - left a half-finished attempt
+   * with no error shown at all. A caller that can trust `success: false` is
+   * also a caller that cannot forget to handle it.
+   *
+   * `applySession(null)` runs either way, including on a transport failure:
+   * no session was established, and failing closed is the same posture the
+   * context already takes for a refused attempt.
+   */
+  const runAuthAttempt = useCallback(
+    async (attempt: () => Promise<AuthResult>): Promise<LoginOutcome> => {
+      let outcome: LoginOutcome
+      let session: AuthSession | null
+      try {
+        const result = await attempt()
+        outcome = { success: result.success, message: result.message }
+        session = result.success ? result.session : null
+      } catch {
+        outcome = { success: false, message: NETWORK_ERROR_MESSAGE }
+        session = null
+      }
+      applySession(session)
+      return outcome
     },
     [applySession],
   )
 
+  const login = useCallback(
+    (email: string, password: string): Promise<LoginOutcome> =>
+      runAuthAttempt(() => loginRequest(email, password)),
+    [runAuthAttempt],
+  )
+
   const loginWithGoogle = useCallback(
-    async (credential: string): Promise<LoginOutcome> => {
-      const result = await googleLoginRequest(credential)
-      applySession(result.success && result.session ? result.session : null)
-      return { success: result.success, message: result.message }
-    },
-    [applySession],
+    (credential: string): Promise<LoginOutcome> =>
+      runAuthAttempt(() => googleLoginRequest(credential)),
+    [runAuthAttempt],
   )
 
   const logout = useCallback(async () => {
@@ -176,6 +250,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // dependency exhaustive-deps correctly requires.
     // oxlint-disable-next-line react/memo-dependencies
   }, [applySession])
+
+  // A refresh that cannot be renewed ends the session. This is the
+  // fail-closed posture: the alternative - keeping the user "signed in"
+  // with a token the server will reject - would show them a dashboard full
+  // of errors instead of a sign-in prompt, and would leave a broken client
+  // retrying a refresh that can only fail.
+  //
+  // Registered as an effect rather than inline so a remount replaces the
+  // handler instead of stacking another one behind it, and torn down on
+  // unmount so a provider that is gone is not signed out by a timer that
+  // outlives it.
+  useEffect(() => {
+    setAuthenticationFailureHandler(() => {
+      // Deliberately not `logout()`: there is no server-side session left
+      // to revoke (the refresh credential was refused or already gone), so
+      // this is a purely local teardown.
+      applySession(null)
+    })
+    return () => {
+      setAuthenticationFailureHandler(null)
+      cancelProactiveRefresh()
+    }
+  }, [applySession])
+
+  // A real sign-in lifts the refresh failure latch, so a user who signs in
+  // again after being signed out is not left with a permanently disabled
+  // refresh.
+  useEffect(() => {
+    if (status === 'authenticated') {
+      beginSession()
+    }
+  }, [status])
 
   const value = useMemo(
     () => ({ status, user, login, loginWithGoogle, logout }),

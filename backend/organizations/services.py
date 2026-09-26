@@ -141,6 +141,43 @@ def _require_permission(
 def create_organization_for_user(
     user: User | None, data: CreateOrganizationInput
 ) -> OrganizationMembership:
+    """
+    Create an organization, and bootstrap the caller into it as its Owner.
+
+    The authorization model here is deliberately NOT "the caller must hold
+    ORGANIZATION_CREATE somewhere", and the reason is structural rather than
+    a preference. Creating an organization is the bootstrap step that comes
+    *before* any membership exists:
+
+        authenticated user
+          -> create organization
+          -> creator membership (ACTIVE)
+          -> Owner role for that organization
+          -> Owner permissions (including organization.create)
+
+    At the moment of the call there is no organization to be a member of, so
+    there is no membership row, no role assignment, and therefore no
+    permission set that could authorize it. Requiring `organization.create`
+    would be circular: the grant that would satisfy the check is created by
+    the very operation being checked. The only thing that can be required is
+    that the caller is an authenticated, active user - which is exactly what
+    `_require_active_user` does - and everything after that is bootstrap
+    rather than authorization.
+
+    The flip side, which is why this is safe to ship: an organization is a
+    resource the platform provisions for the user who asks for one. There is
+    no pre-existing organization whose members this could be used to reach,
+    and the new one contains only the creator. Every subsequent operation on
+    it *is* permission-checked (`organization.view` for reads,
+    `organization.members.manage` for membership writes), and tenant
+    isolation for those is enforced by
+    `organizations.authorization.require_permission`.
+
+    `ORGANIZATION_CREATE` is still provisioned and still granted to the Owner
+    role, so the Owner role's permission set accurately describes the
+    organization surface. It is simply never used as a gate - see
+    `organizations/authorization.py`'s module docstring.
+    """
     user = _require_active_user(user)
     name = _validate_name(data.name)
     normalized_slug = _normalize_slug(name, data.slug)

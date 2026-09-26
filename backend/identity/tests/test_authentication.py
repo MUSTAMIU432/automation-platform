@@ -12,8 +12,10 @@ from identity.authentication import (
     GENERIC_GOOGLE_LOGIN_ERROR,
     GENERIC_LOGIN_ERROR,
     GENERIC_REFRESH_ERROR,
+    GOOGLE_EMAIL_IN_USE_ERROR,
     GOOGLE_PROVIDER,
     AuthenticationError,
+    GoogleEmailInUseError,
     authenticate_with_google,
     get_authenticated_user,
     login,
@@ -204,10 +206,12 @@ class TestAuthenticateWithGoogle:
         assert ExternalIdentity.objects.count() == 1
 
     def test_existing_password_user_is_never_auto_linked_even_with_verified_email(self):
-        # Revised policy (post-review): email_verified=True is not enough.
-        # Only an exact (provider, provider_subject) match ever
+        # Revised policy (post-review): email_verified=True is not enough to
+        # *link*. Only an exact (provider, provider_subject) match ever
         # authenticates into an existing account - see the security note
-        # in authenticate_with_google's docstring.
+        # in authenticate_with_google's docstring. It is, however, enough to
+        # be *told* the address is taken, because that caller has proven
+        # control of the mailbox.
         existing_user = _make_user(email='ada@example.com')
         identity = _google_identity(email='ada@example.com', email_verified=True)
 
@@ -217,7 +221,7 @@ class TestAuthenticateWithGoogle:
         ):
             authenticate_with_google('a-credential')
 
-        assert str(exc_info.value) == GENERIC_GOOGLE_LOGIN_ERROR
+        assert str(exc_info.value) == GOOGLE_EMAIL_IN_USE_ERROR
         assert User.objects.filter(email='ada@example.com').count() == 1
         assert ExternalIdentity.objects.count() == 0
         # No link was ever created to the existing user, verified or not.
@@ -273,9 +277,165 @@ class TestAuthenticateWithGoogle:
         ):
             authenticate_with_google('credential-b')
 
-        assert str(exc_info.value) == GENERIC_GOOGLE_LOGIN_ERROR
+        # Refused, and reported specifically: the caller proved they control
+        # this mailbox, so "an account already exists" discloses nothing they
+        # could not check themselves. See GoogleEmailInUseError.
+        assert str(exc_info.value) == GOOGLE_EMAIL_IN_USE_ERROR
         assert ExternalIdentity.objects.count() == 1
         assert User.objects.filter(email='ada@example.com').count() == 1
+
+    def test_an_unverified_credential_gets_the_generic_message_for_a_collision(
+        self,
+    ):
+        """
+        The gate, and the whole reason this feature is safe.
+
+        `email_verified: false` proves nothing about who is asking, so this
+        caller has not earned the disclosure and gets exactly the same answer
+        as any other failure. If this assertion ever fails, the change has
+        become an enumeration oracle.
+        """
+        _make_user(email='ada@example.com')
+        identity = _google_identity(email='ada@example.com', email_verified=False)
+
+        with (
+            _patched_google_identity(identity=identity),
+            pytest.raises(AuthenticationError) as exc_info,
+        ):
+            authenticate_with_google('a-credential')
+
+        assert str(exc_info.value) == GENERIC_GOOGLE_LOGIN_ERROR
+        assert not isinstance(exc_info.value, GoogleEmailInUseError)
+        assert ExternalIdentity.objects.count() == 0
+
+    def test_the_collision_message_is_the_same_for_both_kinds_of_collision(self):
+        """
+        One message for the whole collision class.
+
+        The existing account might be password-registered *or* belong to a
+        different Google identity reporting the same address. A caller must
+        not be able to tell which, because that difference is the existing
+        account's history and it is not theirs to learn.
+        """
+        # (a) the address belongs to a password account
+        _make_user(email='ada@example.com')
+        with (
+            _patched_google_identity(
+                identity=_google_identity(email='ada@example.com', email_verified=True)
+            ),
+            pytest.raises(AuthenticationError) as password_account,
+        ):
+            authenticate_with_google('credential-a')
+
+        # (b) the address belongs to a *different* Google identity. A second
+        # address keeps the two cases independent instead of mutating the
+        # first one's account.
+        with _patched_google_identity(
+            identity=_google_identity(subject='subject-a', email='grace@example.com')
+        ):
+            authenticate_with_google('credential-b')
+        with (
+            _patched_google_identity(
+                identity=_google_identity(subject='subject-b', email='grace@example.com')
+            ),
+            pytest.raises(AuthenticationError) as google_account,
+        ):
+            authenticate_with_google('credential-c')
+
+        assert str(password_account.value) == str(google_account.value)
+        assert str(password_account.value) == GOOGLE_EMAIL_IN_USE_ERROR
+
+    def test_the_collision_message_reveals_nothing_about_the_existing_account(self):
+        """
+        The message discloses *existence* and nothing else - no password
+        state, no verification state, no provider, no subject, no ids. Pinned
+        as a whole-message check so a future rewording cannot quietly start
+        describing the account it is talking about.
+        """
+        existing = _make_user(email='ada@example.com')
+
+        with (
+            _patched_google_identity(
+                identity=_google_identity(email='ada@example.com', email_verified=True)
+            ),
+            pytest.raises(AuthenticationError) as exc_info,
+        ):
+            authenticate_with_google('a-credential')
+
+        message = str(exc_info.value)
+        assert message == GOOGLE_EMAIL_IN_USE_ERROR
+        for secret in (
+            'password',
+            'verified',
+            'unverified',
+            'google',
+            'subject',
+            str(existing.pk),
+        ):
+            assert secret not in message.lower(), f'the message leaked {secret!r}'
+
+    def test_an_invalid_credential_cannot_be_used_to_probe_for_an_account(self):
+        """
+        The anti-oracle test, stated as the attack it prevents.
+
+        Somebody wanting to know whether an arbitrary address is registered
+        has no Google credential for it and cannot mint one. This is what they
+        get: the same generic message as for a registered address, for an
+        invalid, expired, replayed or unconfigured credential alike. So the
+        two are indistinguishable, and the address-probing attack has nothing
+        to distinguish.
+        """
+        _make_user(email='ada@example.com')
+        with (
+            _patched_google_identity(error=GoogleTokenError('bad token')),
+            pytest.raises(AuthenticationError) as with_account,
+        ):
+            authenticate_with_google('a-credential')
+        with (
+            _patched_google_identity(error=GoogleTokenError('bad token')),
+            pytest.raises(AuthenticationError) as without_account,
+        ):
+            authenticate_with_google('a-credential')  # for an unregistered address
+
+        assert str(with_account.value) == GENERIC_GOOGLE_LOGIN_ERROR
+        assert str(without_account.value) == str(with_account.value)
+
+    def test_the_email_in_use_error_is_still_an_authentication_error(self):
+        """
+        The schema's `except AuthenticationError` handler is what turns this
+        into a `success: false` payload, so the subclass relationship is load-
+        bearing: if this breaks, a refusal would become an uncaught GraphQL
+        error instead of a rendered message.
+        """
+        _make_user(email='ada@example.com')
+        with (
+            _patched_google_identity(
+                identity=_google_identity(email='ada@example.com', email_verified=True)
+            ),
+            pytest.raises(AuthenticationError) as exc_info,
+        ):
+            authenticate_with_google('a-credential')
+
+        assert isinstance(exc_info.value, GoogleEmailInUseError)
+        assert isinstance(exc_info.value, AuthenticationError)
+
+    def test_the_collision_message_is_never_shown_by_a_generic_failure(self):
+        """
+        The inverse, and the one that would matter most in production: no
+        failure that is not the collision may ever produce the specific text.
+        """
+        for error in (
+            GoogleTokenError('bad token'),
+            GoogleTokenError('Token has wrong audience'),
+            GoogleTokenError('Token expired'),
+            GoogleTokenError('Wrong issuer'),
+        ):
+            with (
+                _patched_google_identity(error=error),
+                pytest.raises(AuthenticationError) as exc_info,
+            ):
+                authenticate_with_google('a-credential')
+            assert GOOGLE_EMAIL_IN_USE_ERROR not in str(exc_info.value), error
 
     def test_duplicate_first_time_google_sign_in_recovers_via_retry(self):
         """
