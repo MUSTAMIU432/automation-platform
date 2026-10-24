@@ -156,7 +156,8 @@ last delivery manager while delivery work is open.
 
 | Area | Route | GraphQL | Notes |
 | ---- | ----- | ------- | ----- |
-| Dashboard | `/app/admin` | `adminOverview` | Users (active), organizations, ideas, ideas per status, reviews open/completed, recent lifecycle moves, recent admin actions. All live counts |
+| Dashboard | `/app/admin` | `adminOverview` | Users (active), organizations, ideas, ideas per status, reviews open/completed. All live counts; each card opens the list it counts |
+| Activity | `/app/admin/activity` (account menu, under Profile) | `adminOverview` | Recent lifecycle moves and recent admin actions; each row opens the idea, user, organization, review teams or categories it is about |
 | Users | `/app/admin/users`, `/users/:id` | `adminUsers`, `adminUser` | Search, active/deactivated filter, platform-admins filter, organization filter. Memberships and roles, sign-in methods, activity counts, admin history |
 | Organizations | `/app/admin/organizations`, `/organizations/:id` | `adminOrganizations`, `adminOrganization`, `adminOrganizationMembers` | Member/owner/reviewer/idea counts, roles and holders, ideas per status, paged members (active and inactive) |
 | Ideas | `/app/admin/ideas`, `/ideas/:id` | `adminIdeas`, `adminIdea` | Filters: search, status, visibility, organization, category, author, created from/to. Detail: story, evidence, discussion, review rounds, lifecycle history |
@@ -167,7 +168,7 @@ last delivery manager while delivery work is open.
 | Invitations | `/app/admin/invitations` | `adminInvitations` | Both scopes, filterable by scope and status, with whether each one could still be accepted |
 | Messages | `/app/admin/messages`, `/messages/:id` | `adminMessageThreads`, `adminMessageThread`, `adminThreadMessages` | Metadata only: participants, counts, last activity. Bodies need `inspect_idea_content` (§3.1) |
 | Notifications | `/app/admin/notifications` | `adminNotifications` | Filterable by kind and unread, with the recipient. These are the platform's own words |
-| Audit trail | Dashboard, user detail | `adminAuditEntries` | Filterable by target |
+| Audit trail | Activity, user detail | `adminAuditEntries` | Filterable by target |
 
 Every list is paged by the server (`ideas.pagination`, max 50 per page) and
 filtered in the database. A page costs a fixed number of queries regardless

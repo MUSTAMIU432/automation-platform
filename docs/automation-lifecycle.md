@@ -146,3 +146,31 @@ administrator who cannot inspect idea content).
 `assignableAssignees` (delivery managers only), `adminAutomationOpportunities` and
 `adminAutomationProjects` (console only), plus the proposal, project, testing, UAT,
 deployment and impact queries and mutations - see `automation/delivery_schema.py`.
+
+## Implementation plan and stage approvals (`automation/implementation.py`)
+
+After the owner's go-ahead, delivery runs through two approvals by a delivery manager
+(the **Delivery manager** platform role, `automation.manage_delivery`):
+
+1. **Assign.** On the admin console's *Automation delivery* desk the manager picks a developer
+   (anyone with the **Developer** role, shown with their active workload) and, optionally, start
+   and target dates. `assignDeveloper` assigns and opens the project in `planning` in one step.
+2. **Plan.** The developer reads the agreed proposal and writes the implementation plan on the
+   project's *Implementation plan* tab: technical approach, architecture and components,
+   technology stack, integrations and data, environments and deployment, testing strategy and
+   technical risks, plus the **stages** (the project's milestones, with due dates). It can be
+   submitted once the approach, architecture, technology, testing strategy and at least one
+   stage are written. While submitted it is locked.
+3. **Approve the plan.** The manager approves it - which starts the project (`planning` ->
+   `active`); `startProject` refuses until a plan is approved - or sends it back with feedback,
+   reopening it for the developer.
+4. **Report each stage.** During implementation the developer reports a stage done with a
+   summary (*Stages & tasks* tab). The manager approves it, completing the milestone, or sends it
+   back with feedback; each report and decision is kept (`StageReport`). A milestone is no
+   longer completed directly by the developer.
+
+Every step writes an `OpportunityEvent` (`plan_submitted`, `plan_approved`, `plan_returned`,
+`stage_submitted`, `stage_approved`, `stage_returned`) and notifies the other side
+(`automation.plan_*`, `automation.stage_*`), linking to the project tab the news is about. The
+desk (`deliveryDesk`) lists what waits for the manager: opportunities to assign, plans and stage
+reports to decide, every project with its plan status and stage progress, and the developers.
