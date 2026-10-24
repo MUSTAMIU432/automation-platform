@@ -106,6 +106,7 @@ class Query(
             django_version=django.get_version(),
         )
 
+
 @strawberry.type
 class Mutation(
     IdentityMutation,

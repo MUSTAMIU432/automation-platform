@@ -239,10 +239,11 @@ def test_production_cors_is_restricted_to_the_configured_origins():
         # setting. Endpoint-scoped rather than broad: what is restricted here is
         # *which paths* may be called cross-origin, and that list is asserted
         # path by path below and in `tests/test_cors.py`. The origin allow-list
-        # above is unchanged, so this widens no origin.
+        # above is unchanged, so this widens no origin. The marketplace document
+        # is a buyer's download of an idea they paid for, served the same way.
         'CORS_URLS_REGEX': (
             r'^(?:/graphql/|/ideas/\d+/attachments/|/administration/attachments/'
-            r'|/account/avatar/|/users/\d+/avatar/)'
+            r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/)'
         ),
         'CSRF_TRUSTED_ORIGINS': ['https://app.example.test'],
     }
