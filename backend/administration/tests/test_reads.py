@@ -30,7 +30,7 @@ query($filters: AdminUserFiltersInput, $offset: Int, $limit: Int) {
   adminUsers(filters: $filters, offset: $offset, limit: $limit) {
     items {
       id email firstName lastName isActive isVerified isPlatformAdmin isSuperuser
-      createdAt lastActiveAt
+      createdAt lastActiveAt avatarUrl
       memberships { id status organization { id name } roles { id name slug isSystem } }
     }
     pageInfo { offset limit totalCount hasNextPage hasPreviousPage }
@@ -172,6 +172,19 @@ class TestUsers:
         assert by_email['root@platform.example']['isPlatformAdmin'] is True
         assert by_email['root@platform.example']['isSuperuser'] is True
         assert by_email['owner@acme.example']['isPlatformAdmin'] is False
+
+    def test_each_account_carries_its_photo_address_or_null(self, gql, world):
+        world['author'].avatar_key = 'avatars/1/photo.png'
+        world['author'].save()
+
+        page = gql(USERS, user=world['admin'])['adminUsers']
+
+        by_email = {item['email']: item for item in page['items']}
+        assert re.fullmatch(
+            rf'/users/{world["author"].pk}/avatar/\?v=[0-9a-f]{{10}}',
+            by_email[world['author'].email]['avatarUrl'],
+        )
+        assert by_email['owner@acme.example']['avatarUrl'] is None
 
     def test_search_and_filters_are_applied_by_the_server(self, gql, world):
         def emails(filters):

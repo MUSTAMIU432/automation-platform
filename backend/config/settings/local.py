@@ -24,6 +24,9 @@ if ENVIRONMENT not in _LOCAL_ENVIRONMENTS:
 
 DEBUG = env.bool('DJANGO_DEBUG', default=True)
 
+# Phone payments in local development go to the sandbox gateway unless told otherwise.
+MARKETPLACE_PAYMENT_GATEWAY = env('MARKETPLACE_PAYMENT_GATEWAY', default='sandbox')
+
 if not ALLOWED_HOSTS:  # noqa: F405
     ALLOWED_HOSTS = ['localhost', '127.0.0.1']
 

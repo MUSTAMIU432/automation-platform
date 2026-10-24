@@ -21,3 +21,9 @@ PyJWT==2.15.0
 # [requests] extra provides the HTTP transport the verifier uses to fetch
 # those keys - no other feature of the package is used.
 google-auth[requests]==2.58.0
+# Gemini's REST API (ai/gemini.py). Already present through google-auth[requests];
+# pinned here because the platform now calls it directly.
+requests==2.34.2
+# The platform admin's proposal PDF (reviews/proposal_pdf.py): pure Python, no system
+# libraries, so it installs the same everywhere.
+reportlab==4.5.1

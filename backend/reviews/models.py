@@ -743,7 +743,8 @@ class IdeaProposal(models.Model):
         related_name='proposals',
         help_text='The review team that wrote it; empty when a single reviewer did.',
     )
-    title = models.CharField(max_length=200)
+    # Text, not a capped CharField: the team writes as much as the proposal needs.
+    title = models.TextField()
     executive_summary = models.TextField(blank=True)
     problem = models.TextField(blank=True)
     proposed_solution = models.TextField(blank=True)
@@ -752,8 +753,8 @@ class IdeaProposal(models.Model):
     deliverables = models.TextField(blank=True)
     risks = models.TextField(blank=True)
     assumptions = models.TextField(blank=True)
-    estimated_effort = models.CharField(max_length=120, blank=True)
-    estimated_timeline = models.CharField(max_length=120, blank=True)
+    estimated_effort = models.TextField(blank=True)
+    estimated_timeline = models.TextField(blank=True)
     acceptance_criteria = models.TextField(blank=True)
     feasibility = models.TextField(blank=True)
     milestones = models.TextField(blank=True, help_text='The timeline, phase by phase.')
@@ -765,6 +766,10 @@ class IdeaProposal(models.Model):
         help_text='Whether the owner pays for it; empty until the team answers.',
     )
     payment_plan = models.TextField(blank=True)
+    # When the work is planned to begin and end - the dates on the proposal's cover. Optional,
+    # and separate from `estimated_timeline`, which explains the duration in the team's words.
+    planned_start = models.DateField(null=True, blank=True)
+    planned_end = models.DateField(null=True, blank=True)
 
     status = models.CharField(max_length=20, choices=PROPOSAL_STATUS_CHOICES, default='draft')
     review_feedback = models.TextField(blank=True)

@@ -322,9 +322,18 @@ def _save_project_move(user, project, before, kind=None, title='', body='', **te
         _tell(project, kind, title, body, actor=user, **tell)
 
 
+def _plan_gate(project: Project) -> None:
+    from automation.implementation import plan_is_approved
+
+    if not plan_is_approved(project):
+        raise AutomationError(
+            'Implementation starts once the delivery manager approves the implementation plan.'
+        )
+
+
 @transaction.atomic
 def start_project(user, project_id) -> Project:
-    project = _project_edge(user, project_id, 'planning', 'active')
+    project = _project_edge(user, project_id, 'planning', 'active', check=_plan_gate)
     if project.start_date is None:
         project.start_date = timezone.localdate()
     _save_project_move(
@@ -470,6 +479,10 @@ def complete_milestone(user, milestone_id) -> Milestone:
     if milestone is None:
         raise AutomationError(UNAVAILABLE)
     project = _open_project(user, milestone.project_id)
+    # A stage is approved by the delivery manager; the developer reports it instead
+    # (`automation.implementation.submit_stage`).
+    if not authz.is_delivery_manager(user):
+        raise AutomationError('A stage is completed when the delivery manager approves it.')
     milestone = Milestone.objects.select_for_update().get(pk=milestone.pk)
     if milestone.status == 'completed':
         raise AutomationError('This milestone is already complete.')

@@ -75,6 +75,8 @@ RELEASE_PROPOSALS = 'administration.release_proposals'
 # Give an existing account one of the platform's jobs - developer, delivery manager,
 # intake, proposal approver (`administration.platform_roles`) - and take it away.
 MANAGE_PLATFORM_ROLES = 'administration.manage_platform_roles'
+# Publish ideas for sale, price them, set the accounts buyers pay into, and confirm payments.
+MANAGE_MARKETPLACE = 'administration.manage_marketplace'
 
 # The console's own permissions: the gate, the additional capabilities, and
 # *staffing* - making reviewers and handing out the platform's other jobs - but
@@ -95,6 +97,7 @@ CONSOLE_PERMISSIONS = (
     MANAGE_CATEGORIES,
     MANAGE_REVIEWERS,
     MANAGE_PLATFORM_ROLES,
+    MANAGE_MARKETPLACE,
 )
 
 ALL_PERMISSIONS = (
@@ -108,6 +111,7 @@ ALL_PERMISSIONS = (
     MANAGE_REVIEWERS,
     RELEASE_PROPOSALS,
     MANAGE_PLATFORM_ROLES,
+    MANAGE_MARKETPLACE,
 )
 
 
@@ -140,6 +144,7 @@ class AdminCapabilities:
     can_manage_reviewers: bool = False
     can_release_proposals: bool = False
     can_manage_platform_roles: bool = False
+    can_manage_marketplace: bool = False
 
 
 NO_CAPABILITIES = AdminCapabilities()
@@ -171,6 +176,7 @@ def capabilities_for(user: User | None) -> AdminCapabilities:
         can_manage_reviewers=active_user.has_perm(MANAGE_REVIEWERS),
         can_release_proposals=active_user.has_perm(RELEASE_PROPOSALS),
         can_manage_platform_roles=active_user.has_perm(MANAGE_PLATFORM_ROLES),
+        can_manage_marketplace=active_user.has_perm(MANAGE_MARKETPLACE),
     )
 
 

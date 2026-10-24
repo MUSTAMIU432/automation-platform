@@ -34,7 +34,6 @@ from automation.models import (
     Requirement,
     SolutionScope,
 )
-from ideas import selectors as idea_selectors
 from ideas.models import Idea
 from identity.models import User
 
@@ -164,7 +163,9 @@ def _open(idea: Idea, proposal, created_by: User) -> AutomationOpportunity:
         with transaction.atomic():
             opportunity = AutomationOpportunity.objects.create(
                 idea=idea,
-                title=proposal.title or idea.title,
+                # The opportunity's title is a list heading; the full proposal title
+                # travels with the Proposal record created below.
+                title=(proposal.title or idea.title)[:200],
                 summary=proposal.executive_summary,
                 problem_statement=proposal.problem or idea.description,
                 automation_goal=idea.desired_outcome or idea.improvement_goal,
@@ -459,24 +460,38 @@ def get_opportunity(user: User | None, opportunity_id: object) -> AutomationOppo
 
 
 def list_opportunities(user: User | None, *, status: str | None = None):
-    """Opportunities the caller may read, newest first. Delivery managers see all."""
+    """
+    The opportunities that belong to the caller, newest first: those for their own ideas -
+    as the author, or as a member of the team or organization the idea was submitted for -
+    and those assigned to them to deliver.
+
+    The same for everyone, delivery managers included. Platform-wide oversight is the
+    administration console's (`adminAutomationOpportunities`, `deliveryDesk`); in the app
+    a delivery manager is an ordinary user, and their own ideas are what they see here.
+    Opening any one opportunity is still decided by `authz.can_view`.
+    """
     if user is None or not user.is_active:
         return AutomationOpportunity.objects.none()
-    queryset = AutomationOpportunity.objects.select_related('idea', 'owner', 'organization', 'team')
-    if not authz.is_delivery_manager(user):
-        from django.db.models import Q
+    from django.db.models import Q
 
-        from teams.authorization import active_team_ids
+    from organizations.authorization import active_organization_ids
+    from teams.authorization import active_team_ids
 
-        readable = idea_selectors.list_ideas(user).values('pk')
-        queryset = queryset.filter(
-            Q(idea_id__in=readable)
-            | Q(assignments__status='active', assignments__assignee_user=user)
+    teams = active_team_ids(user)
+    queryset = (
+        AutomationOpportunity.objects.select_related('idea', 'owner', 'organization', 'team')
+        .filter(
+            Q(idea__author=user)
+            | Q(idea__submission_context=Idea.SubmissionContext.TEAM, idea__team_id__in=teams)
             | Q(
-                assignments__status='active',
-                assignments__assignee_team_id__in=active_team_ids(user),
+                idea__submission_context=Idea.SubmissionContext.ORGANIZATION,
+                idea__organization_id__in=active_organization_ids(user),
             )
-        ).distinct()
+            | Q(assignments__status='active', assignments__assignee_user=user)
+            | Q(assignments__status='active', assignments__assignee_team_id__in=teams)
+        )
+        .distinct()
+    )
     if status:
         queryset = queryset.filter(status=status)
     return queryset

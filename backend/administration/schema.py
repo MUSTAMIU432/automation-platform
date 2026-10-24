@@ -64,6 +64,7 @@ from ideas.schema import (
     PageInfo,
     SubmissionContext,
 )
+from identity import avatars
 from identity.models import User
 from invitations.models import Invitation
 from messaging.models import Message, MessageThread
@@ -116,6 +117,7 @@ class AdminCapabilitiesType:
     can_manage_reviewers: bool
     can_release_proposals: bool
     can_manage_platform_roles: bool
+    can_manage_marketplace: bool
 
     @staticmethod
     def from_capabilities(capabilities: AdminCapabilities) -> 'AdminCapabilitiesType':
@@ -130,6 +132,7 @@ class AdminCapabilitiesType:
             can_manage_reviewers=capabilities.can_manage_reviewers,
             can_release_proposals=capabilities.can_release_proposals,
             can_manage_platform_roles=capabilities.can_manage_platform_roles,
+            can_manage_marketplace=capabilities.can_manage_marketplace,
         )
 
 
@@ -351,6 +354,9 @@ class AdminUserType:
         description='When the account last signed in or renewed its session.'
     )
     memberships: list[AdminUserMembershipType]
+    avatar_url: str | None = strawberry.field(
+        description='Where the profile photo is served from (needs the bearer token), or null.'
+    )
 
     @staticmethod
     def fields_from(user: User) -> dict:
@@ -374,6 +380,7 @@ class AdminUserType:
                 )
                 for membership in user.memberships.all()
             ],
+            'avatar_url': avatars.avatar_url(user),
         }
 
     @staticmethod

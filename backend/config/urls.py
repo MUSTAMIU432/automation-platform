@@ -23,6 +23,9 @@ from config.views import health
 from graphql_api.views import graphql_view
 from ideas.views import download_attachment_view, upload_attachment_view
 from identity.views import avatar_view, user_avatar_view
+from marketplace.views import document_view as market_document_view
+from marketplace.views import gateway_callback_view as market_gateway_callback_view
+from reviews.views import admin_proposal_pdf_view
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -53,5 +56,25 @@ urlpatterns = [
         'administration/attachments/<int:attachment_id>/download/',
         admin_download_attachment_view,
         name='admin-attachment-download',
+    ),
+    # A proposal as a watermarked PDF, for the platform admin. See `reviews/views.py`.
+    path(
+        'administration/proposals/<int:idea_id>/pdf/',
+        admin_proposal_pdf_view,
+        name='admin-proposal-pdf',
+    ),
+    # A marketplace idea's document: uploaded by an administrator, downloaded by a buyer
+    # once their payment is confirmed. See `marketplace/views.py`.
+    path(
+        'marketplace/ideas/<int:idea_id>/document/',
+        market_document_view,
+        name='market-idea-document',
+    ),
+    # The payment gateway's report of a phone payment's outcome. Server to server: not in
+    # CORS. See `marketplace/gateways.py`.
+    path(
+        'marketplace/gateway/callback/',
+        market_gateway_callback_view,
+        name='market-gateway-callback',
     ),
 ]

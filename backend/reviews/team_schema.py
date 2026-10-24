@@ -8,6 +8,7 @@ other domain. Who may do what is `reviews.review_teams`' to decide; nothing here
 import strawberry
 
 from administration.authorization import AdministrationError
+from identity import avatars
 from reviews import review_teams
 from reviews.models import ReviewTeam
 
@@ -17,6 +18,11 @@ class ReviewerType:
     id: strawberry.ID
     email: str
     name: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None = strawberry.field(
+        description='Where the profile photo is served from (needs the bearer token), or null.'
+    )
 
 
 @strawberry.type
@@ -24,6 +30,11 @@ class ReviewTeamMemberType:
     id: strawberry.ID
     email: str
     name: str
+    first_name: str
+    last_name: str
+    avatar_url: str | None = strawberry.field(
+        description='Where the profile photo is served from (needs the bearer token), or null.'
+    )
     is_lead: bool
 
 
@@ -47,6 +58,9 @@ class ReviewTeamType:
                     id=strawberry.ID(str(m.user_id)),
                     email=m.user.email,
                     name=m.user.get_full_name() or m.user.email,
+                    first_name=m.user.first_name,
+                    last_name=m.user.last_name,
+                    avatar_url=avatars.avatar_url(m.user),
                     is_lead=m.user_id == team.lead_id,
                 )
                 for m in team.members.select_related('user').all()
@@ -80,7 +94,12 @@ class AssignTeamPayload:
 
 def _reviewer(user) -> ReviewerType:
     return ReviewerType(
-        id=strawberry.ID(str(user.pk)), email=user.email, name=user.get_full_name() or user.email
+        id=strawberry.ID(str(user.pk)),
+        email=user.email,
+        name=user.get_full_name() or user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        avatar_url=avatars.avatar_url(user),
     )
 
 

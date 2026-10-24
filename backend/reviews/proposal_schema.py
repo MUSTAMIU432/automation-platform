@@ -7,7 +7,7 @@ through `ideaProposalState` and announces each reading with `recordProposalView`
 carries what the page needs for its watermark.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 import strawberry
 
@@ -39,8 +39,11 @@ class IdeaProposalType:
     financial_requirements: str
     payment_required: str
     payment_plan: str
+    planned_start: date | None
+    planned_end: date | None
     status: str
     review_feedback: str
+    started_at: datetime
     submitted_at: datetime | None
     decided_at: datetime | None
     updated_at: datetime
@@ -68,8 +71,11 @@ class IdeaProposalType:
             financial_requirements=p.financial_requirements,
             payment_required=p.payment_required,
             payment_plan=p.payment_plan,
+            planned_start=p.planned_start,
+            planned_end=p.planned_end,
             status=p.status,
             review_feedback=p.review_feedback,
+            started_at=p.created_at,
             submitted_at=p.submitted_at,
             decided_at=p.decided_at,
             updated_at=p.updated_at,
@@ -191,6 +197,14 @@ class ViewPayload:
     receipt: ViewReceipt | None = None
 
 
+@strawberry.type
+class ProposalDraftPayload:
+    success: bool
+    message: str
+    field: str | None = None
+    text: str | None = None
+
+
 @strawberry.input
 class UpdateIdeaProposalInput:
     idea_id: strawberry.ID
@@ -211,6 +225,9 @@ class UpdateIdeaProposalInput:
     financial_requirements: str | None = None
     payment_required: str | None = None
     payment_plan: str | None = None
+    # ISO dates ('2026-11-02'); an empty string clears one.
+    planned_start: str | None = None
+    planned_end: str | None = None
 
 
 def _camel(name: str | None) -> str | None:
@@ -218,6 +235,10 @@ def _camel(name: str | None) -> str | None:
         return None
     head, *rest = name.split('_')
     return head + ''.join(part.capitalize() for part in rest)
+
+
+def _snake(name: str) -> str:
+    return ''.join(f'_{c.lower()}' if c.isupper() else c for c in name)
 
 
 def _run(action):
@@ -305,6 +326,34 @@ class Mutation:
             if name != 'idea_id' and value is not None
         }
         return _run(lambda: proposals.update_proposal(info.context.user, input.idea_id, values))
+
+    @strawberry.mutation(
+        description='A first draft of one proposal section, written by AI from the idea and '
+        "the other sections (`input` carries the editor's unsaved text). Writers only; "
+        'nothing is saved - the draft goes back to the editor.'
+    )
+    def draft_idea_proposal_section(
+        self,
+        info: strawberry.Info,
+        input: UpdateIdeaProposalInput,
+        section: str,
+        instructions: str | None = None,
+    ) -> ProposalDraftPayload:
+        from reviews import proposal_drafting
+
+        field = _snake(section)
+        written = {
+            name: value
+            for name, value in vars(input).items()
+            if name != 'idea_id' and value is not None
+        }
+        try:
+            text = proposal_drafting.draft_section(
+                info.context.user, input.idea_id, field, written, instructions or ''
+            )
+        except proposals.ProposalError as exc:
+            return ProposalDraftPayload(success=False, message=exc.message, field=_camel(exc.field))
+        return ProposalDraftPayload(success=True, message='Drafted.', text=text)
 
     @strawberry.mutation(description="The team's lead sends the finished proposal to the admin.")
     def submit_idea_proposal(

@@ -4,6 +4,7 @@ the owner, who then gives the go-ahead that opens the idea to delivery.
 """
 
 from datetime import date, timedelta
+from typing import ClassVar
 
 import pytest
 
@@ -640,3 +641,303 @@ class TestWhoAnswersAndReads:
         for reader in (owner, lead, releaser):
             assert proposal_answers.answer_for(reader, released.pk) is not None
         assert proposal_answers.answer_for(make_user('stranger@example.com'), released.pk) is None
+
+
+@pytest.mark.django_db
+class TestAiDrafts:
+    """A writer asks Gemini for a first draft of one section; nothing is saved."""
+
+    def draft(self, user, idea, section='feasibility', written=None, reply='A draft.'):
+        from unittest import mock
+
+        from reviews import proposal_drafting
+
+        with mock.patch('ai.gemini.generate_text', return_value=reply) as generate:
+            text = proposal_drafting.draft_section(user, idea.pk, section, written or {})
+        return text, generate
+
+    def test_a_writer_gets_a_draft_built_from_the_idea_and_the_other_sections(
+        self, approved, member
+    ):
+        proposals.start_proposal(member, approved.pk)
+
+        text, generate = self.draft(
+            member, approved, written={'scope': 'Import and match, unsaved.'}
+        )
+
+        assert text == 'A draft.'
+        prompt = generate.call_args.args[0]
+        assert approved.title in prompt
+        assert approved.description in prompt
+        assert 'Import and match, unsaved.' in prompt  # the editor's unsaved text
+        assert 'NOW WRITE THE SECTION "Feasibility"' in prompt
+        assert generate.call_args.kwargs['system'].startswith('You are drafting')
+        assert proposals.proposal_for(member, approved.pk)[0].feasibility == ''  # not saved
+
+    def test_the_title_comes_back_as_one_line(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        text, _ = self.draft(member, approved, section='title', reply='"Tax dashboard"\nBecause…')
+
+        assert text == 'Tax dashboard'
+
+    def test_the_timeline_may_be_more_than_one_line(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        text, _ = self.draft(
+            member, approved, section='estimated_timeline', reply='12 weeks.\nFour phases.'
+        )
+
+        assert text == '12 weeks.\nFour phases.'
+
+    def test_the_writers_instructions_steer_the_draft(self, approved, member):
+        from unittest import mock
+
+        from reviews import proposal_drafting
+
+        proposals.start_proposal(member, approved.pk)
+        with mock.patch('ai.gemini.generate_text', return_value='A draft.') as generate:
+            proposal_drafting.draft_section(
+                member, approved.pk, 'risks', {}, 'Focus on SMS delivery failures.'
+            )
+
+        prompt = generate.call_args.args[0]
+        assert "THE WRITER'S INSTRUCTIONS" in prompt
+        assert 'Focus on SMS delivery failures.' in prompt
+        assert prompt.index('Focus on SMS') < prompt.index('NOW WRITE THE SECTION')
+
+    def test_only_writers_may_ask(self, approved, member, owner):
+        proposals.start_proposal(member, approved.pk)
+        outsider = make_user('outsider@example.com')
+
+        for person in (owner, outsider, None):
+            with pytest.raises(proposals.ProposalError):
+                self.draft(person, approved)
+
+    def test_not_once_the_proposal_has_left_the_team(self, approved, lead, member):
+        submitted(approved, lead, member)
+
+        with pytest.raises(proposals.ProposalError, match='can no longer be edited'):
+            self.draft(member, approved)
+
+    def test_the_owner_pays_answer_is_not_drafted(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        with pytest.raises(proposals.ProposalError, match='cannot be drafted'):
+            self.draft(member, approved, section='payment_required')
+
+    def test_an_ai_failure_is_the_services_own_safe_words(self, approved, member):
+        from unittest import mock
+
+        from ai import gemini
+        from reviews import proposal_drafting
+
+        proposals.start_proposal(member, approved.pk)
+        busy = gemini.GeminiError('The AI service is busy right now. Please try again shortly.')
+        with (
+            mock.patch('ai.gemini.generate_text', side_effect=busy),
+            pytest.raises(proposals.ProposalError, match='busy') as raised,
+        ):
+            proposal_drafting.draft_section(member, approved.pk, 'risks', {})
+        assert raised.value.field == 'risks'
+
+    def test_over_graphql(self, approved, member, owner):
+        from unittest import mock
+
+        from automation.tests.test_api_journey import Api
+
+        proposals.start_proposal(member, approved.pk)
+        query = """mutation($input: UpdateIdeaProposalInput!) {
+            draftIdeaProposalSection(
+                input: $input, section: "acceptanceCriteria", instructions: "Be brief."
+            ) { success message field text } }"""
+        variables = {'input': {'ideaId': str(approved.pk), 'scope': 'Import only.'}}
+
+        with mock.patch('ai.gemini.generate_text', return_value='- Finance sees it.') as generate:
+            answer = Api(member)(query, variables)['draftIdeaProposalSection']
+            refused = Api(owner)(query, variables)['draftIdeaProposalSection']
+
+        assert answer == {
+            'success': True,
+            'message': 'Drafted.',
+            'field': None,
+            'text': '- Finance sees it.',
+        }
+        assert 'Import only.' in generate.call_args.args[0]
+        assert 'Be brief.' in generate.call_args.args[0]
+        assert refused['success'] is False
+        assert refused['text'] is None
+        assert generate.call_count == 1
+
+
+@pytest.mark.django_db
+class TestAdminPdf:
+    """A platform admin downloads a proposal as a PDF stamped with their name."""
+
+    def get(self, idea_id, user=None):
+        from django.test import Client
+
+        from identity.tokens import issue_access_token
+
+        headers = {}
+        if user is not None:
+            headers['HTTP_AUTHORIZATION'] = f'Bearer {issue_access_token(user.pk)[0]}'
+        return Client().get(f'/administration/proposals/{idea_id}/pdf/', **headers)
+
+    def test_an_admin_gets_a_pdf_and_the_download_is_audited(
+        self, approved, lead, member, releaser
+    ):
+        from administration.models import AdminAuditEntry
+
+        submitted(approved, lead, member)
+
+        response = self.get(approved.pk, releaser)
+
+        assert response.status_code == 200
+        assert response['Content-Type'] == 'application/pdf'
+        assert response.content.startswith(b'%PDF')
+        assert response['Content-Disposition'].startswith(
+            f'attachment; filename="proposal-{approved.pk}-'
+        )
+        assert response['Cache-Control'] == 'no-store'
+        entry = AdminAuditEntry.objects.get(action='proposal.downloaded')
+        assert entry.actor == releaser
+        assert entry.target_id == str(approved.pk)
+
+    def test_the_pdf_carries_the_proposal_and_the_readers_stamp(
+        self, approved, lead, member, releaser
+    ):
+        from reviews import proposal_pdf
+        from reviews.models import IdeaProposal
+
+        submitted(approved, lead, member)
+        proposal = IdeaProposal.objects.select_related('idea', 'team').get(idea=approved)
+
+        pdf = proposal_pdf.build_pdf(proposal, releaser)
+
+        assert pdf.startswith(b'%PDF')
+        assert f'downloaded by {releaser.email}'.encode() in pdf  # the document's subject
+
+    def test_writer_text_is_never_read_as_markup(self, approved, member):
+        from reviews import proposal_pdf
+        from reviews.models import IdeaProposal
+
+        proposals.start_proposal(member, approved.pk)
+        proposals.update_proposal(member, approved.pk, {'scope': '<b>bold & <unclosed'})
+        proposal = IdeaProposal.objects.select_related('idea', 'team').get(idea=approved)
+
+        assert proposal_pdf.build_pdf(proposal, member).startswith(b'%PDF')
+
+    def test_nobody_else_gets_one(self, approved, lead, member, owner, manager):
+        submitted(approved, lead, member)
+
+        # `manager` is a console admin who manages reviewers but cannot release proposals.
+        for person in (None, owner, member, lead, manager):
+            assert self.get(approved.pk, person).status_code == 404
+
+    def test_a_missing_proposal_is_a_404(self, approved, releaser):
+        assert self.get(approved.pk, releaser).status_code == 404
+        assert self.get(999999, releaser).status_code == 404
+
+
+@pytest.mark.django_db
+class TestNoLengthLimits:
+    """The team writes as much as the proposal needs; no section has a length limit."""
+
+    LONG: ClassVar[dict[str, str]] = {
+        'title': 'A very long proposal title ' * 20,
+        'estimated_effort': 'Approximately 250 to 400 person-hours across analysis. ' * 20,
+        'estimated_timeline': 'Twelve weeks, in four phases of three weeks each. ' * 20,
+    }
+
+    def test_long_sections_are_saved_whole_and_can_be_sent(self, approved, lead, member):
+        proposals.start_proposal(member, approved.pk)
+
+        proposal = proposals.update_proposal(member, approved.pk, {**FULL, **self.LONG})
+        proposals.submit_proposal(lead, approved.pk)
+
+        proposal.refresh_from_db()
+        assert proposal.status == 'submitted'
+        assert proposal.estimated_effort == self.LONG['estimated_effort'].strip()
+        assert proposal.title == self.LONG['title'].strip()
+
+    def test_the_go_ahead_carries_the_long_text_into_delivery(
+        self, owner, approved, lead, member, releaser
+    ):
+        proposals.start_proposal(member, approved.pk)
+        proposals.update_proposal(member, approved.pk, {**FULL, **self.LONG})
+        proposals.submit_proposal(lead, approved.pk)
+        proposals.release(releaser, approved.pk)
+
+        proceed(owner, approved)
+
+        opportunity = approved.automation_opportunities.get()
+        agreed = DeliveryProposal.objects.get(opportunity=opportunity)
+        assert agreed.estimated_effort == self.LONG['estimated_effort'].strip()
+        assert agreed.title == self.LONG['title'].strip()
+        assert len(opportunity.title) <= 200  # the list heading; the proposal keeps it whole
+
+
+@pytest.mark.django_db
+class TestPlannedDates:
+    """The planned start and end on the proposal's cover."""
+
+    def test_the_team_sets_and_clears_them(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        proposal = proposals.update_proposal(
+            member, approved.pk, {'planned_start': '2026-11-02', 'planned_end': '2027-01-29'}
+        )
+        assert (proposal.planned_start, proposal.planned_end) == (
+            date(2026, 11, 2),
+            date(2027, 1, 29),
+        )
+
+        proposal = proposals.update_proposal(member, approved.pk, {'planned_end': ''})
+        proposal.refresh_from_db()
+        assert proposal.planned_end is None
+        assert proposal.planned_start == date(2026, 11, 2)
+
+    def test_the_end_cannot_come_before_the_start(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        with pytest.raises(proposals.ProposalError, match='cannot be before') as raised:
+            proposals.update_proposal(
+                member, approved.pk, {'planned_start': '2026-11-02', 'planned_end': '2026-10-01'}
+            )
+        assert raised.value.field == 'planned_end'
+
+    def test_a_date_must_be_a_date(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+
+        with pytest.raises(proposals.ProposalError, match='calendar date'):
+            proposals.update_proposal(member, approved.pk, {'planned_start': 'next week'})
+
+    def test_they_are_not_sections_and_do_not_count_towards_progress(self, approved, member):
+        proposals.start_proposal(member, approved.pk)
+        proposals.update_proposal(member, approved.pk, {'planned_start': '2026-11-02'})
+
+        assert 'planned_start' not in proposals.FIELDS
+
+    def test_over_graphql(self, approved, member):
+        from automation.tests.test_api_journey import Api
+
+        proposals.start_proposal(member, approved.pk)
+        update = """mutation($input: UpdateIdeaProposalInput!) { updateIdeaProposal(input: $input) {
+            success proposal { plannedStart plannedEnd startedAt } } }"""
+
+        payload = Api(member)(
+            update,
+            {
+                'input': {
+                    'ideaId': str(approved.pk),
+                    'plannedStart': '2026-11-02',
+                    'plannedEnd': '2027-01-29',
+                }
+            },
+        )['updateIdeaProposal']
+
+        assert payload['success'] is True
+        assert payload['proposal']['plannedStart'] == '2026-11-02'
+        assert payload['proposal']['plannedEnd'] == '2027-01-29'
+        assert payload['proposal']['startedAt']

@@ -83,6 +83,12 @@ EVENT_ACTION_CHOICES = (
     ('deployment_recorded', 'Deployment recorded'),
     ('deployment_verified', 'Deployment verified'),
     ('impact_recorded', 'Impact recorded'),
+    ('plan_submitted', 'Implementation plan submitted'),
+    ('plan_approved', 'Implementation plan approved'),
+    ('plan_returned', 'Implementation plan sent back'),
+    ('stage_submitted', 'Stage submitted for approval'),
+    ('stage_approved', 'Stage approved'),
+    ('stage_returned', 'Stage sent back'),
 )
 
 PROPOSAL_STATUS_CHOICES = (
@@ -107,7 +113,22 @@ PROJECT_STATUS_CHOICES = (
 MILESTONE_STATUS_CHOICES = (
     ('pending', 'Pending'),
     ('in_progress', 'In progress'),
+    # The developer reported the stage done; the delivery manager has not decided yet.
+    ('submitted', 'Waiting for approval'),
+    # The delivery manager sent the stage back with feedback.
+    ('returned', 'Sent back'),
     ('completed', 'Completed'),
+)
+PLAN_STATUS_CHOICES = (
+    ('draft', 'Draft'),
+    ('submitted', 'Waiting for approval'),
+    ('changes_requested', 'Sent back'),
+    ('approved', 'Approved'),
+)
+STAGE_REPORT_DECISION_CHOICES = (
+    ('pending', 'Waiting for a decision'),
+    ('approved', 'Approved'),
+    ('returned', 'Sent back'),
 )
 TASK_STATUS_CHOICES = (
     ('todo', 'To do'),
@@ -390,7 +411,8 @@ class Proposal(models.Model):
     opportunity = models.OneToOneField(
         AutomationOpportunity, on_delete=models.CASCADE, related_name='proposal'
     )
-    title = models.CharField(max_length=200)
+    # As long as the review team's proposal it is copied from (`reviews.IdeaProposal`).
+    title = models.TextField()
     executive_summary = models.TextField(blank=True)
     problem = models.TextField(blank=True)
     proposed_solution = models.TextField(blank=True)
@@ -399,8 +421,8 @@ class Proposal(models.Model):
     deliverables = models.TextField(blank=True)
     risks = models.TextField(blank=True)
     assumptions = models.TextField(blank=True)
-    estimated_effort = models.CharField(max_length=120, blank=True)
-    estimated_timeline = models.CharField(max_length=120, blank=True)
+    estimated_effort = models.TextField(blank=True)
+    estimated_timeline = models.TextField(blank=True)
     acceptance_criteria = models.TextField(blank=True)
     feasibility = models.TextField(blank=True)
     milestones = models.TextField(blank=True, help_text='The timeline, phase by phase.')
@@ -572,6 +594,75 @@ class Milestone(models.Model):
 
     def __str__(self) -> str:
         return self.title
+
+
+class ImplementationPlan(models.Model):
+    """
+    How the assigned developer will build the project, written from the agreed proposal.
+
+    The delivery manager approves it before any implementation starts - approving it is what
+    starts the project - or sends it back with feedback. Its stages are the project's
+    milestones, each of which the developer later reports on and the manager approves.
+    """
+
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='plan')
+    approach = models.TextField(blank=True, help_text='The technical approach, in brief.')
+    architecture = models.TextField(blank=True, help_text='Architecture and components.')
+    technology = models.TextField(blank=True, help_text='Technology stack.')
+    integrations = models.TextField(blank=True, help_text='Integrations and data.')
+    environments = models.TextField(blank=True, help_text='Environments and deployment.')
+    testing_strategy = models.TextField(blank=True)
+    risks = models.TextField(blank=True, help_text='Technical risks and mitigations.')
+    status = models.CharField(max_length=20, choices=PLAN_STATUS_CHOICES, default='draft')
+    review_feedback = models.TextField(blank=True)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    submitted_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            _known('status', PLAN_STATUS_CHOICES, 'implementation_plan_status_is_known'),
+        ]
+
+    def __str__(self) -> str:
+        return f'Implementation plan for project {self.project_id} ({self.status})'
+
+
+class StageReport(models.Model):
+    """
+    The developer's report that a stage (milestone) is done, and the manager's decision on it.
+
+    One per submission, so a stage that was sent back and reported again keeps its history.
+    """
+
+    milestone = models.ForeignKey(Milestone, on_delete=models.CASCADE, related_name='reports')
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='+')
+    summary = models.TextField(help_text='What was done, and anything the manager should know.')
+    decision = models.CharField(
+        max_length=10, choices=STAGE_REPORT_DECISION_CHOICES, default='pending'
+    )
+    feedback = models.TextField(blank=True)
+    decided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='+'
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering: ClassVar[list[str]] = ['-created_at', '-pk']
+        constraints: ClassVar[list[models.BaseConstraint]] = [
+            _known('decision', STAGE_REPORT_DECISION_CHOICES, 'stage_report_decision_is_known'),
+        ]
+
+    def __str__(self) -> str:
+        return f'Report on milestone {self.milestone_id} ({self.decision})'
 
 
 class Task(models.Model):

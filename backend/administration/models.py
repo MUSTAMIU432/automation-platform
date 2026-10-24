@@ -79,6 +79,13 @@ ADMIN_AUDIT_ACTION_CHOICES = (
     ('platform_role.revoked', 'Platform role removed'),
     # A platform approval or rejection, sent to the idea's owner by an administrator.
     ('decision_letter.sent', 'Decision letter sent to the owner'),
+    # A proposal downloaded as a watermarked PDF by an administrator (`reviews/views.py`).
+    ('proposal.downloaded', 'Proposal downloaded as a PDF'),
+    # The marketplace (`marketplace.services`): what is offered for sale, and the money.
+    ('marketplace.idea_published', 'Idea published to the marketplace'),
+    ('marketplace.idea_unpublished', 'Idea withdrawn from the marketplace'),
+    ('marketplace.payment_confirmed', 'Marketplace payment confirmed'),
+    ('marketplace.payment_rejected', 'Marketplace payment rejected'),
 )
 
 ADMIN_AUDIT_RESULT_CHOICES = (
@@ -145,6 +152,11 @@ class AdminAuditEntry(models.Model):
             PLATFORM_ROLE_GRANTED,
             PLATFORM_ROLE_REVOKED,
             DECISION_LETTER_SENT,
+            PROPOSAL_DOWNLOADED,
+            MARKETPLACE_IDEA_PUBLISHED,
+            MARKETPLACE_IDEA_UNPUBLISHED,
+            MARKETPLACE_PAYMENT_CONFIRMED,
+            MARKETPLACE_PAYMENT_REJECTED,
         ) = ADMIN_AUDIT_ACTION_CHOICES
 
     class Result(models.TextChoices):
@@ -224,6 +236,13 @@ class AdminAuditEntry(models.Model):
                 'manage_platform_roles',
                 'Can give accounts platform roles: developer, delivery manager, intake and '
                 'proposal approver',
+            ),
+            # The marketplace: ideas the platform publishes for sale, the prices on them,
+            # the accounts buyers pay into, and confirming those payments.
+            (
+                'manage_marketplace',
+                'Can publish ideas for sale, set their prices and payment methods, and '
+                'confirm payments',
             ),
         ]
         constraints: ClassVar[list[models.BaseConstraint]] = [

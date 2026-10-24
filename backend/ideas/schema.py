@@ -53,6 +53,7 @@ service describes what may be *used* today.
 """
 
 import copy
+from enum import Enum
 
 import strawberry
 
@@ -69,6 +70,16 @@ IdeaTone = strawberry.enum(states.Tone, name='IdeaTone')
 # `TextChoices` for the same reason as the two above.
 IdeaFrequency = strawberry.enum(Idea.Frequency, name='IdeaFrequency')
 IdeaImpact = strawberry.enum(Idea.Impact, name='IdeaImpact')
+
+
+@strawberry.enum(description='How a page of ideas is ordered. NEWEST is the default.')
+class IdeaSort(Enum):
+    NEWEST = 'newest'
+    OLDEST = 'oldest'
+    MOST_VOTED = 'most_voted'
+    RECENTLY_UPDATED = 'recently_updated'
+
+
 IdeaCurrentTool = strawberry.enum(Idea.CurrentTool, name='IdeaCurrentTool')
 
 
@@ -217,6 +228,10 @@ class IdeaType:
     # than an obviously missing one.
     vote_count: int
     viewer_has_voted: bool
+    # The size of the discussion and of the supporting evidence, for the card's
+    # counts. From the row when a discovery query annotated it, as with votes.
+    comment_count: int
+    attachment_count: int
     # The row and the viewer this type was built from, for the review
     # capability fields below. Private: never part of the schema.
     _idea: strawberry.Private[Idea]
@@ -370,6 +385,7 @@ class IdeaType:
             ],
             discussion_open=lifecycle.discussion_is_open(idea),
             **_vote_state_fields(idea, user),
+            **_activity_count_fields(idea),
             _idea=idea,
             _viewer=user,
         )
@@ -646,6 +662,8 @@ class IdeaFiltersInput:
     submission_context: SubmissionContext | None = None
     visibility: IdeaVisibility | None = None
     mine: bool = False
+    # An arrangement of the rows the filters chose, never a filter itself.
+    sort: IdeaSort | None = None
     offset: int = 0
     limit: int | None = None
 
@@ -786,6 +804,16 @@ def _vote_state_fields(idea: Idea, user) -> dict:
     return {'vote_count': selectors.vote_count_for(idea), 'viewer_has_voted': False}
 
 
+def _activity_count_fields(idea: Idea) -> dict:
+    """`commentCount`/`attachmentCount`, from the row if a discovery query annotated it."""
+    if hasattr(idea, 'comment_count'):
+        return {'comment_count': idea.comment_count, 'attachment_count': idea.attachment_count}
+    return {
+        'comment_count': selectors.comment_count_for(idea),
+        'attachment_count': selectors.attachment_count_for(idea),
+    }
+
+
 def _comment_payload(comment: Comment) -> CommentType:
     return CommentType.from_model(comment)
 
@@ -824,6 +852,7 @@ def _idea_page(info: strawberry.Info, scope: selectors.IdeaFilters, filters) -> 
         ),
         visibility=requested.visibility.value if requested.visibility else None,
         mine=requested.mine,
+        sort=requested.sort.value if requested.sort else None,
     )
 
     page = selectors.list_discoverable_ideas(

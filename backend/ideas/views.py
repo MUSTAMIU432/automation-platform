@@ -200,28 +200,40 @@ def attachment_file_response(attachment: Attachment) -> HttpResponse:
     function authorizes nothing; it is the one place the safe-download rules
     below live, so a second download path cannot quietly relax them.
     """
+    return stored_file_response(
+        attachment.storage_key, attachment.content_type, attachment.size, attachment.filename
+    )
+
+
+def stored_file_response(
+    storage_key: str, content_type: str, size: int, filename: str
+) -> HttpResponse:
+    """
+    The safe-download rules for any stored file, *already authorized* by the caller: an idea
+    attachment above, or a marketplace idea's document (`marketplace.views`). `content_type`
+    must be the server's own canonical type, never the uploading browser's claim.
+    """
     try:
-        file_handle = open_object(attachment.storage_key)
+        file_handle = open_object(storage_key)
     except FileNotFoundError:
         return HttpResponse(status=404)
     except AttachmentStorageError:
         return HttpResponse(status=502)
 
-    response = FileResponse(file_handle, content_type=attachment.content_type)
-    response['Content-Length'] = str(attachment.size)
+    response = FileResponse(file_handle, content_type=content_type)
+    response['Content-Length'] = str(size)
     # Both forms of the filename: the plain one for clients that only read
     # `filename`, and the percent-encoded `filename*` (RFC 5987/6266) for a
     # name with non-ASCII characters, which the plain form cannot carry
     # correctly. A stray `"` in the plain form is replaced rather than
     # escaped - it would otherwise terminate the quoted value early and let
     # the rest of the filename be read as header syntax.
-    safe_quoted_name = attachment.filename.replace('"', "'")
+    safe_quoted_name = filename.replace('"', "'")
     response['Content-Disposition'] = (
-        f'attachment; filename="{safe_quoted_name}"; '
-        f"filename*=UTF-8''{quote(attachment.filename)}"
+        f'attachment; filename="{safe_quoted_name}"; filename*=UTF-8\'\'{quote(filename)}'
     )
     # An uploaded file's declared type is never trusted for *this* header
-    # either - `attachment.content_type` is the canonical value
+    # either - `content_type` is the canonical value
     # `ideas.attachments.canonical_content_type` derived from the validated
     # extension, not whatever the uploading browser claimed. Combined with
     # `nosniff`, the browser is told exactly one type and refused permission

@@ -411,6 +411,19 @@ class IdeaFilters:
     submission_context: str | None = None
     visibility: str | None = None
     mine: bool = False
+    # How the page is ordered - one of `IDEA_ORDERINGS`; anything else is the default.
+    # An ordering never narrows or widens: it only arranges rows already chosen.
+    sort: str | None = None
+
+
+# Every ordering ends in `-pk` for the reason `list_discoverable_ideas` gives: a
+# tie-breaker is what makes `offset` paging deterministic.
+IDEA_ORDERINGS: dict[str, tuple[str, ...]] = {
+    'newest': ('-created_at', '-pk'),
+    'oldest': ('created_at', 'pk'),
+    'most_voted': ('-vote_count', '-created_at', '-pk'),
+    'recently_updated': ('-updated_at', '-pk'),
+}
 
 
 def _normalize_id(value: object) -> int | None:
@@ -558,14 +571,17 @@ def list_discoverable_ideas(
     # show the same row twice and skip another. Ordering by the primary key as
     # well makes every page deterministic, which is what lets `offset` be a
     # correct way to page at all.
-    queryset = queryset.order_by('-created_at', '-pk')
+    #
+    # Vote state and the discussion/evidence counts ride along on the rows this
+    # query already fetches (S2-006). Annotated here rather than in the caller so
+    # that every path into a page of ideas reports the same numbers, and so no
+    # caller can forget: the alternative is a resolver looping and counting, which
+    # is an N+1 the annotations make unnecessary. Annotated before ordering, so
+    # "most voted" can sort on the count.
+    queryset = annotate_activity_counts(annotate_vote_state(queryset, user))
+    queryset = queryset.order_by(*IDEA_ORDERINGS.get(applied.sort or '', IDEA_ORDERINGS['newest']))
 
-    # Vote state rides along on the rows this query already fetches (S2-006).
-    # Annotated here rather than in the caller so that every path into a page
-    # of ideas reports the same numbers, and so no caller can forget: the
-    # alternative is a resolver looping and counting, which is an N+1 the
-    # annotations make unnecessary.
-    return paginate(annotate_vote_state(queryset, user), offset=offset, limit=limit)
+    return paginate(queryset, offset=offset, limit=limit)
 
 
 def list_active_categories() -> QuerySet[Category]:
@@ -852,6 +868,47 @@ def list_attachments(
     )
 
     return paginate(queryset, offset=offset, limit=limit)
+
+
+def _count_subquery(model, field: str = 'idea'):
+    """A `COUNT` of `model` rows per idea, as a correlated subquery (see `annotate_vote_state`)."""
+    return Coalesce(
+        Subquery(
+            model.objects.filter(**{field: OuterRef('pk')})
+            .order_by()
+            .values(field)
+            .annotate(total=Count('*'))
+            .values('total')[:1],
+            output_field=IntegerField(),
+        ),
+        0,
+    )
+
+
+def annotate_activity_counts(queryset: QuerySet[Idea]) -> QuerySet[Idea]:
+    """
+    Add `comment_count` and `attachment_count` to a queryset of ideas: the size of
+    the discussion and of the supporting evidence a reader of each idea sees.
+
+    Every comment and every attachment of a readable idea is readable
+    (`list_comments`, `list_attachments`), so these are plain totals per idea. The
+    same correlated-subquery shape as `annotate_vote_state`, for the same reasons:
+    no extra query per page, and `Coalesce` because an empty group is `NULL`.
+    """
+    return queryset.annotate(
+        comment_count=_count_subquery(Comment),
+        attachment_count=_count_subquery(Attachment),
+    )
+
+
+def comment_count_for(idea: Idea) -> int:
+    """How many comments one already authorized idea has."""
+    return Comment.objects.filter(idea=idea).count()
+
+
+def attachment_count_for(idea: Idea) -> int:
+    """How many attachments one already authorized idea has."""
+    return Attachment.objects.filter(idea=idea).count()
 
 
 def vote_count_for(idea: Idea) -> int:

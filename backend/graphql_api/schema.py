@@ -20,14 +20,19 @@ from administration.schema import Mutation as AdministrationMutation
 from administration.schema import Query as AdministrationQuery
 from automation.delivery_schema import Mutation as DeliveryMutation
 from automation.delivery_schema import Query as DeliveryQuery
+from automation.implementation_schema import Mutation as ImplementationMutation
+from automation.implementation_schema import Query as ImplementationQuery
 from automation.schema import Mutation as AutomationMutation
 from automation.schema import Query as AutomationQuery
+from dashboard.schema import Query as DashboardQuery
 from ideas.schema import Mutation as IdeasMutation
 from ideas.schema import Query as IdeasQuery
 from identity.schema import Mutation as IdentityMutation
 from identity.schema import Query as IdentityQuery
 from invitations.schema import Mutation as InvitationsMutation
 from invitations.schema import Query as InvitationsQuery
+from marketplace.schema import Mutation as MarketplaceMutation
+from marketplace.schema import Query as MarketplaceQuery
 from messaging.schema import Mutation as MessagingMutation
 from messaging.schema import Query as MessagingQuery
 from notifications.schema import Mutation as NotificationsMutation
@@ -50,6 +55,8 @@ from reviews.team_schema import Query as ReviewTeamQuery
 from reviews.workboard_schema import Query as ReviewerWorkQuery
 from teams.schema import Mutation as TeamsMutation
 from teams.schema import Query as TeamsQuery
+from website.schema import Mutation as WebsiteMutation
+from website.schema import Query as WebsiteQuery
 
 
 @strawberry.type
@@ -80,8 +87,12 @@ class Query(
     MessagingQuery,
     AutomationQuery,
     DeliveryQuery,
+    ImplementationQuery,
+    MarketplaceQuery,
     AdministrationQuery,
     PlatformRolesQuery,
+    WebsiteQuery,
+    DashboardQuery,
 ):
     @strawberry.field(
         description=(
@@ -94,7 +105,6 @@ class Query(
             version='0.1.0',
             django_version=django.get_version(),
         )
-
 
 @strawberry.type
 class Mutation(
@@ -113,7 +123,10 @@ class Mutation(
     NotificationsMutation,
     MessagingMutation,
     AutomationMutation,
+    WebsiteMutation,
     DeliveryMutation,
+    ImplementationMutation,
+    MarketplaceMutation,
     AdministrationMutation,
     PlatformRolesMutation,
 ):

@@ -280,3 +280,34 @@ class TestHowTheTeamDecides:
         second = services.start_review(member, routed.pk)
 
         assert second.round == 2
+
+
+@pytest.mark.django_db
+class TestTheConsoleSeesFaces:
+    def test_a_reviewer_carries_their_names_and_photo(self, lead):
+        from reviews.team_schema import _reviewer
+
+        lead.avatar_key = 'avatars/1/photo.png'
+        lead.save(update_fields=['avatar_key'])
+
+        reviewer = _reviewer(lead)
+
+        assert (reviewer.first_name, reviewer.last_name) == ('Test', 'User')
+        assert reviewer.avatar_url.startswith(f'/users/{lead.pk}/avatar/?v=')
+
+    def test_a_reviewer_without_a_photo_has_no_url(self, lead):
+        from reviews.team_schema import _reviewer
+
+        assert _reviewer(lead).avatar_url is None
+
+    def test_every_team_member_carries_their_photo(self, team, lead, member):
+        from reviews.team_schema import ReviewTeamType
+
+        member.avatar_key = 'avatars/2/photo.png'
+        member.save(update_fields=['avatar_key'])
+
+        members = {m.id: m for m in ReviewTeamType.from_model(team).members}
+
+        assert members[str(member.pk)].avatar_url.startswith(f'/users/{member.pk}/avatar/?v=')
+        assert members[str(lead.pk)].avatar_url is None
+        assert members[str(lead.pk)].first_name == 'Test'

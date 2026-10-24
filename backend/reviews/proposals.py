@@ -21,6 +21,7 @@ transaction, and notifies afterwards. Nothing takes a status from a client.
 
 import logging
 from dataclasses import dataclass
+from datetime import date
 
 from django.db import transaction
 from django.db.models import Prefetch, Q
@@ -79,7 +80,6 @@ _REQUIRED = (
     ('payment_plan', 'payment plan'),
     ('acceptance_criteria', 'acceptance criteria'),
 )
-_LIMITS = {'title': 200, 'estimated_effort': 120, 'estimated_timeline': 120}
 _EDITABLE = frozenset({'draft', 'changes_requested'})
 UNAVAILABLE = 'This proposal is not available.'
 
@@ -167,16 +167,14 @@ def _idea(idea_id: object) -> Idea:
     return idea
 
 
-def _clean(value: str | None, field: str, *, limit: int | None = None) -> str:
-    text = (value or '').strip()
-    if limit is not None and len(text) > limit:
-        raise ProposalError(f'{field.replace("_", " ").capitalize()} is too long.', field=field)
-    return text
+def _clean(value: str | None) -> str:
+    # No length limit on any section: the team writes as much as the proposal needs.
+    return (value or '').strip()
 
 
 def _audit(actor, action, proposal: IdeaProposal, **meta) -> None:
     admin_services.record_event(
-        actor, action, 'idea', proposal.idea_id, proposal.title, metadata=meta or None
+        actor, action, 'idea', proposal.idea_id, proposal.title[:255], metadata=meta or None
     )
 
 
@@ -258,6 +256,32 @@ def start_proposal(user: User | None, idea_id: object) -> IdeaProposal:
     return proposal
 
 
+#: The planned dates on the proposal's cover; set alongside the sections, but not sections.
+DATE_FIELDS = ('planned_start', 'planned_end')
+
+
+def _set_dates(proposal: IdeaProposal, values: dict) -> list[str]:
+    """Apply the planned dates in `values` ('' clears one); the end may not be before the start."""
+    changed = []
+    for field in DATE_FIELDS:
+        raw = values.get(field)
+        if raw is None:
+            continue
+        try:
+            day = date.fromisoformat(raw) if str(raw).strip() else None
+        except ValueError:
+            raise ProposalError('Enter the date as a calendar date.', field=field) from None
+        if getattr(proposal, field) != day:
+            setattr(proposal, field, day)
+            changed.append(field)
+    start, end = proposal.planned_start, proposal.planned_end
+    if start and end and end < start:
+        raise ProposalError(
+            'The planned end date cannot be before the start date.', field='planned_end'
+        )
+    return changed
+
+
 @transaction.atomic
 def update_proposal(user: User | None, idea_id: object, values: dict) -> IdeaProposal:
     idea = _idea(idea_id)
@@ -267,15 +291,15 @@ def update_proposal(user: User | None, idea_id: object, values: dict) -> IdeaPro
         raise ProposalError('There is no proposal for this idea yet.')
     if proposal.status not in _EDITABLE:
         raise ProposalError('This proposal can no longer be edited.')
-    unknown = set(values) - set(FIELDS)
+    unknown = set(values) - set(FIELDS) - set(DATE_FIELDS)
     if unknown:
         raise ProposalError('Unknown proposal field.', field=sorted(unknown)[0])
 
-    changed = []
+    changed = _set_dates(proposal, values)
     for field, value in values.items():
-        if value is None:
+        if value is None or field in DATE_FIELDS:
             continue
-        text = _clean(value, field, limit=_LIMITS.get(field))
+        text = _clean(value)
         if field == 'title' and not text:
             raise ProposalError('Title is required.', field='title')
         if field == 'payment_required' and text not in ('', 'yes', 'no'):
@@ -340,7 +364,7 @@ def _decide(admin, idea_id, to_status: str, action, *, feedback: str | None = No
         # The people who wrote it never approve it, even holding the permission.
         raise ProposalError('You helped write this proposal, so somebody else has to decide it.')
     if feedback is not None:
-        proposal.review_feedback = _clean(feedback, 'feedback')
+        proposal.review_feedback = _clean(feedback)
         if not proposal.review_feedback:
             raise ProposalError('Say why, so the team knows what to do.', field='feedback')
     proposal.status = to_status

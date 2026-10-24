@@ -64,6 +64,14 @@ INSTALLED_APPS = [
     'notifications',
     'messaging',
     'automation',
+    # The signed-in dashboard's figures: reads the domains above, owns no models.
+    'dashboard',
+    # Gemini text and image generation; a service the domains call, no models.
+    'ai',
+    # Ideas the platform publishes for sale, and the payments that unlock them.
+    'marketplace',
+    # The public website's own endpoints: its contact form and platform figures.
+    'website',
     # Platform administration (the internal console): reads and changes the
     # domains above through their own rules, so it comes after all of them.
     'administration',
@@ -107,6 +115,18 @@ REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', d
 GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
 
 
+# Google Gemini (ai/gemini.py)
+# ---------------------------------------------------------------------------------
+# Text and image generation. The key is a secret sent only to Google; without it every
+# generation fails closed with a "not configured" message rather than at startup, so
+# the rest of the platform runs without AI. The model names are settings because Google
+# retires models (new projects can no longer use gemini-2.5-flash, for one).
+GEMINI_API_KEY = env('GEMINI_API_KEY', default='')
+GEMINI_TEXT_MODEL = env('GEMINI_TEXT_MODEL', default='gemini-3.5-flash')
+GEMINI_IMAGE_MODEL = env('GEMINI_IMAGE_MODEL', default='gemini-3.1-flash-image')
+GEMINI_TIMEOUT_SECONDS = env.int('GEMINI_TIMEOUT_SECONDS', default=60)
+
+
 # Outgoing email (identity/email.py)
 # ---------------------------------------------------------------------------------
 # Everything the two emailed flows need: where the browser app lives (to build
@@ -143,6 +163,10 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='no-reply@localhost')
 # one. Required in every deployed environment (a link built from an empty
 # value is a link to nowhere); local.py fills in the Vite dev server.
 FRONTEND_URL = env('FRONTEND_URL', default='').rstrip('/')
+
+# Where the website's contact form messages are emailed (website.services). Optional:
+# every message is stored and readable in the admin site either way.
+CONTACT_NOTIFY_EMAIL = env('CONTACT_NOTIFY_EMAIL', default='')
 
 # How long an emailed link stays usable. Both are deliberately short: the link
 # travels over plaintext-ish channels (a mail client's search index, a shared
@@ -375,6 +399,13 @@ ATTACHMENT_MAX_UPLOAD_BYTES = env.int('ATTACHMENT_MAX_UPLOAD_BYTES', default=200
 # Profile photos and other pictures: 100 MB. Enforced in `identity.avatars`.
 AVATAR_MAX_UPLOAD_BYTES = env.int('AVATAR_MAX_UPLOAD_BYTES', default=100 * 1024 * 1024)
 
+# Marketplace push payments: the gateway that prompts a buyer's phone to pay
+# (`marketplace.gateways`). `sandbox`, or the dotted path to an adapter class; empty
+# turns push payments off, leaving the manual methods. The sandbox works only with DEBUG.
+MARKETPLACE_PAYMENT_GATEWAY = env('MARKETPLACE_PAYMENT_GATEWAY', default='')
+# How long the sandbox waits before approving a request, in seconds.
+MARKETPLACE_SANDBOX_APPROVE_SECONDS = env.int('MARKETPLACE_SANDBOX_APPROVE_SECONDS', default=6)
+
 
 # CORS
 # The browser app calls two surfaces, not one: the GraphQL API, and the handful
@@ -400,7 +431,7 @@ AVATAR_MAX_UPLOAD_BYTES = env.int('AVATAR_MAX_UPLOAD_BYTES', default=100 * 1024 
 
 CORS_URLS_REGEX = (
     r'^(?:/graphql/|/ideas/\d+/attachments/|/administration/attachments/'
-    r'|/account/avatar/|/users/\d+/avatar/)'
+    r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/)'
 )
 # Explicit so a stray setting elsewhere can never open the API to every origin.
 CORS_ALLOW_ALL_ORIGINS = False

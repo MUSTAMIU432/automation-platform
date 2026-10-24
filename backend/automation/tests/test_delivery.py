@@ -5,7 +5,7 @@ from decimal import Decimal
 import pytest
 from django.utils import timezone
 
-from automation import delivery, impact, services
+from automation import delivery, impact, implementation, services
 from automation.authorization import AutomationError
 from automation.models import ImpactRecord, OpportunityEvent
 from automation.tests.test_opportunity import make_org, make_user, opened
@@ -52,9 +52,27 @@ def project_stage(author, manager, developer):
     return delivery.create_project(developer, opportunity.pk)
 
 
+PLAN = {
+    'approach': 'Import the bank CSV nightly and match it to invoices.',
+    'architecture': 'A Django service with a matching job and a dashboard.',
+    'technology': 'Python, Django, PostgreSQL.',
+    'testing_strategy': 'Unit tests for matching; UAT with finance.',
+}
+
+
+def start_with_approved_plan(project, manager, developer):
+    """The developer writes and submits the plan; the manager's approval starts the project."""
+    implementation.update_plan(developer, project.pk, PLAN)
+    implementation.add_stage(developer, project.pk, title='Import and matching')
+    implementation.submit_plan(developer, project.pk)
+    implementation.approve_plan(manager, project.pk)
+    project.refresh_from_db()
+    return project
+
+
 def uat_ready_project(author, manager, developer):
     project = project_stage(author, manager, developer)
-    delivery.start_project(developer, project.pk)
+    start_with_approved_plan(project, manager, developer)
     case = delivery.create_test_case(developer, project.pk, title='Import works')
     delivery.start_testing(developer, project.pk)
     delivery.record_test_result(developer, case.pk, status='pass', actual_result='ok')
@@ -173,7 +191,7 @@ class TestProjectLifecycle:
 
     def test_tasks_and_milestones(self, author, manager, developer):
         project = project_stage(author, manager, developer)
-        delivery.start_project(developer, project.pk)
+        start_with_approved_plan(project, manager, developer)
         milestone = delivery.create_milestone(developer, project.pk, title='MVP')
         task = delivery.create_task(
             developer,
@@ -184,7 +202,9 @@ class TestProjectLifecycle:
         )
 
         delivery.update_task(developer, task.pk, {'status': 'done'})
-        delivery.complete_milestone(developer, milestone.pk)
+        with pytest.raises(AutomationError, match='when the delivery manager approves'):
+            delivery.complete_milestone(developer, milestone.pk)
+        delivery.complete_milestone(manager, milestone.pk)
 
         task.refresh_from_db()
         assert task.status == 'done'
@@ -218,7 +238,7 @@ class TestProjectLifecycle:
 class TestTestingAndUAT:
     def test_a_failed_required_test_blocks_uat_and_says_why(self, author, manager, developer):
         project = project_stage(author, manager, developer)
-        delivery.start_project(developer, project.pk)
+        start_with_approved_plan(project, manager, developer)
         good = delivery.create_test_case(developer, project.pk, title='Good')
         bad = delivery.create_test_case(developer, project.pk, title='Bad')
         delivery.start_testing(developer, project.pk)
@@ -230,7 +250,7 @@ class TestTestingAndUAT:
 
     def test_an_optional_failure_does_not_block_and_untested_does(self, author, manager, developer):
         project = project_stage(author, manager, developer)
-        delivery.start_project(developer, project.pk)
+        start_with_approved_plan(project, manager, developer)
         required = delivery.create_test_case(developer, project.pk, title='Req')
         optional = delivery.create_test_case(developer, project.pk, title='Nice', is_required=False)
         delivery.start_testing(developer, project.pk)
@@ -243,7 +263,7 @@ class TestTestingAndUAT:
 
     def test_uat_needs_some_required_test(self, author, manager, developer):
         project = project_stage(author, manager, developer)
-        delivery.start_project(developer, project.pk)
+        start_with_approved_plan(project, manager, developer)
         delivery.start_testing(developer, project.pk)
 
         with pytest.raises(AutomationError, match='no required test cases'):

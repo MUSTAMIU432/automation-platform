@@ -163,12 +163,40 @@ def test_an_approved_idea_becomes_a_measured_completed_project(people):
         {'o': oid},
     )['project']
     pid = project['id']
-    developer.ok('mutation($i: ID!){ startProject(id:$i){ success } }', 'startProject', {'i': pid})
+
+    # --- the implementation plan: written by the developer, approved by the manager
+    developer.ok(
+        'mutation($i: ImplementationPlanInput!){ updateImplementationPlan(input:$i){ success } }',
+        'updateImplementationPlan',
+        {
+            'i': {
+                'projectId': pid,
+                'approach': 'Nightly import and matching.',
+                'architecture': 'One service and a dashboard.',
+                'technology': 'Django and PostgreSQL.',
+                'testingStrategy': 'Unit tests and UAT.',
+            }
+        },
+    )
     milestone = developer.ok(
-        'mutation($p: ID!){ createMilestone(projectId:$p, title:"MVP"){ success milestone{ id } } }',
-        'createMilestone',
+        'mutation($p: ID!){ addStage(projectId:$p, title:"MVP", dueDate:"2030-01-31"){'
+        ' success stage{ milestone{ id dueDate } } } }',
+        'addStage',
         {'p': pid},
-    )['milestone']['id']
+    )['stage']['milestone']['id']
+    developer.ok(
+        'mutation($p: ID!){ submitImplementationPlan(projectId:$p){ success } }',
+        'submitImplementationPlan',
+        {'p': pid},
+    )
+    desk = manager('query{ deliveryDesk{ canManage plans{ project{ id } plan{ canDecide } } } }')
+    assert desk['deliveryDesk']['plans'] == [{'project': {'id': pid}, 'plan': {'canDecide': True}}]
+    approved = manager.ok(
+        'mutation($p: ID!){ approveImplementationPlan(projectId:$p){ success plan{ status } } }',
+        'approveImplementationPlan',
+        {'p': pid},
+    )
+    assert approved['plan']['status'] == 'approved'
     task = developer.ok(
         'mutation($p: ID!, $m: ID){ createTask(projectId:$p, title:"Build", milestoneId:$m){ success task{ id } } }',
         'createTask',
@@ -180,8 +208,13 @@ def test_an_approved_idea_becomes_a_measured_completed_project(people):
         {'t': task},
     )
     developer.ok(
-        'mutation($m: ID!){ completeMilestone(id:$m){ success } }',
-        'completeMilestone',
+        'mutation($m: ID!){ submitStage(milestoneId:$m, summary:"Import works."){ success } }',
+        'submitStage',
+        {'m': milestone},
+    )
+    manager.ok(
+        'mutation($m: ID!){ approveStage(milestoneId:$m){ success stage{ milestone{ status } } } }',
+        'approveStage',
         {'m': milestone},
     )
 
