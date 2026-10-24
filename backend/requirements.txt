@@ -3,3 +3,6 @@ django-environ==0.14.0
 psycopg[binary]==3.3.5
 strawberry-graphql-django==0.89.2
 django-cors-headers==4.9.0
+# The production WSGI server (Render's start command: gunicorn config.wsgi:application).
+# Not used in local development, which runs `manage.py runserver`.
+gunicorn==26.2.0
