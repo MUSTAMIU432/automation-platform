@@ -29,6 +29,16 @@ vi.mock('../../invitations/api/invitationsApi', () => ({
 }))
 
 vi.mock('../../reviews/api/reviewsApi', () => ({ teamReviewQueueRequest: vi.fn(async () => []) }))
+// The page's ideas panel loads the team's ideas. Left unmocked it reached for the
+// network, and where that failed fast (CI) its "could not load" alert was the first
+// alert on the page - the one the add-a-colleague tests were looking for.
+vi.mock('../../ideas/api/ideasApi', async (importOriginal) => {
+  const { page } = await import('../../../test/ideaPage')
+  return {
+    ...(await importOriginal()),
+    teamIdeasRequest: vi.fn(async () => page([])),
+  }
+})
 vi.mock('../../identity/auth/AuthContext', () => ({ useAuth: vi.fn() }))
 
 // The add-a-colleague panel draws its candidates from the reader's organization
