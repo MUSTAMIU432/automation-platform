@@ -1,4 +1,6 @@
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
+
+import { useReturnHere } from '../../../lib/returnTo'
 
 import { moveProject, type Project, type ProjectStep } from '../api/automationApi'
 import { formatDate } from '../utils/labels'
@@ -6,11 +8,6 @@ import { useOutcome } from '../utils/useOutcome'
 import { cardClass, NoticeBanner, primaryButton } from './ui'
 
 const STEPS: Record<string, { step: ProjectStep; text: string; hint: string }> = {
-  planning: {
-    step: 'start',
-    text: 'Start development',
-    hint: 'Work begins. Add tasks and milestones.',
-  },
   active: { step: 'testing', text: 'Move to testing', hint: 'Development is done; test it.' },
   testing: {
     step: 'uat',
@@ -27,11 +24,23 @@ const STEPS: Record<string, { step: ProjectStep; text: string; hint: string }> =
 export function ProjectOverview({
   project,
   onChanged,
+  onOpenPlan,
 }: {
   project: Project
   onChanged: () => void
+  /** Show the implementation plan tab, where a project in planning moves forward. */
+  onOpenPlan?: () => void
 }) {
   const move = useOutcome()
+  const { pathname } = useLocation()
+  const returnHere = useReturnHere()
+  // Coming back lands on this project's Overview, where the links were.
+  const back = returnHere(
+    pathname.startsWith('/app/automation/workspace')
+      ? 'Back to your workspace'
+      : 'Back to the project',
+    `${pathname}?tab=overview`,
+  )
   const next = STEPS[project.status]
   const { progress } = project
 
@@ -70,12 +79,14 @@ export function ProjectOverview({
         <div className="mt-5 flex flex-wrap gap-4 text-sm">
           <Link
             to={`/app/ideas/${project.ideaId}`}
+            state={back}
             className="font-semibold text-brand-700 hover:underline"
           >
             View original idea
           </Link>
           <Link
             to={`/app/automation/opportunities/${project.opportunityId}`}
+            state={back}
             className="font-semibold text-brand-700 hover:underline"
           >
             View opportunity
@@ -88,7 +99,22 @@ export function ProjectOverview({
           What happens next
         </h3>
         <NoticeBanner notice={move.notice} />
-        {next && project.capabilities.canManage ? (
+        {project.status === 'planning' ? (
+          // Planning moves on through the implementation plan: the delivery manager's
+          // approval of it is what starts development.
+          <>
+            <p className="mt-2 text-sm text-gray-600">
+              {project.capabilities.canManage
+                ? 'Write the implementation plan and submit it. Development starts when the delivery manager approves it.'
+                : 'The developer is writing the implementation plan. Development starts when it is approved.'}
+            </p>
+            {onOpenPlan && (
+              <button type="button" className={`mt-3 w-full ${primaryButton}`} onClick={onOpenPlan}>
+                Open the implementation plan
+              </button>
+            )}
+          </>
+        ) : next && project.capabilities.canManage ? (
           <>
             <p className="mt-2 text-sm text-gray-600">{next.hint}</p>
             <button

@@ -82,7 +82,7 @@ describe('SignInForm', () => {
     renderWithProviders(<SignInForm onSwitchToSignUp={() => {}} onForgotPassword={() => {}} />)
     await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(screen.getByText('Email is required.')).toBeInTheDocument()
     expect(screen.getByText('Password is required.')).toBeInTheDocument()
@@ -96,19 +96,19 @@ describe('SignInForm', () => {
     fireEvent.change(screen.getByLabelText('Email'), {
       target: { value: 'not-an-email' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(screen.getByText('Enter a valid email address.')).toBeInTheDocument()
   })
 
-  it('calls onSwitchToSignUp when "Create account" is clicked', async () => {
+  it('calls onSwitchToSignUp when "Sign Up" is clicked', async () => {
     const onSwitchToSignUp = vi.fn()
     renderWithProviders(
       <SignInForm onSwitchToSignUp={onSwitchToSignUp} onForgotPassword={() => {}} />,
     )
     await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
 
     expect(onSwitchToSignUp).toHaveBeenCalledOnce()
   })
@@ -145,9 +145,9 @@ describe('SignInForm', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'a-strong-unique-pass-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
-    expect(await screen.findByRole('button', { name: 'Signing in…' })).toBeDisabled()
+    expect(await screen.findByRole('button', { name: 'Logging in…' })).toBeDisabled()
     expect(mockedLogin).toHaveBeenCalledWith('ada@example.com', 'a-strong-unique-pass-1')
 
     resolveLogin({
@@ -155,7 +155,7 @@ describe('SignInForm', () => {
       message: 'Invalid email or password.',
       session: null,
     })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Sign In' })).not.toBeDisabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Login' })).not.toBeDisabled())
   })
 
   it('shows the generic auth error message on invalid credentials, without navigating', async () => {
@@ -174,7 +174,7 @@ describe('SignInForm', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'wrong-password' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password.')
     // Still on the sign-in form - a failed login must not be treated as one.
@@ -197,7 +197,7 @@ describe('SignInForm', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'wrong-password' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Password'), {
@@ -283,7 +283,7 @@ describe('SignInForm', () => {
     // Back to its normal label and clickable: the spinner the user was
     // stuck on is gone and the form can be used again.
     expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE)
-    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Login' })).toBeEnabled()
   })
 
   it('re-enables the form and reports a network error when a password submit fails', async () => {
@@ -298,12 +298,12 @@ describe('SignInForm', () => {
       target: { value: 'a-strong-pass-1' },
     })
 
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     // Back to its normal label and clickable: the spinner the user was
     // stuck on is gone and the form can be used again.
     expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_ERROR_MESSAGE)
-    expect(screen.getByRole('button', { name: 'Sign In' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Login' })).toBeEnabled()
   })
 
   it('does not show the generic invalid-credentials message for a network error', async () => {

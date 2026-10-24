@@ -6,6 +6,8 @@
  */
 
 import { graphqlClient } from '../../../graphql/client'
+import { getAccessToken } from '../../../graphql/tokenStore'
+import { env } from '../../../lib/env'
 
 export interface IdeaProposal {
   ideaId: string
@@ -29,8 +31,13 @@ export interface IdeaProposal {
   /** `yes` (the owner pays), `no` (no charge), or `''` (not answered yet). */
   paymentRequired: '' | 'yes' | 'no'
   paymentPlan: string
+  /** When the work is planned to begin and end, as ISO dates (`2026-11-02`), or null. */
+  plannedStart: string | null
+  plannedEnd: string | null
   status: string
   reviewFeedback: string
+  /** When the team started writing it. */
+  startedAt: string
   submittedAt: string | null
   decidedAt: string | null
   updatedAt: string
@@ -103,23 +110,105 @@ export interface ViewReceipt {
  * plan is required only when the owner pays.
  */
 export const PROPOSAL_SECTIONS = [
-  { key: 'title', label: 'Title', short: true },
-  { key: 'executiveSummary', label: 'Executive summary', required: true },
-  { key: 'problem', label: 'Problem', required: true },
-  { key: 'feasibility', label: 'Feasibility', required: true },
-  { key: 'proposedSolution', label: 'Proposed solution', required: true },
-  { key: 'requirementsSummary', label: 'Requirements', required: true },
-  { key: 'scope', label: 'Scope', required: true },
-  { key: 'deliverables', label: 'Deliverables', required: true },
-  { key: 'estimatedTimeline', label: 'Overall timeline', short: true, required: true },
-  { key: 'milestones', label: 'Timeline and milestones', required: true },
-  { key: 'estimatedEffort', label: 'Estimated effort', short: true },
-  { key: 'financialRequirements', label: 'Financial requirements', required: true },
-  { key: 'paymentRequired', label: 'Does the owner pay?', choice: true, required: true },
-  { key: 'paymentPlan', label: 'Payment plan' },
-  { key: 'risks', label: 'Risks' },
-  { key: 'assumptions', label: 'Assumptions' },
-  { key: 'acceptanceCriteria', label: 'Acceptance criteria', required: true },
+  {
+    key: 'title',
+    label: 'Title',
+    short: true,
+    hint: 'A short name for the work, as the owner will see it.',
+  },
+  {
+    key: 'executiveSummary',
+    label: 'Executive summary',
+    required: true,
+    hint: 'The whole proposal in a few sentences: what will be built, why, and what it takes.',
+  },
+  {
+    key: 'problem',
+    label: 'Problem',
+    required: true,
+    hint: 'What goes wrong today, who it affects and what it costs them.',
+  },
+  {
+    key: 'feasibility',
+    label: 'Feasibility',
+    required: true,
+    hint: 'Whether this can be built, and what it depends on.',
+  },
+  {
+    key: 'proposedSolution',
+    label: 'Proposed solution',
+    required: true,
+    hint: 'What will be built and how it solves the problem.',
+  },
+  {
+    key: 'requirementsSummary',
+    label: 'Requirements',
+    required: true,
+    hint: 'What the solution needs: systems, data, access and people.',
+  },
+  {
+    key: 'scope',
+    label: 'Scope',
+    required: true,
+    hint: 'What is included, and just as clearly, what is not.',
+  },
+  {
+    key: 'deliverables',
+    label: 'Deliverables',
+    required: true,
+    hint: 'What the owner receives at the end.',
+  },
+  {
+    key: 'estimatedTimeline',
+    label: 'Overall timeline',
+    required: true,
+    hint: 'How long the work takes from start to finish, e.g. 8 weeks, and why.',
+  },
+  {
+    key: 'milestones',
+    label: 'Timeline and milestones',
+    required: true,
+    hint: 'The stages of the work and when each is reached.',
+  },
+  {
+    key: 'estimatedEffort',
+    label: 'Estimated effort',
+    hint: 'The effort involved, e.g. 2 developers for 6 weeks, and what it is spent on.',
+  },
+  {
+    key: 'financialRequirements',
+    label: 'Financial requirements',
+    required: true,
+    hint: 'What the work costs, and what that money pays for.',
+  },
+  {
+    key: 'paymentRequired',
+    label: 'Does the owner pay?',
+    choice: true,
+    required: true,
+    hint: 'Whether the owner is charged for this work.',
+  },
+  {
+    key: 'paymentPlan',
+    label: 'Payment plan',
+    hint: 'How much the owner pays and when, e.g. by milestone.',
+  },
+  {
+    key: 'risks',
+    label: 'Risks',
+    hint: 'What could go wrong, and how each risk will be handled.',
+  },
+  {
+    key: 'assumptions',
+    label: 'Assumptions',
+    hint: 'What this proposal takes for granted.',
+  },
+  {
+    key: 'acceptanceCriteria',
+    label: 'Acceptance criteria',
+    required: true,
+    hint: 'How everyone will know the work is done and working.',
+  },
 ] as const
 
 /** Words for the answer to "Does the owner pay?". */
@@ -138,7 +227,7 @@ export type SectionKey = (typeof PROPOSAL_SECTIONS)[number]['key']
 const FIELDS = `ideaId ideaTitle teamName title executiveSummary problem proposedSolution
   requirementsSummary scope deliverables risks assumptions estimatedEffort estimatedTimeline
   acceptanceCriteria feasibility milestones financialRequirements paymentRequired paymentPlan
-  status reviewFeedback submittedAt decidedAt updatedAt`
+  plannedStart plannedEnd status reviewFeedback startedAt submittedAt decidedAt updatedAt`
 
 export async function proposalStateRequest(ideaId: string): Promise<ProposalState> {
   const data = await graphqlClient.request<{ ideaProposalState: ProposalState }>(
@@ -176,7 +265,49 @@ export async function proposalProgressRequest(): Promise<ProposalProgress[]> {
 
 /** The label of a section, by its key. */
 export function sectionLabel(key: string): string {
-  return PROPOSAL_SECTIONS.find((section) => section.key === key)?.label ?? key
+  return (
+    PROPOSAL_SECTIONS.find((section) => section.key === key)?.label ??
+    PLANNED_DATES.find((field) => field.key === key)?.label ??
+    key
+  )
+}
+
+/** The planned dates on the proposal's cover: set with the sections, but not sections. */
+export const PLANNED_DATES = [
+  { key: 'plannedStart', label: 'Planned start' },
+  { key: 'plannedEnd', label: 'Planned end' },
+] as const
+
+export type DateKey = (typeof PLANNED_DATES)[number]['key']
+
+/** What the editor sends: any sections, and the planned dates ('' clears one). */
+export type ProposalValues = Partial<Record<SectionKey | DateKey, string>>
+
+/** An ISO date (`2026-11-02`) as words, read as a calendar day rather than a moment. */
+export function formatPlannedDate(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const [year, month, day] = iso.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+/** How long the planned dates span, inclusive: "12 weeks 4 days", or null without both. */
+export function plannedDuration(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): string | null {
+  if (!start || !end) return null
+  const days = Math.round((Date.parse(end) - Date.parse(start)) / 86_400_000) + 1
+  if (!Number.isFinite(days) || days < 1) return null
+  const weeks = Math.floor(days / 7)
+  const rest = days % 7
+  const part = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+  if (weeks === 0) return part(days, 'day')
+  return rest ? `${part(weeks, 'week')} ${part(rest, 'day')}` : part(weeks, 'week')
 }
 
 function outcome(root: string, decl: string, args: string) {
@@ -209,9 +340,68 @@ export const declineProposalRequest = outcome(
   'ideaId: $ideaId, reason: $reason',
 )
 
+/** How long a download's blob URL is kept; the same 40 s the attachment downloads use. */
+const BLOB_URL_LIFETIME_MS = 40_000
+
+/**
+ * Admin: download the proposal as a PDF stamped with the admin's name, email and the time.
+ * The server builds it, checks the release permission and records the download. A plain link
+ * cannot carry the bearer token, so it is fetched and handed to the browser as a blob.
+ */
+export async function downloadProposalPdfRequest(ideaId: string): Promise<void> {
+  const token = getAccessToken()
+  const response = await fetch(`${env.apiBaseUrl}/administration/proposals/${ideaId}/pdf/`, {
+    credentials: 'include',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error('Could not download this proposal.')
+
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] ?? `proposal-${ideaId}.pdf`
+  const url = URL.createObjectURL(await response.blob())
+  try {
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS)
+  }
+}
+
+export interface ProposalDraft {
+  success: boolean
+  message: string
+  field: string | null
+  text: string | null
+}
+
+/**
+ * An AI first draft of one section, from the idea and the editor's current (unsaved) text.
+ * Nothing is saved: the draft goes into the editor for the writer to change and save.
+ */
+export async function draftProposalSectionRequest(
+  ideaId: string,
+  section: SectionKey,
+  values: ProposalValues,
+  instructions = '',
+): Promise<ProposalDraft> {
+  const data = await graphqlClient.request<{ draftIdeaProposalSection: ProposalDraft }>(
+    `mutation($input: UpdateIdeaProposalInput!, $section: String!, $instructions: String) {
+       draftIdeaProposalSection(input: $input, section: $section, instructions: $instructions) {
+         success message field text
+       }
+     }`,
+    { input: { ideaId, ...values }, section, instructions },
+  )
+  return data.draftIdeaProposalSection
+}
+
 export function updateProposalRequest(
   ideaId: string,
-  values: Partial<Record<SectionKey, string>>,
+  values: ProposalValues,
 ): Promise<ProposalOutcome> {
   return outcome(
     'updateIdeaProposal',

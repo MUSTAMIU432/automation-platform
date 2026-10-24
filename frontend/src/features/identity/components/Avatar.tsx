@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 
-import { fetchAvatarBlob, type AuthUser } from '../auth/authApi'
-import { initialsFor } from './initials'
+import { fetchAvatarBlob } from '../auth/authApi'
+import { initialsFor, type AvatarPerson } from './initials'
 
 /**
  * The user's photo, or their initials while there is none or it is loading.
@@ -9,7 +9,7 @@ import { initialsFor } from './initials'
  * an `<img src>` cannot send an `Authorization` header. The URL carries a
  * version that changes with every new photo, so it is refetched exactly then.
  */
-export function Avatar({ user, className }: { user: AuthUser | null; className: string }) {
+export function Avatar({ user, className }: { user: AvatarPerson | null; className: string }) {
   const avatarUrl = user?.avatarUrl ?? null
   const [loaded, setLoaded] = useState<{ source: string; src: string } | null>(null)
 

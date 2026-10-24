@@ -1,4 +1,5 @@
 import type { AuthMode } from '../types/auth'
+import { neuPressed, neuRaised } from './fieldStyles'
 
 interface AuthTabsProps {
   mode: AuthMode
@@ -11,16 +12,16 @@ const TABS: Array<{ mode: AuthMode; label: string }> = [
 ]
 
 /**
- * Underline-style tab switch between the sign in and sign up forms on the
- * same page — reads as part of the auth surface rather than a separate
- * segmented-button control floating above it.
+ * Tab switch between the sign in and sign up forms, at the top of the auth
+ * card: a track pressed into the neumorphic surface, with the active view
+ * raised out of it. Arrow keys move between the two, as in any tab list.
  */
 export function AuthTabs({ mode, onChange }: AuthTabsProps) {
   return (
     <div
       role="tablist"
       aria-label="Authentication mode"
-      className="flex gap-12 border-b border-gray-200"
+      className={`mx-auto flex max-w-xs gap-1 rounded-full bg-neu p-1.5 ${neuPressed}`}
     >
       {TABS.map((tab) => {
         const isActive = tab.mode === mode
@@ -41,13 +42,9 @@ export function AuthTabs({ mode, onChange }: AuthTabsProps) {
               }
             }}
             className={[
-              // h-11 keeps the tap target comfortable on touch screens even
-              // though the visible underline sits tight beneath the label.
-              '-mb-px flex h-11 items-center border-b-2 text-sm font-semibold motion-safe:transition-colors motion-safe:duration-150',
-              'focus:outline-none focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2',
-              isActive
-                ? 'border-brand-600 text-gray-900'
-                : 'border-transparent text-gray-400 hover:border-gray-300 hover:text-gray-600',
+              'flex h-10 flex-1 items-center justify-center rounded-full text-sm font-semibold motion-safe:transition-[color,box-shadow] motion-safe:duration-200',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50',
+              isActive ? `bg-neu text-jade ${neuRaised}` : 'text-sage hover:text-ink',
             ].join(' ')}
           >
             {tab.label}

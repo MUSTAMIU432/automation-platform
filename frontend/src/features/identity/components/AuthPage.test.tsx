@@ -54,6 +54,7 @@ describe('AuthPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Sign In' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('tab', { name: 'Sign Up' })).toHaveAttribute('aria-selected', 'false')
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
   })
 
   it('renders a Google button ready for future OAuth integration', () => {
@@ -108,7 +109,7 @@ describe('AuthPage', () => {
     fireEvent.change(screen.getByLabelText('Password'), {
       target: { value: 'a-strong-unique-pass-1' },
     })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(await screen.findByText('Settings destination')).toBeInTheDocument()
   })
@@ -120,10 +121,10 @@ describe('AuthPage', () => {
     expect(screen.queryByText(/mutation/i)).not.toBeInTheDocument()
   })
 
-  it('switches to sign up via the tab and shows the registration fields', () => {
+  it('switches to sign up via the "Sign Up" link and shows the registration fields', () => {
     renderWithProviders(<AuthPage />)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Create your account' }),
@@ -144,22 +145,130 @@ describe('AuthPage', () => {
   it('switches from sign up back to sign in via the "Sign in" link', () => {
     renderWithProviders(<AuthPage />)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
 
     expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Sign In' })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('switches from sign in to sign up via the "Create account" link', () => {
+  it('switches from sign in to sign up via the "Sign Up" link', () => {
     renderWithProviders(<AuthPage />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
 
     expect(
       screen.getByRole('heading', { level: 1, name: 'Create your account' }),
     ).toBeInTheDocument()
+  })
+
+  describe('opened on a view by ?mode=', () => {
+    function renderAt(entry: string | { pathname: string; search: string; state?: unknown }) {
+      return render(
+        <MemoryRouter initialEntries={[entry]}>
+          <AuthProvider>
+            <Routes>
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/app" element={<p>App home</p>} />
+              <Route path="/app/settings" element={<p>Settings destination</p>} />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>,
+      )
+    }
+
+    it('opens sign up for ?mode=sign-up', () => {
+      renderAt('/auth?mode=sign-up')
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Create your account' }),
+      ).toBeInTheDocument()
+    })
+
+    it('opens forgot password for ?mode=forgot-password', () => {
+      renderAt('/auth?mode=forgot-password')
+
+      expect(
+        screen.getByRole('heading', { level: 1, name: 'Reset your password' }),
+      ).toBeInTheDocument()
+    })
+
+    it('falls back to sign in for an unknown mode', () => {
+      renderAt('/auth?mode=nonsense')
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
+    })
+
+    it('keeps the return destination while switching views', async () => {
+      mockedLogin.mockResolvedValue({
+        success: true,
+        message: 'ok',
+        session: {
+          accessToken: 'login-token',
+          accessTokenExpiresAt: '2099-01-01',
+          user: {
+            id: '1',
+            email: 'ada@example.com',
+            firstName: 'Ada',
+            lastName: 'Lovelace',
+            phoneNumber: '',
+            isActive: true,
+            isVerified: true,
+          },
+        },
+      })
+      renderAt({
+        pathname: '/auth',
+        search: '?mode=sign-up',
+        state: { from: { pathname: '/app/settings' } },
+      })
+      await waitFor(() => expect(mockedRefresh).toHaveBeenCalled())
+
+      fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'ada@example.com' } })
+      fireEvent.change(screen.getByLabelText('Password'), {
+        target: { value: 'a-strong-unique-pass-1' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+
+      expect(await screen.findByText('Settings destination')).toBeInTheDocument()
+    })
+
+    it('sends someone already signed in straight on to the app', async () => {
+      const user = {
+        id: '1',
+        email: 'ada@example.com',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        phoneNumber: '',
+        isActive: true,
+        isVerified: true,
+      }
+      mockedRefresh.mockResolvedValue({
+        success: true,
+        message: 'ok',
+        session: { accessToken: 'token', accessTokenExpiresAt: '2099-01-01', user },
+      })
+      mockedMe.mockResolvedValue(user)
+
+      renderAt('/auth')
+
+      expect(await screen.findByText('App home')).toBeInTheDocument()
+    })
+  })
+
+  it('switches between the views with the tabs at the top of the card', () => {
+    renderWithProviders(<AuthPage />)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Sign Up' }))
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Create your account' }),
+    ).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Sign Up' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Create Account' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Sign In' }))
+    expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Sign In' })).toHaveAttribute('aria-selected', 'true')
   })
 
   describe('forgot password', () => {
@@ -178,14 +287,13 @@ describe('AuthPage', () => {
       expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument()
     })
 
-    it('returns to the Sign In tab (with tabs restored) via "Back to Sign In"', () => {
+    it('returns to sign in via "Back to Sign In"', () => {
       renderWithProviders(<AuthPage />)
 
       fireEvent.click(screen.getByRole('button', { name: 'Forgot password?' }))
       fireEvent.click(screen.getByRole('button', { name: /Back to Sign In/ }))
 
       expect(screen.getByRole('heading', { level: 1, name: 'Welcome back' })).toBeInTheDocument()
-      expect(screen.getByRole('tab', { name: 'Sign In' })).toHaveAttribute('aria-selected', 'true')
     })
   })
 })

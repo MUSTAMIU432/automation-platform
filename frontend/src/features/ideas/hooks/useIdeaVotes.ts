@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 
 import { removeVoteRequest, voteIdeaRequest } from '../api/ideasApi'
 import type { Idea } from '../api/ideasApi'
@@ -95,8 +95,14 @@ export function useIdeaVotes(ideas: Idea[]): {
   // stale: it is written after every render, so a click always sees the
   // current state, including one that arrived with the list rather than from a
   // response. Same pattern as `useDebouncedCallback` in this app.
+  //
+  // A layout effect, not a passive one: it runs in the same commit that puts
+  // the new state on screen, so there is no window where the button is drawn
+  // enabled while the ref still says `pending` and swallows the click. A
+  // passive effect leaves that window open, and a quick second click (or a
+  // test clicking as soon as `aria-pressed` flips) fell straight through it.
   const latest = useRef(votes)
-  useEffect(() => {
+  useLayoutEffect(() => {
     latest.current = votes
   })
 

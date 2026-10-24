@@ -1,3 +1,4 @@
+import { neuRaised } from './fieldStyles'
 import { GoogleIcon } from './icons'
 
 interface GoogleAuthButtonProps {
@@ -12,7 +13,8 @@ interface GoogleAuthButtonProps {
  * (see `SignInForm`/`SignUpForm`), which forwards the click to Google
  * Identity Services' own hidden button. `disabled` covers both form
  * submission in progress and Google sign-in not being configured
- * (`useGoogleSignIn`'s `isConfigured`).
+ * (`useGoogleSignIn`'s `isConfigured`). Drawn as a raised pill on the auth
+ * card's neumorphic surface, pressed in while clicked.
  */
 export function GoogleAuthButton({
   label = 'Continue with Google',
@@ -24,9 +26,9 @@ export function GoogleAuthButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm motion-safe:transition-colors motion-safe:duration-150 hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-200 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:border-gray-300 disabled:hover:bg-white"
+      className={`flex h-12 w-full items-center justify-center gap-3 rounded-full bg-neu px-5 text-sm font-semibold text-ink ${neuRaised} active:shadow-[inset_4px_4px_9px_rgba(122,156,141,0.5),inset_-4px_-4px_9px_rgba(255,255,255,0.95)] focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 disabled:cursor-not-allowed disabled:opacity-60 motion-safe:transition-shadow`}
     >
-      <GoogleIcon className="h-5 w-5" />
+      <GoogleIcon className="h-6 w-6" />
       <span>{label}</span>
     </button>
   )

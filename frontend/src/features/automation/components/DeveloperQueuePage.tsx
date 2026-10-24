@@ -13,7 +13,9 @@ export function DeveloperQueuePage() {
         Developer queue
       </h2>
       <p className="mt-1 text-sm text-gray-600">
-        Opportunities whose proposal the owner accepted and that are waiting to be assigned.
+        Opportunities whose owner gave the go-ahead, waiting for the delivery manager to assign a
+        developer. Once one is assigned to you it moves to your workspace, where you start the
+        implementation plan.
       </p>
 
       {queue.loading ? (

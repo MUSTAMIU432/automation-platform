@@ -47,6 +47,7 @@ import {
   getAccessTokenExpiresAt,
   setAccessToken,
 } from '../../../graphql/tokenStore'
+import { setRequestGuard } from '../../../graphql/requestGuard'
 import { refreshTokenRequest, type AuthSession } from './authApi'
 import { resetTokenRefreshState, tokenRefreshState as state } from './tokenRefreshState'
 
@@ -225,6 +226,37 @@ export function cancelProactiveRefresh(): void {
 /** Whether a proactive refresh is currently scheduled. */
 export function isProactiveRefreshScheduled(): boolean {
   return state.scheduledTimer !== null
+}
+
+/**
+ * The session's own requests: they run without a usable access token by nature, and the
+ * refresh must never wait on itself.
+ */
+const SESSION_OPERATIONS = new Set(['RefreshToken', 'Login', 'GoogleLogin', 'Logout'])
+
+/**
+ * Before any other request of a signed-in session, renew an access token that is expired
+ * or about to be. Requests made while a refresh is running wait for that same refresh.
+ */
+export async function guardRequest(operationName: string | undefined): Promise<void> {
+  if (operationName && SESSION_OPERATIONS.has(operationName)) return
+  if (getAccessToken() === null || state.failed) return
+  if (isRefreshDue()) await refreshAccessToken()
+}
+
+setRequestGuard(guardRequest)
+
+/**
+ * A tab coming back into view - a laptop waking, most often - may hold a token that
+ * expired while its refresh timer was paused. Renew it at once rather than on the next
+ * request.
+ */
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return
+    if (getAccessToken() === null || state.failed || !isRefreshDue()) return
+    void refreshAccessToken()
+  })
 }
 
 export { resetTokenRefreshState }

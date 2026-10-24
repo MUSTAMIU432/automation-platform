@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { graphqlClient } from './client'
+import { getRequestGuard, setRequestGuard } from './requestGuard'
 import { setAccessToken } from './tokenStore'
 
 // No backend is contacted: fetch is stubbed, so this stays a unit test.
@@ -156,5 +157,53 @@ describe('graphqlClient', () => {
 
     const headers = new Headers(requestInit(fetchMock).headers)
     expect(headers.get('Content-Type')).toBe('application/json')
+  })
+})
+
+// The guard is what renews an expired access token before a request goes out; without it
+// an expired token reaches the server, which reads it as "not signed in" and answers a
+// "my work" query with an empty list instead of an error.
+describe('graphqlClient request guard', () => {
+  const original = getRequestGuard()
+
+  afterEach(() => {
+    setRequestGuard(original)
+    setAccessToken(null)
+    vi.unstubAllGlobals()
+  })
+
+  function stubOk() {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ data: { ok: true } }, { headers: { 'content-type': 'application/json' } }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return fetchMock
+  }
+
+  function sentAuthorization(fetchMock: ReturnType<typeof stubOk>): string | null {
+    const [, init] = fetchMock.mock.calls[0] as unknown as [URL | string, RequestInit]
+    return new Headers(init.headers).get('Authorization')
+  }
+
+  it('runs the guard first and sends the token it leaves behind', async () => {
+    const fetchMock = stubOk()
+    setAccessToken('stale')
+    const guard = vi.fn(async () => setAccessToken('fresh'))
+    setRequestGuard(guard)
+
+    await graphqlClient.request('query MyWork { ok }')
+
+    expect(guard).toHaveBeenCalledWith('MyWork')
+    expect(sentAuthorization(fetchMock)).toBe('Bearer fresh')
+  })
+
+  it('sends no Authorization header when the guard ended the session', async () => {
+    const fetchMock = stubOk()
+    setAccessToken('stale')
+    setRequestGuard(async () => setAccessToken(null))
+
+    await graphqlClient.request('query { ok }')
+
+    expect(sentAuthorization(fetchMock)).toBeNull()
   })
 })

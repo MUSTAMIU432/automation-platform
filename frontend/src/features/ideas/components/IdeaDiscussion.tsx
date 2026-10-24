@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '../../identity/auth/AuthContext'
+import { Avatar } from '../../identity/components/Avatar'
 import { SpinnerIcon } from '../../identity/components/icons'
 import { MAX_COMMENT_LENGTH, useComments } from '../hooks/useComments'
 import { groupCommentThread } from '../utils/commentThread'
@@ -65,11 +66,26 @@ const PREVIEW_COMMENTS = 1
  * is nothing to open it from. Same component, same fetches, one fewer click -
  * and the `open` prop stays because the card still needs it.
  */
-export function IdeaDiscussionPanel({ idea }: { idea: Idea }) {
-  return <IdeaDiscussion idea={idea} open />
+export function IdeaDiscussionPanel({
+  idea,
+  onCountChange,
+}: {
+  idea: Idea
+  onCountChange?: (count: number) => void
+}) {
+  return <IdeaDiscussion idea={idea} open onCountChange={onCountChange} />
 }
 
-export function IdeaDiscussion({ idea, open }: { idea: Idea; open: boolean }) {
+export function IdeaDiscussion({
+  idea,
+  open,
+  onCountChange,
+}: {
+  idea: Idea
+  open: boolean
+  /** Told the discussion's size whenever the server reports it, for a heading's count. */
+  onCountChange?: (count: number) => void
+}) {
   const { user } = useAuth()
   // Fetched only while open. The list can hold twenty ideas, and a page that
   // asked for twenty discussions up front would be twenty requests for content
@@ -101,6 +117,11 @@ export function IdeaDiscussion({ idea, open }: { idea: Idea; open: boolean }) {
       replyRef.current?.focus()
     })
   }
+
+  const total = discussion.pageInfo?.totalCount
+  useEffect(() => {
+    if (total !== undefined) onCountChange?.(total)
+  }, [total, onCountChange])
 
   if (!open) return null
 
@@ -715,6 +736,7 @@ function CommentComposer({
   onContentChange: (content: string) => void
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
 }) {
+  const { user } = useAuth()
   // `idea.discussionOpen` is the server's answer, from the same rule
   // `createComment` enforces. Re-deriving "is this rejected?" here would be the
   // second copy of a lifecycle rule this app has twice decided not to keep on
@@ -750,18 +772,41 @@ function CommentComposer({
       <label htmlFor={`comment-${idea.id}`} className="sr-only">
         Add a comment
       </label>
-      <textarea
-        id={`comment-${idea.id}`}
-        ref={textareaRef}
-        value={content}
-        rows={2}
-        placeholder="Add a comment"
-        onChange={(event) => {
-          onContentChange(event.target.value)
-          discussion.clearWriteError()
-        }}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
-      />
+      <div className="flex items-start gap-3">
+        {user && typeof user.firstName === 'string' ? (
+          <Avatar
+            user={user}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mist text-sm font-bold text-jade ring-2 ring-white"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-mist text-sm font-bold text-jade"
+          >
+            {(user?.email?.[0] ?? '?').toUpperCase()}
+          </span>
+        )}
+        <textarea
+          id={`comment-${idea.id}`}
+          ref={textareaRef}
+          value={content}
+          rows={1}
+          placeholder="Add a comment…"
+          onChange={(event) => {
+            onContentChange(event.target.value)
+            discussion.clearWriteError()
+          }}
+          className="min-h-10 w-full flex-1 resize-y rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm text-ink focus:border-jade/50 focus:outline-none focus:ring-2 focus:ring-mint/40"
+        />
+        <button
+          type="submit"
+          disabled={!canSubmit}
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-forest px-4 text-sm font-semibold text-white hover:bg-pine focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/40 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {discussion.posting && <SpinnerIcon className="h-3.5 w-3.5 motion-safe:animate-spin" />}
+          Comment
+        </button>
+      </div>
       {discussion.writeError !== null && discussion.writeError.field !== 'content' && (
         <p role="alert" className="mt-1 text-xs text-red-700">
           {discussion.writeError.message}
@@ -777,17 +822,9 @@ function CommentComposer({
           {discussion.writeError.message}
         </p>
       )}
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-xs text-gray-500">{content.length} characters</span>
-        <button
-          type="submit"
-          disabled={!canSubmit}
-          className="inline-flex items-center gap-2 rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {discussion.posting && <SpinnerIcon className="h-3.5 w-3.5 motion-safe:animate-spin" />}
-          Comment
-        </button>
-      </div>
+      {content.length > 0 && (
+        <p className="mt-1 pl-[3.25rem] text-xs text-sage">{content.length} characters</p>
+      )}
     </form>
   )
 }

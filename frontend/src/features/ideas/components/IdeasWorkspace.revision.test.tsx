@@ -120,7 +120,7 @@ describe('IdeasWorkspace — changes requested', () => {
     expect(screen.queryByRole('button', { name: 'Submit again' })).not.toBeInTheDocument()
   })
 
-  it('sends the revision to the guided form on its own page', async () => {
+  it('opens the revision in the guided form, in a dialog over the list', async () => {
     mockContext(AUTHOR, sentBack())
     const router = createMemoryRouter(
       [
@@ -133,9 +133,12 @@ describe('IdeasWorkspace — changes requested', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Revise idea' }))
 
-    expect(await screen.findByText('Edit page')).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/app/ideas/1/edit')
+    expect(await screen.findByRole('dialog', { name: 'Revise your idea' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/ideas')
     expect(updateMock).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog', { name: 'Revise your idea' })).not.toBeInTheDocument()
   })
 
   it('resubmits through the existing submitIdea, refreshes, and creates no review', async () => {

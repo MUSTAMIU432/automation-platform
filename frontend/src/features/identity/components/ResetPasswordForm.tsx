@@ -6,6 +6,7 @@ import { validateResetPassword, hasErrors, type FieldErrors } from '../schemas/a
 import type { ResetPasswordFormValues } from '../types/auth'
 import { PasswordField } from './PasswordField'
 import { SpinnerIcon } from './icons'
+import { primaryButtonClasses } from './fieldStyles'
 
 const INITIAL_VALUES: ResetPasswordFormValues = {
   password: '',
@@ -21,9 +22,6 @@ const INITIAL_VALUES: ResetPasswordFormValues = {
  */
 type Status = 'idle' | 'submitting' | 'success' | 'invalid-token' | 'error'
 
-const PRIMARY_BUTTON_CLASSES =
-  'flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-300 disabled:shadow-none'
-
 /**
  * Shown once the real `resetPassword` mutation resolves successfully.
  *
@@ -37,13 +35,15 @@ const PRIMARY_BUTTON_CLASSES =
 export function ResetPasswordSuccessView() {
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Password reset</h1>
-      <p className="mt-2 text-sm text-gray-500">Your password has been reset successfully.</p>
-      <p className="mt-2 text-sm text-gray-500">
+      <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">Password reset</h1>
+      <p className="mt-2 text-center text-sm text-sage">
+        Your password has been reset successfully.
+      </p>
+      <p className="mt-2 text-center text-sm text-sage">
         For safety, every session on this account was signed out, including this one. Sign in again
         with your new password.
       </p>
-      <Link to="/auth" className={`mt-6 ${PRIMARY_BUTTON_CLASSES}`}>
+      <Link to="/auth" className={`mt-6 ${primaryButtonClasses}`}>
         Sign In
       </Link>
     </div>
@@ -63,11 +63,11 @@ export function ResetPasswordSuccessView() {
 export function ResetPasswordInvalidTokenView() {
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Link invalid</h1>
-      <p className="mt-2 text-sm text-gray-500">
+      <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">Link invalid</h1>
+      <p className="mt-2 text-center text-sm text-sage">
         This password reset link is invalid or has expired.
       </p>
-      <Link to="/auth" className={`mt-6 ${PRIMARY_BUTTON_CLASSES}`}>
+      <Link to="/auth" className={`mt-6 ${primaryButtonClasses}`}>
         Request a new reset link
       </Link>
     </div>
@@ -167,8 +167,10 @@ export function ResetPasswordForm() {
 
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Reset your password</h1>
-      <p className="mt-2 text-sm text-gray-500">Choose a new password for your account.</p>
+      <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+        Reset your password
+      </h1>
+      <p className="mt-2 text-center text-sm text-sage">Choose a new password for your account.</p>
 
       {formError && (
         <p role="alert" className="mt-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -197,7 +199,7 @@ export function ResetPasswordForm() {
           disabled={isSubmitting}
         />
 
-        <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON_CLASSES}>
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClasses}>
           {isSubmitting && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
           <span>{isSubmitting ? 'Resetting…' : 'Reset Password'}</span>
         </button>
@@ -206,7 +208,7 @@ export function ResetPasswordForm() {
       <p className="mt-6 text-center text-sm text-gray-500">
         <Link
           to="/auth"
-          className="font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+          className="font-semibold text-jade hover:text-pine focus:outline-none focus-visible:underline"
         >
           ← Back to Sign In
         </Link>

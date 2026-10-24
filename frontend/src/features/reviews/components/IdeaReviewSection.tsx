@@ -30,12 +30,18 @@ export function IdeaReviewSection({
   idea,
   viewerId,
   open,
+  onCountChange,
 }: {
   idea: Idea
   viewerId: string | null
   open: boolean
+  /** Told how many rounds there are once they have loaded, for a heading's count. */
+  onCountChange?: (count: number) => void
 }) {
   if (!reviewHistoryVisible(idea, viewerId)) return null
+  // Closed, and no reviewer link to offer: nothing to draw - an empty box would
+  // still take its margin and push the card's foot up.
+  if (!open && !idea.viewerCanStartReview && idea.viewerActiveReviewId === null) return null
 
   return (
     <div className="mt-3">
@@ -61,7 +67,7 @@ export function IdeaReviewSection({
       </div>
       {open && (
         <div className="mt-3">
-          <ReviewHistory ideaId={idea.id} viewerId={viewerId} />
+          <ReviewHistory ideaId={idea.id} viewerId={viewerId} onCountChange={onCountChange} />
         </div>
       )}
     </div>

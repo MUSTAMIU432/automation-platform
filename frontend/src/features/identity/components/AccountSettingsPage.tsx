@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { Navigate, NavLink, useParams } from 'react-router-dom'
 
 import {
@@ -6,7 +6,6 @@ import {
   AVATAR_TYPES,
   changePasswordRequest,
   removeAvatarRequest,
-  uploadAvatarRequest,
   NETWORK_ERROR_MESSAGE,
   resendActivationEmailRequest,
   updateProfileRequest,
@@ -20,6 +19,7 @@ import {
 } from '../schemas/authValidation'
 import { Avatar } from './Avatar'
 import { PasswordField } from './PasswordField'
+import { PhotoUploadDialog } from './PhotoUploadDialog'
 import { TextField } from './TextField'
 
 const SECTIONS = [
@@ -95,13 +95,21 @@ function PhotoPicker() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
   const [busy, setBusy] = useState(false)
+  // The chosen photo, previewed in a dialog before it is uploaded.
+  const [pending, setPending] = useState<{ file: File; previewUrl: string } | null>(null)
 
-  async function apply(action: () => ReturnType<typeof uploadAvatarRequest>) {
+  // Each preview's object URL is released when it is replaced or closed.
+  useEffect(() => {
+    if (!pending) return
+    return () => URL.revokeObjectURL(pending.previewUrl)
+  }, [pending])
+
+  async function remove() {
     if (!user) return
     setBusy(true)
     setNotice(null)
     try {
-      const result = await action()
+      const result = await removeAvatarRequest()
       if (result.success) updateUser({ ...user, avatarUrl: result.avatarUrl })
       setNotice({
         kind: result.success ? 'success' : 'error',
@@ -126,7 +134,8 @@ function PhotoPicker() {
         text: 'The photo must be 100 MB or smaller.',
       })
     } else {
-      void apply(() => uploadAvatarRequest(file))
+      setNotice(null)
+      setPending({ file, previewUrl: URL.createObjectURL(file) })
     }
   }
 
@@ -158,7 +167,7 @@ function PhotoPicker() {
             <button
               type="button"
               disabled={busy}
-              onClick={() => void apply(removeAvatarRequest)}
+              onClick={() => void remove()}
               className="inline-flex h-11 items-center rounded-lg px-4 text-sm font-semibold text-gray-700 ring-1 ring-gray-300 hover:bg-gray-50 disabled:opacity-60"
             >
               Remove
@@ -168,6 +177,18 @@ function PhotoPicker() {
       </div>
       <p className="text-xs text-gray-500">JPEG, PNG or WebP, up to 100 MB.</p>
       <NoticeBanner notice={notice} />
+      {pending && (
+        <PhotoUploadDialog
+          key={pending.previewUrl}
+          file={pending.file}
+          previewUrl={pending.previewUrl}
+          onUploaded={(avatarUrl) => {
+            if (user) updateUser({ ...user, avatarUrl })
+          }}
+          onChooseAnother={() => inputRef.current?.click()}
+          onClose={() => setPending(null)}
+        />
+      )}
     </div>
   )
 }

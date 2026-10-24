@@ -7,8 +7,9 @@ import { useGoogleSignIn } from '../auth/useGoogleSignIn'
 import { validateSignUp, hasErrors, type FieldErrors } from '../schemas/authValidation'
 import type { SignUpFormValues } from '../types/auth'
 import { GoogleAuthButton } from './GoogleAuthButton'
-import { fieldErrorClasses } from './fieldStyles'
-import { SpinnerIcon } from './icons'
+import { fieldErrorClasses, primaryButtonClasses } from './fieldStyles'
+import { AuthHeading } from './AuthCardParts'
+import { LockIcon, MailIcon, SpinnerIcon, UserIcon } from './icons'
 import { PasswordField } from './PasswordField'
 import { PhoneField } from './PhoneField'
 import { TextField } from './TextField'
@@ -159,7 +160,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
   if (created) {
     return (
       <div>
-        <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Account created</h1>
+        <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+          Account created
+        </h1>
         <output className="mt-2 block text-sm text-gray-500">
           Your account is ready. Sign in to continue.
         </output>
@@ -186,31 +189,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
 
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Create your account</h1>
-      <p className="mt-2 text-sm text-gray-500">Start turning problems into automation.</p>
+      <AuthHeading title="Create your account" subtitle="Join MUSTANET" />
 
-      <div className="mt-7">
-        <GoogleAuthButton
-          disabled={isSubmitting || !googleSignIn.isConfigured}
-          onClick={googleSignIn.trigger}
-        />
-        {/* Google Identity Services renders its own real button here,
-            visually hidden - see SignInForm's matching comment. */}
-        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
-        {googleError && (
-          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-            {googleError}
-          </p>
-        )}
-      </div>
-
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Or</span>
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
-
-      <form noValidate onSubmit={handleSubmit} aria-busy={isSubmitting} className="space-y-5">
+      <form noValidate onSubmit={handleSubmit} aria-busy={isSubmitting} className="mt-6 space-y-4">
         {formError && (
           <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
             {formError}
@@ -226,6 +207,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
             onChange={(value) => updateField('firstName', value)}
             error={errors.firstName}
             disabled={isSubmitting}
+            placeholder="First name"
+            hideLabel
+            icon={<UserIcon className="h-5 w-5" />}
           />
           <TextField
             id="signup-last-name"
@@ -235,6 +219,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
             onChange={(value) => updateField('lastName', value)}
             error={errors.lastName}
             disabled={isSubmitting}
+            placeholder="Last name"
+            hideLabel
+            icon={<UserIcon className="h-5 w-5" />}
           />
         </div>
 
@@ -246,8 +233,10 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
           value={values.email}
           onChange={(value) => updateField('email', value)}
           error={errors.email}
-          placeholder="you@company.com"
+          placeholder="Email address"
+          hideLabel
           disabled={isSubmitting}
+          icon={<MailIcon className="h-5 w-5" />}
         />
 
         <PhoneField
@@ -257,6 +246,7 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
           onPhoneNumberChange={(value) => updateField('phoneNumber', value)}
           error={errors.phoneNumber}
           disabled={isSubmitting}
+          hideLabel
         />
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -268,6 +258,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
             onChange={(value) => updateField('password', value)}
             error={errors.password}
             disabled={isSubmitting}
+            placeholder="Password"
+            hideLabel
+            icon={<LockIcon className="h-5 w-5" />}
           />
 
           <PasswordField
@@ -278,6 +271,9 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
             onChange={(value) => updateField('confirmPassword', value)}
             error={errors.confirmPassword}
             disabled={isSubmitting}
+            placeholder="Confirm"
+            hideLabel
+            icon={<LockIcon className="h-5 w-5" />}
           />
         </div>
 
@@ -292,7 +288,7 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
               disabled={isSubmitting}
               aria-invalid={Boolean(errors.acceptedTerms)}
               aria-describedby={errors.acceptedTerms ? 'signup-terms-error' : undefined}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-brand-600 focus:ring-2 focus:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 accent-jade focus:ring-2 focus:ring-mint disabled:cursor-not-allowed disabled:opacity-60"
             />
             <label htmlFor="signup-terms" className="text-sm text-gray-600">
               I agree to the{' '}
@@ -313,22 +309,33 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
           )}
         </div>
 
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-300 disabled:shadow-none"
-        >
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClasses}>
           {isSubmitting && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
           <span>{isSubmitting ? 'Creating account…' : 'Create Account'}</span>
         </button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-gray-500">
+      <div className="mt-4">
+        <GoogleAuthButton
+          disabled={isSubmitting || !googleSignIn.isConfigured}
+          onClick={googleSignIn.trigger}
+        />
+        {/* Google Identity Services renders its own real button here,
+            visually hidden - see SignInForm's matching comment. */}
+        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
+        {googleError && (
+          <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            {googleError}
+          </p>
+        )}
+      </div>
+
+      <p className="mt-4 text-center text-sm text-sage">
         Already have an account?{' '}
         <button
           type="button"
           onClick={onSwitchToSignIn}
-          className="-my-3 inline-block py-3 font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+          className="-my-3 inline-block py-3 font-semibold text-jade hover:text-pine focus:outline-none focus-visible:underline"
         >
           Sign in
         </button>

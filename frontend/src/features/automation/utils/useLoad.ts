@@ -12,12 +12,15 @@ export interface Loaded<T> {
  *
  * The answer is stored with the key it answered, and read only while the key still
  * matches - so moving to another record shows "loading" instead of the previous
- * record's data under the new one, with no state written inside the effect.
+ * record's data under the new one, with no state written inside the effect. A reload
+ * of the same record keeps showing what is there until the new answer arrives, so a
+ * page does not blank out every time something on it is saved.
  */
 export function useLoad<T>(loader: () => Promise<T>, key: string): Loaded<T> {
   const [token, setToken] = useState(0)
   const [answer, setAnswer] = useState<{
     key: string
+    record: string
     data: T | null
     failed: boolean
   } | null>(null)
@@ -27,10 +30,10 @@ export function useLoad<T>(loader: () => Promise<T>, key: string): Loaded<T> {
     let cancelled = false
     loader()
       .then((data) => {
-        if (!cancelled) setAnswer({ key: current, data, failed: false })
+        if (!cancelled) setAnswer({ key: current, record: key, data, failed: false })
       })
       .catch(() => {
-        if (!cancelled) setAnswer({ key: current, data: null, failed: true })
+        if (!cancelled) setAnswer({ key: current, record: key, data: null, failed: true })
       })
     return () => {
       cancelled = true
@@ -41,9 +44,11 @@ export function useLoad<T>(loader: () => Promise<T>, key: string): Loaded<T> {
 
   const reload = useCallback(() => setToken((value) => value + 1), [])
   const ready = answer !== null && answer.key === current
+  // Reloading the same record: keep what was loaded until the new answer replaces it.
+  const reloading = !ready && answer !== null && answer.record === key && !answer.failed
   return {
-    data: ready ? answer.data : null,
-    loading: !ready,
+    data: ready || reloading ? answer.data : null,
+    loading: !ready && !reloading,
     failed: ready && answer.failed,
     reload,
   }

@@ -198,7 +198,7 @@ describe('IdeasWorkspace discovery (S2-004)', () => {
     fireEvent.change(searchBox(), { target: { value: 'invoice' } })
     await waitFor(() => expect(lastFilters().search).toBe('invoice'))
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all' }))
 
     await waitFor(() =>
       expect(lastFilters()).toMatchObject({

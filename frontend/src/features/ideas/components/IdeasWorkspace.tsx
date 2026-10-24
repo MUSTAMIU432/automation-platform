@@ -9,9 +9,12 @@ import {
   type IdeaStatus,
 } from '../api/ideasApi'
 import { useDebouncedCallback } from '../../../lib/useDebouncedCallback'
+import { IdeaEditDialog } from './IdeaEditDialog'
 import { IdeaList } from './IdeaList'
+import { IdeasHero } from './IdeasHero'
 import { SEARCH_DEBOUNCE_MS } from './IdeaFiltersBar'
-import { readIdeasRedirect, type NoticeTone } from '../utils/savedIdeaNotice'
+import { filtersFromParams, paramsFromFilters } from '../utils/filterParams'
+import { readIdeasRedirect, savedIdeaNotice, type NoticeTone } from '../utils/savedIdeaNotice'
 import { IdeaContextDialog } from './IdeaContextDialog'
 
 /**
@@ -55,12 +58,33 @@ export function IdeasWorkspace() {
   const navigate = useNavigate()
   const [submittingIdeaId, setSubmittingIdeaId] = useState<string | null>(null)
   const [submittingTarget, setSubmittingTarget] = useState<IdeaStatus | null>(null)
-  const [filters, setFilters] = useState<IdeaFilters>({})
+  /*
+   * The filters live in the page's address (`utils/filterParams`), so a reader
+   * who opens an idea and comes back finds the list as they left it. They are
+   * read from it on arrival, and read again whenever the address changes from
+   * outside - the header's search box sends `?search=` here - adjusted during
+   * render rather than in an effect, so the list is never asked for the old
+   * filters first.
+   */
+  const addressFilters = location.search
+  const [filters, setFilters] = useState<IdeaFilters>(() =>
+    filtersFromParams(new URLSearchParams(location.search)),
+  )
+  const [seenAddress, setSeenAddress] = useState(addressFilters)
+  if (addressFilters !== seenAddress) {
+    setSeenAddress(addressFilters)
+    const fromAddress = filtersFromParams(new URLSearchParams(addressFilters))
+    if (paramsFromFilters(fromAddress).toString() !== paramsFromFilters(filters).toString()) {
+      setFilters(fromAddress)
+    }
+  }
   // Whether the "Where does this idea belong?" dialog is open. The one piece of
   // create-idea state that lives on the list rather than on a page of its own,
   // because it is a question about the next thing rather than about an idea.
   const [choosingContext, setChoosingContext] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
+  // The idea being edited in the dialog over the list, if any.
+  const [editingIdea, setEditingIdea] = useState<Idea | null>(null)
   // Both seeded from the redirect after filing a new idea on `/app/ideas/new`.
   const [redirect] = useState(() => readIdeasRedirect(location.state))
   const [notice, setNotice] = useState<{
@@ -106,7 +130,15 @@ export function IdeasWorkspace() {
    * page in three separate handlers would have three chances to forget.
    */
   function applyFilters(next: IdeaFilters) {
-    setFilters({ ...next, offset: next.offset ?? 0 })
+    const applied = { ...next, offset: next.offset ?? 0 }
+    setFilters(applied)
+    // Into the address too, replacing rather than adding a history entry, so Back
+    // leaves the Ideas page instead of stepping through every filter change.
+    const query = paramsFromFilters(applied).toString()
+    navigate(`${location.pathname}${query ? `?${query}` : ''}`, {
+      replace: true,
+      state: location.state,
+    })
   }
 
   async function handleTransition(idea: Idea, target: IdeaStatus) {
@@ -137,7 +169,7 @@ export function IdeasWorkspace() {
   }
 
   return (
-    <section aria-labelledby="ideas-heading" className="mt-8">
+    <section aria-labelledby="ideas-heading">
       {choosingContext && (
         <IdeaContextDialog
           onCancel={() => setChoosingContext(false)}
@@ -156,32 +188,19 @@ export function IdeasWorkspace() {
           }}
         />
       )}
-      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Ideas</p>
-          <h2
-            id="ideas-heading"
-            className="mt-1 text-2xl font-semibold tracking-tight text-gray-900"
-          >
-            Your ideas
-          </h2>
-        </div>
-        {/*
-          The global entry point, and the only place a reader is asked where an
-          idea belongs. It opens a dialog rather than navigating straight to the
-          form, because an idea filed for the wrong owner is hard to notice
-          afterwards - nothing breaks, it simply never reaches the queue its
-          owner can see.
-        */}
-        <button
-          type="button"
-          onClick={() => setChoosingContext(true)}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-        >
-          <span aria-hidden="true">+</span>
-          File a new idea
-        </button>
-      </div>
+      {editingIdea && (
+        <IdeaEditDialog
+          idea={editingIdea}
+          onClose={() => setEditingIdea(null)}
+          onSaved={(saved) => {
+            setEditingIdea(null)
+            setSubmitError(null)
+            setNotice({ text: savedIdeaNotice(saved), tone: 'success' })
+            reloadList()
+          }}
+        />
+      )}
+      <IdeasHero onNewIdea={() => setChoosingContext(true)} />
 
       {notice && (
         <output
@@ -213,7 +232,7 @@ export function IdeasWorkspace() {
         </p>
       )}
 
-      <div className="mt-5">
+      <div className="mt-8">
         <IdeaList
           filters={filters}
           onFiltersChange={applyFilters}
@@ -224,7 +243,7 @@ export function IdeasWorkspace() {
           // the write. The fetch is a side effect of the list's props, so
           // changing one of them is enough.
           reloadToken={reloadToken}
-          onEdit={(idea) => navigate(`/app/ideas/${idea.id}/edit`)}
+          onEdit={setEditingIdea}
           onTransition={handleTransition}
           submittingIdeaId={submittingIdeaId}
           submittingTarget={submittingTarget}

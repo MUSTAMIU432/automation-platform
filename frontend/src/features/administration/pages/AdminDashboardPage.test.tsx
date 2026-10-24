@@ -64,6 +64,7 @@ const OVERVIEW: AdminOverview = {
       targetType: 'user',
       targetId: '5',
       targetLabel: 'left@acme.example',
+      organizationId: null,
       message: '',
       createdAt: '2026-09-02T09:00:00Z',
     },
@@ -99,14 +100,32 @@ describe('AdminDashboardPage', () => {
     expect(links[1]).toHaveAttribute('href', '/app/admin/ideas?status=SUBMITTED')
   })
 
-  it('shows recent activity, withholding a restricted title', async () => {
+  it('opens the matching section when a card is clicked', async () => {
     overviewMock.mockResolvedValue(OVERVIEW)
     renderAdminPage(<AdminDashboardPage />)
 
-    expect(await screen.findByText('Automate the invoice run')).toBeInTheDocument()
-    expect(screen.getByText('Restricted idea')).toBeInTheDocument()
-    expect(screen.getByText('Account deactivated')).toBeInTheDocument()
-    expect(screen.getByText(/left@acme\.example/)).toBeInTheDocument()
+    const figures = within(await screen.findByRole('region', { name: 'Key figures' }))
+    const card = (label: string) => figures.getByText(label).closest('a')
+    expect(card('Users')).toHaveAttribute('href', '/app/admin/users')
+    expect(card('Organizations')).toHaveAttribute('href', '/app/admin/organizations')
+    expect(card('Ideas')).toHaveAttribute('href', '/app/admin/ideas')
+    expect(card('Reviews in progress')).toHaveAttribute('href', '/app/admin/reviews')
+    expect(card('Awaiting review')).toHaveAttribute('href', '/app/admin/ideas?status=SUBMITTED')
+    expect(card('Approved')).toHaveAttribute('href', '/app/admin/ideas?status=APPROVED')
+    expect(card('Changes requested')).toHaveAttribute(
+      'href',
+      '/app/admin/ideas?status=CHANGES_REQUESTED',
+    )
+    expect(card('Rejected')).toHaveAttribute('href', '/app/admin/ideas?status=REJECTED')
+  })
+
+  it('leaves the recent activity to the Activity page', async () => {
+    overviewMock.mockResolvedValue(OVERVIEW)
+    renderAdminPage(<AdminDashboardPage />)
+
+    await screen.findByRole('region', { name: 'Key figures' })
+    expect(screen.queryByText('Recent lifecycle activity')).not.toBeInTheDocument()
+    expect(screen.queryByText('Recent administrative actions')).not.toBeInTheDocument()
   })
 
   it('shows a loading state while the overview loads', () => {
@@ -125,14 +144,6 @@ describe('AdminDashboardPage', () => {
     )
     screen.getByRole('button', { name: 'Try again' }).click()
     await waitFor(() => expect(overviewMock).toHaveBeenCalledTimes(2))
-    expect(await screen.findByText('Automate the invoice run')).toBeInTheDocument()
-  })
-
-  it('shows empty activity panels on a fresh platform', async () => {
-    overviewMock.mockResolvedValue({ ...OVERVIEW, recentActivity: [], recentAdminActions: [] })
-    renderAdminPage(<AdminDashboardPage />)
-
-    expect(await screen.findByText('No lifecycle activity yet.')).toBeInTheDocument()
-    expect(screen.getByText('No administrative actions yet.')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Key figures' })).toBeInTheDocument()
   })
 })

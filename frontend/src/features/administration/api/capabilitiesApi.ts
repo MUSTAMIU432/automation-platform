@@ -20,6 +20,8 @@ export interface AdminCapabilities {
   canManageReviewers: boolean
   canReleaseProposals: boolean
   canManagePlatformRoles: boolean
+  /** Publish ideas for sale, price them, set payment methods and confirm payments. */
+  canManageMarketplace: boolean
 }
 
 export const NO_ADMIN_CAPABILITIES: AdminCapabilities = {
@@ -33,6 +35,7 @@ export const NO_ADMIN_CAPABILITIES: AdminCapabilities = {
   canManageReviewers: false,
   canReleaseProposals: false,
   canManagePlatformRoles: false,
+  canManageMarketplace: false,
 }
 
 const CAPABILITIES_QUERY = `
@@ -48,6 +51,7 @@ const CAPABILITIES_QUERY = `
       canManageReviewers
       canReleaseProposals
       canManagePlatformRoles
+      canManageMarketplace
     }
   }
 `

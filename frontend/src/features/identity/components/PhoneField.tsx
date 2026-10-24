@@ -1,4 +1,5 @@
-import { fieldErrorClasses, inputClasses } from './fieldStyles'
+import { useFieldAppearance } from './fieldAppearance'
+import { fieldErrorClasses, inputClasses, softInputClasses, softLabelClasses } from './fieldStyles'
 
 interface PhoneFieldProps {
   countryCode: string
@@ -7,6 +8,8 @@ interface PhoneFieldProps {
   onPhoneNumberChange: (value: string) => void
   error?: string
   disabled?: boolean
+  /** Keep the group's label for assistive technology but not on screen. */
+  hideLabel?: boolean
 }
 
 // A representative set of country calling codes. The platform serves users
@@ -38,10 +41,13 @@ export function PhoneField({
   onPhoneNumberChange,
   error,
   disabled,
+  hideLabel,
 }: PhoneFieldProps) {
   const errorId = 'signup-phone-error'
 
   const labelId = 'signup-phone-label'
+  const soft = useFieldAppearance() === 'soft'
+  const fieldClasses = soft ? softInputClasses : inputClasses
 
   return (
     // A plain, labeled group rather than <fieldset>/<legend>: browsers give
@@ -52,7 +58,16 @@ export function PhoneField({
     // assistive tech the same grouping semantics without that quirk.
     // oxlint-disable-next-line jsx-a11y/prefer-tag-over-role
     <div role="group" aria-labelledby={labelId} className="min-w-0">
-      <span id={labelId} className="mb-1.5 block text-sm font-medium text-gray-700">
+      <span
+        id={labelId}
+        className={
+          hideLabel
+            ? 'sr-only'
+            : soft
+              ? softLabelClasses
+              : 'mb-1.5 block text-sm font-medium text-gray-700'
+        }
+      >
         Phone number
       </span>
       <div className="flex gap-2">
@@ -65,13 +80,13 @@ export function PhoneField({
           select from forcing the row (and the whole page) wider than the
           viewport on narrow screens.
         */}
-        <div className="w-32 shrink-0 overflow-hidden">
+        <div className="w-28 shrink-0 overflow-hidden sm:w-32">
           <select
             aria-label="Country code"
             value={countryCode}
             onChange={(event) => onCountryCodeChange(event.target.value)}
             disabled={disabled}
-            className={`${inputClasses(Boolean(error))} w-full min-w-0`}
+            className={`${fieldClasses(Boolean(error))} w-full min-w-0`}
           >
             {COUNTRY_CODES.map((option) => (
               <option key={option.code} value={option.code}>
@@ -86,14 +101,14 @@ export function PhoneField({
           type="tel"
           inputMode="tel"
           autoComplete="tel-national"
-          placeholder="7XX XXX XXX"
+          placeholder={hideLabel ? 'Phone (7XX XXX XXX)' : '7XX XXX XXX'}
           value={phoneNumber}
           onChange={(event) => onPhoneNumberChange(event.target.value)}
           disabled={disabled}
           aria-label="Phone number"
           aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
-          className={`${inputClasses(Boolean(error))} min-w-0 flex-1`}
+          className={`${fieldClasses(Boolean(error))} min-w-0 flex-1`}
         />
       </div>
       {error && (

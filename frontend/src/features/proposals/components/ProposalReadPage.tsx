@@ -8,6 +8,9 @@ import {
   type ViewReceipt,
 } from '../api/proposalsApi'
 import { OwnerDecisionForm } from './OwnerDecisionForm'
+import { ProposalPageNav } from './ProposalPageNav'
+import { ProposalFacts } from './ProposalFacts'
+import { plannedFacts } from './proposalFacts'
 import { ProposalSections } from './ProposalSections'
 import { ProtectedView } from './ProtectedView'
 
@@ -88,14 +91,24 @@ export function ProposalReadPage() {
 
   const { proposal, receipt } = load
   return (
-    <section className="mt-6 max-w-4xl" aria-labelledby="proposal-heading">
+    <section className="mt-6 w-full" aria-labelledby="proposal-heading">
       <p className="text-xs font-bold tracking-[0.18em] text-brand-700 uppercase">
         Proposal for your idea
       </p>
       <h1 id="proposal-heading" className="mt-1 text-3xl font-bold tracking-tight text-gray-900">
         {proposal.title}
       </h1>
-      <p className="mt-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      <div className="mt-4">
+        <ProposalFacts
+          label="About this proposal"
+          facts={[
+            ['Prepared by', proposal.teamName ?? 'The platform review team'],
+            ['For your idea', proposal.ideaTitle],
+            ...plannedFacts(proposal),
+          ]}
+        />
+      </div>
+      <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
         This proposal is for you only. It cannot be downloaded, copied or printed from here, and
         your name and the time are on every page. A photo of the screen cannot be prevented, so
         please do not share it.
@@ -109,9 +122,7 @@ export function ProposalReadPage() {
 
       <OwnerDecisionForm ideaId={ideaId} proposal={proposal} />
 
-      <Link to={`/app/ideas/${ideaId}`} className="mt-8 inline-block font-semibold text-brand-700">
-        Back to the idea
-      </Link>
+      <ProposalPageNav ideaId={ideaId} />
     </section>
   )
 }

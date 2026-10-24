@@ -3,6 +3,7 @@
  * console as a single on-demand chunk the first time an administrator opens
  * it (see `src/app/routes.tsx`).
  */
+export { AdminActivityPage } from './AdminActivityPage'
 export { AdminAutomationPage } from './AdminAutomationPage'
 export { AdminCategoriesPage } from './AdminCategoriesPage'
 export { AdminDashboardPage } from './AdminDashboardPage'
@@ -24,3 +25,7 @@ export { AdminMessagesPage } from './AdminMessagesPage'
 export { AdminNotificationsPage } from './AdminNotificationsPage'
 export { AdminTeamDetailPage } from './AdminTeamDetailPage'
 export { AdminTeamsPage } from './AdminTeamsPage'
+export { AdminMarketIdeasPage } from './AdminMarketIdeasPage'
+export { AdminMarketPaymentsPage } from './AdminMarketPaymentsPage'
+export { AdminPaymentMethodsPage } from './AdminPaymentMethodsPage'
+export { AdminMarketEnquiriesPage } from './AdminMarketEnquiriesPage'

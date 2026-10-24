@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { getRequestGuard } from '../../../graphql/requestGuard'
 import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
 import { refreshTokenRequest, type AuthSession } from './authApi'
 import {
@@ -8,6 +9,7 @@ import {
   beginSession,
   cancelProactiveRefresh,
   ensureFreshAccessToken,
+  guardRequest,
   isProactiveRefreshScheduled,
   isRefreshDue,
   refreshAccessToken,
@@ -420,5 +422,82 @@ describe('tokenRefresh', () => {
     expect(localStorage.length).toBe(0)
     expect(sessionStorage.length).toBe(0)
     setItemSpy.mockRestore()
+  })
+})
+
+describe('the request guard', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-01-01T00:00:00Z'))
+    resetTokenRefreshState()
+    setAccessToken(null)
+    mockedRefresh.mockReset()
+  })
+
+  afterEach(() => {
+    cancelProactiveRefresh()
+    resetTokenRefreshState()
+    setAccessToken(null)
+    vi.useRealTimers()
+  })
+
+  it('is what the GraphQL client runs before each request', () => {
+    expect(getRequestGuard()).toBe(guardRequest)
+  })
+
+  it('renews an expired token before the request goes out', async () => {
+    // The laptop slept: the token expired and its refresh timer never ran.
+    setAccessToken('stale', expiresIn(-60))
+    mockedRefresh.mockResolvedValue(resolved(fakeSession('fresh')))
+
+    await guardRequest('MyDevelopmentWork')
+
+    expect(mockedRefresh).toHaveBeenCalledTimes(1)
+    expect(getAccessToken()).toBe('fresh')
+  })
+
+  it('lets concurrent requests share one renewal', async () => {
+    setAccessToken('stale', expiresIn(-60))
+    mockedRefresh.mockResolvedValue(resolved(fakeSession('fresh')))
+
+    await Promise.all([guardRequest(undefined), guardRequest(undefined), guardRequest('Me')])
+
+    expect(mockedRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a token that is still good alone', async () => {
+    setAccessToken('good', expiresIn(600))
+
+    await guardRequest(undefined)
+
+    expect(mockedRefresh).not.toHaveBeenCalled()
+    expect(getAccessToken()).toBe('good')
+  })
+
+  it('never makes the session requests wait on a renewal', async () => {
+    setAccessToken('stale', expiresIn(-60))
+
+    for (const operation of ['RefreshToken', 'Login', 'GoogleLogin', 'Logout']) {
+      await guardRequest(operation)
+    }
+
+    expect(mockedRefresh).not.toHaveBeenCalled()
+  })
+
+  it('does nothing for someone who is not signed in', async () => {
+    await guardRequest(undefined)
+
+    expect(mockedRefresh).not.toHaveBeenCalled()
+  })
+
+  it('renews a due token when the tab comes back into view', async () => {
+    setAccessToken('stale', expiresIn(-60))
+    mockedRefresh.mockResolvedValue(resolved(fakeSession('fresh')))
+
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    document.dispatchEvent(new Event('visibilitychange'))
+    await vi.waitFor(() => expect(getAccessToken()).toBe('fresh'))
+
+    expect(mockedRefresh).toHaveBeenCalledTimes(1)
   })
 })

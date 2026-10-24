@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 import { useIdeaReviews } from '../hooks/useIdeaReviews'
 import { CRITERION_LABELS, DECISION_LABELS, RATING_LABELS, formatDate } from '../utils/reviewLabels'
 
@@ -13,8 +15,28 @@ import { CRITERION_LABELS, DECISION_LABELS, RATING_LABELS, formatDate } from '..
  * `reviewerId` is shown as "you" when it is the viewer, and otherwise not
  * named: the API carries an id, not a person, on purpose.
  */
-export function ReviewHistory({ ideaId, viewerId }: { ideaId: string; viewerId: string | null }) {
+/** Each decision's colour, so a round's outcome reads at a glance. */
+const DECISION_TONES: Record<string, string> = {
+  APPROVED: 'bg-mist text-jade ring-jade/20',
+  CONFIRMED: 'bg-mist text-jade ring-jade/20',
+  CHANGES_REQUESTED: 'bg-amber-50 text-amber-800 ring-amber-200',
+  REJECTED: 'bg-red-50 text-red-700 ring-red-200',
+  WITHDRAWN: 'bg-gray-100 text-gray-700 ring-gray-200',
+}
+
+export function ReviewHistory({
+  ideaId,
+  viewerId,
+  onCountChange,
+}: {
+  ideaId: string
+  viewerId: string | null
+  onCountChange?: (count: number) => void
+}) {
   const { reviews, loading, error } = useIdeaReviews(ideaId)
+  useEffect(() => {
+    if (!loading && !error) onCountChange?.(reviews.length)
+  }, [loading, error, reviews.length, onCountChange])
 
   if (loading) {
     return <p className="text-sm text-gray-500">Loading review history…</p>
@@ -31,50 +53,60 @@ export function ReviewHistory({ ideaId, viewerId }: { ideaId: string; viewerId: 
   }
 
   return (
-    <ol aria-label="Review history" className="space-y-3">
+    <ol aria-label="Review history" className="relative space-y-3">
+      {/* The rail joining the rounds, through their markers. */}
+      <span
+        aria-hidden="true"
+        className="absolute bottom-6 left-[0.9rem] top-6 w-px bg-gradient-to-b from-jade/40 to-jade/10"
+      />
       {reviews.map((review) => (
-        <li key={review.id} className="rounded-lg border border-gray-200 bg-white p-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <p className="text-sm font-semibold text-gray-900">
-              Review {review.round}
+        <li key={review.id} className="relative flex gap-3">
+          <span className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-jade/30 bg-white text-xs font-bold text-forest shadow-sm">
+            <span className="sr-only">Review </span>
+            {review.round}
+          </span>
+          <div className="min-w-0 flex-1 rounded-2xl border border-gray-100 bg-white p-4 shadow-[0_1px_2px_rgba(20,45,37,0.05)]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               {review.decision ? (
-                <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ${DECISION_TONES[review.decision] ?? 'bg-gray-100 text-gray-700 ring-gray-200'}`}
+                >
                   {DECISION_LABELS[review.decision]}
                 </span>
               ) : (
-                <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
                   In progress
                 </span>
               )}
-            </p>
-            <p className="text-xs text-gray-500">
-              {review.completedAt
-                ? `Completed ${formatDate(review.completedAt)}`
-                : `Started ${formatDate(review.createdAt)}`}
-              {viewerId !== null && review.reviewerId === viewerId ? ' · by you' : ''}
-            </p>
+              <p className="text-xs text-sage">
+                {review.completedAt
+                  ? `Completed ${formatDate(review.completedAt)}`
+                  : `Started ${formatDate(review.createdAt)}`}
+                {viewerId !== null && review.reviewerId === viewerId ? ' · by you' : ''}
+              </p>
+            </div>
+            {review.decision === 'WITHDRAWN' && (
+              <p className="mt-2 text-sm text-sage">
+                The reviewer could no longer review this idea, so another reviewer took it over in
+                the next round. No decision was made in this round.
+              </p>
+            )}
+            {review.feedback && (
+              <p className="mt-2 text-sm leading-6 whitespace-pre-line text-ink/80">
+                {review.feedback}
+              </p>
+            )}
+            {review.assessments.length > 0 && (
+              <dl className="mt-3 grid gap-x-6 gap-y-1.5 border-t border-gray-100 pt-3 text-sm sm:grid-cols-2">
+                {review.assessments.map((assessment) => (
+                  <div key={assessment.criterion} className="flex justify-between gap-3">
+                    <dt className="text-sage">{CRITERION_LABELS[assessment.criterion]}</dt>
+                    <dd className="font-semibold text-ink">{RATING_LABELS[assessment.rating]}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </div>
-          {review.decision === 'WITHDRAWN' && (
-            <p className="mt-2 text-sm text-gray-500">
-              The reviewer could no longer review this idea, so another reviewer took it over in the
-              next round. No decision was made in this round.
-            </p>
-          )}
-          {review.feedback && (
-            <p className="mt-2 whitespace-pre-line text-sm leading-6 text-gray-700">
-              {review.feedback}
-            </p>
-          )}
-          {review.assessments.length > 0 && (
-            <dl className="mt-2 grid gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
-              {review.assessments.map((assessment) => (
-                <div key={assessment.criterion} className="flex justify-between gap-2">
-                  <dt className="text-gray-500">{CRITERION_LABELS[assessment.criterion]}</dt>
-                  <dd className="font-medium text-gray-800">{RATING_LABELS[assessment.rating]}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
         </li>
       ))}
     </ol>

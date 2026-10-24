@@ -10,6 +10,7 @@ import { AdminCapabilitiesContext, type AdminCapabilitiesValue } from './AdminCa
 
 interface Answer {
   key: string
+  userId: string | null
   capabilities: AdminCapabilities | null
 }
 
@@ -37,10 +38,10 @@ export function AdminCapabilitiesProvider({ children }: { children: ReactNode })
     let cancelled = false
     adminCapabilitiesRequest()
       .then((capabilities) => {
-        if (!cancelled) setAnswer({ key, capabilities })
+        if (!cancelled) setAnswer({ key, userId, capabilities })
       })
       .catch(() => {
-        if (!cancelled) setAnswer({ key, capabilities: null })
+        if (!cancelled) setAnswer({ key, userId, capabilities: null })
       })
     return () => {
       cancelled = true
@@ -49,8 +50,24 @@ export function AdminCapabilitiesProvider({ children }: { children: ReactNode })
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), [])
 
+  // Permissions change while the app is open - a role given, a new permission added - so
+  // ask again whenever the tab comes back into view, rather than only at sign-in.
+  useEffect(() => {
+    if (userId === null) return
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reload()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [userId, reload])
+
   const value = useMemo<AdminCapabilitiesValue>(() => {
-    const current = answer !== null && answer.key === key ? answer : null
+    // While a refresh for the same person is in flight, the last answer stands: asking
+    // again must not flash the app back to "no permissions".
+    const current =
+      answer !== null && (answer.key === key || (answer.userId === userId && answer.capabilities))
+        ? answer
+        : null
     if (userId === null) {
       return { status: 'ready', capabilities: NO_ADMIN_CAPABILITIES, reload }
     }

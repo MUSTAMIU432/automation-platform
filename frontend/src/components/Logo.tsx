@@ -2,9 +2,9 @@
  * The MUSTANET brand mark: an "M" drawn as a connected network path with
  * nodes at its joints, next to the wordmark. Decorative mark, readable name -
  * the accessible name comes from the wordmark text. Drawn for the green app
- * header: a white tile and a light wordmark.
+ * header: a white tile and a light wordmark, with an optional tagline under it.
  */
-export function Logo() {
+export function Logo({ tagline }: { tagline?: string } = {}) {
   return (
     <span className="flex items-center gap-2.5">
       <svg
@@ -26,8 +26,11 @@ export function Logo() {
         <circle cx="16" cy="18" r="2.25" className="fill-brand-400" />
         <circle cx="24" cy="10" r="2.25" className="fill-brand-400" />
       </svg>
-      <span className="text-lg font-bold tracking-tight text-white">
-        MUSTA<span className="text-brand-300">NET</span>
+      <span className="flex flex-col leading-tight">
+        <span className="text-lg font-bold tracking-tight text-white">
+          MUSTA<span className="text-brand-300">NET</span>
+        </span>
+        {tagline && <span className="text-xs font-medium text-white/65">{tagline}</span>}
       </span>
     </span>
   )

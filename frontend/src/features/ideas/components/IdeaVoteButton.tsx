@@ -1,5 +1,6 @@
 import { SpinnerIcon } from '../../identity/components/icons'
 import type { IdeaVoteControl } from '../hooks/useIdeaVotes'
+import { COUNT_CHIP } from './ideaCardStyles'
 import { VoteIcon } from './IdeaCardActions'
 
 /**
@@ -31,16 +32,17 @@ export function IdeaVoteButton({
    * `bar` draws the vote as one cell of `IdeaCardActions`, matching the three
    * disclosures beside it; `pill` is the standalone button for the pages that
    * are not a card in a list. Both carry the same state and the same names, so
-   * a vote reads the same wherever it is drawn.
+   * a vote reads the same wherever it is drawn. `chip` is the Ideas page card's
+   * count, the same shape as the comment and evidence counts beside it.
    */
-  layout?: 'pill' | 'bar'
+  layout?: 'pill' | 'bar' | 'chip'
 }) {
   const { voteCount, viewerHasVoted, pending, error } = control
 
   return (
     <span
       className={
-        layout === 'bar'
+        layout === 'bar' || layout === 'chip'
           ? 'flex min-w-0 flex-col items-stretch gap-1'
           : 'inline-flex flex-col items-start gap-1'
       }
@@ -51,17 +53,23 @@ export function IdeaVoteButton({
         disabled={pending}
         onClick={() => onToggle(ideaId)}
         className={
-          layout === 'bar'
-            ? `flex flex-col items-center gap-1.5 rounded-lg px-2 py-2 text-[13px] font-bold tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60 ${
+          layout === 'chip'
+            ? `${COUNT_CHIP} disabled:cursor-not-allowed disabled:opacity-60 ${
                 viewerHasVoted
-                  ? 'bg-brand-50 text-brand-800 hover:bg-brand-100'
-                  : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'border-jade/40 bg-jade text-white hover:bg-pine'
+                  : 'border-gray-200 bg-white text-ink/80 hover:border-jade/30 hover:bg-mist/60 hover:text-ink'
               }`
-            : `inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60 ${
-                viewerHasVoted
-                  ? 'border-brand-300 bg-brand-50 text-brand-800'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`
+            : layout === 'bar'
+              ? `flex flex-col items-center gap-1.5 rounded-lg px-2 py-2 text-[13px] font-bold tracking-tight transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  viewerHasVoted
+                    ? 'bg-brand-50 text-brand-800 hover:bg-brand-100'
+                    : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                }`
+              : `inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  viewerHasVoted
+                    ? 'border-brand-300 bg-brand-50 text-brand-800'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`
         }
       >
         {pending && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
@@ -94,7 +102,7 @@ export function IdeaVoteButton({
               strokeWidth={2}
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`h-5 w-5 ${viewerHasVoted ? 'fill-current' : 'fill-none stroke-current'}`}
+              className={`${layout === 'chip' ? 'h-[22px] w-[22px]' : 'h-5 w-5'} ${viewerHasVoted ? 'fill-current' : 'fill-none stroke-current'}`}
             >
               <path d="M7 10.5v9H4.5A1.5 1.5 0 0 1 3 18V11.5a1.5 1.5 0 0 1 1.5-1.5H7Zm0 0 3.6-6.2a1.6 1.6 0 0 1 3 .6v3.1h4.2a2 2 0 0 1 1.97 2.4l-1.4 6.6a2 2 0 0 1-1.97 1.6H7" />
             </svg>

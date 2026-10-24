@@ -1,15 +1,16 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { readReturnTo } from '../../../lib/returnTo'
 import * as api from '../api/automationApi'
 import type { Idea } from '../../ideas/api/ideasApi'
-import { AdminAutomationPage } from '../../administration/pages/AdminAutomationPage'
 import { DeveloperQueuePage } from './DeveloperQueuePage'
 import { IdeaAutomationPanel } from './IdeaAutomationPanel'
 import { ImpactTab } from './ImpactTab'
 import { OpportunitiesPage } from './OpportunitiesPage'
 import { OpportunityPage } from './OpportunityPage'
+import { ProjectPage } from './ProjectPage'
 import { ProjectOverview } from './ProjectOverview'
 
 vi.mock('../api/automationApi')
@@ -70,6 +71,10 @@ function project(overrides: Partial<api.Project> = {}): api.Project {
 }
 
 beforeEach(() => {
+  // The opportunity page's header asks for the delivering project; none by default.
+  mocked.projectForOpportunityRequest.mockResolvedValue(null)
+  mocked.requirementsRequest.mockResolvedValue([])
+  mocked.solutionRequest.mockResolvedValue(null)
   mocked.opportunitiesRequest.mockResolvedValue([])
   mocked.developerQueueRequest.mockResolvedValue([])
   mocked.opportunityForIdeaRequest.mockResolvedValue(null)
@@ -155,6 +160,39 @@ describe('OpportunityPage', () => {
       </MemoryRouter>,
     )
   }
+
+  it('orders the steps as the work happens, and walks them with Previous and Next', async () => {
+    mocked.opportunityRequest.mockResolvedValue(opportunity())
+    // The Proposal tab reads the accepted proposal; none is needed to walk the steps.
+    mocked.proposalRequest.mockResolvedValue(null)
+    renderPage()
+
+    const tabs = await screen.findAllByRole('tab')
+    expect(tabs.map((tab) => tab.textContent)).toEqual([
+      '1Overview',
+      '2Proposal',
+      '3Requirements',
+      '4Solution',
+      '5Assignment',
+      '6Project',
+      'Activity',
+    ])
+    expect(screen.queryByRole('button', { name: /Previous:/ })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next: Proposal' }))
+    expect(screen.getByRole('tab', { name: 'Proposal' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Previous: Overview' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Next: Requirements' })).toBeInTheDocument()
+  })
+
+  it('keeps the edit form off the overview - it lives in the idea card menu', async () => {
+    mocked.opportunityRequest.mockResolvedValue(opportunity())
+    renderPage()
+
+    expect(await screen.findByText('The problem')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('form', { name: 'Edit opportunity' })).not.toBeInTheDocument()
+  })
 
   it('does not say whether an unavailable opportunity exists', async () => {
     mocked.opportunityRequest.mockResolvedValue(null)
@@ -274,6 +312,25 @@ describe('IdeaAutomationPanel', () => {
     expect(screen.queryByRole('button', { name: /create/i })).toBeNull()
   })
 
+  it('links to the opportunity and, once there is one, the project', async () => {
+    mocked.opportunityForIdeaRequest.mockResolvedValue(opportunity({ status: 'project_created' }))
+    mocked.traceabilityRequest.mockResolvedValue({ projectId: '9' } as never)
+    render(
+      <MemoryRouter>
+        <IdeaAutomationPanel idea={idea('READY_FOR_IMPLEMENTATION')} />
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('link', { name: 'View project' })).toHaveAttribute(
+      'href',
+      '/app/automation/projects/9',
+    )
+    expect(screen.getByRole('link', { name: 'View opportunity' })).toHaveAttribute(
+      'href',
+      '/app/automation/opportunities/7',
+    )
+  })
+
   it('links to the opportunity once one exists', async () => {
     mocked.opportunityForIdeaRequest.mockResolvedValue(opportunity())
     render(
@@ -291,6 +348,37 @@ describe('IdeaAutomationPanel', () => {
 })
 
 describe('project', () => {
+  it('opens UAT, deployment and impact only once the step before them has happened', async () => {
+    mocked.projectRequest.mockResolvedValue(
+      project({
+        progress: {
+          stages: [
+            { stage: 'development', state: 'done' },
+            { stage: 'testing', state: 'current' },
+            { stage: 'uat', state: 'pending' },
+            { stage: 'deployment', state: 'pending' },
+            { stage: 'impact', state: 'pending' },
+          ],
+          taskCompletionPercent: null,
+          tasksTotal: 0,
+          tasksDone: 0,
+          tasksBlocked: 0,
+        },
+      }),
+    )
+    render(
+      <MemoryRouter initialEntries={['/app/automation/projects/9']}>
+        <Routes>
+          <Route path="/app/automation/projects/:projectId" element={<ProjectPage />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('tab', { name: /UAT/ })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /Deployment/ })).toBeDisabled()
+    expect(screen.getByRole('tab', { name: /Testing/ })).toBeEnabled()
+  })
+
   it("explains why UAT is blocked in the server's words", async () => {
     mocked.moveProject.mockResolvedValue({
       success: false,
@@ -325,6 +413,52 @@ describe('project', () => {
     )
 
     expect(screen.queryByRole('button', { name: 'Submit for UAT' })).not.toBeInTheDocument()
+  })
+
+  it('sends a project in planning to its implementation plan, not to a start it cannot make', () => {
+    const openPlan = vi.fn()
+    render(
+      <MemoryRouter>
+        <ProjectOverview
+          project={project({ status: 'planning' })}
+          onChanged={() => undefined}
+          onOpenPlan={openPlan}
+        />
+      </MemoryRouter>,
+    )
+
+    expect(screen.queryByRole('button', { name: 'Start development' })).not.toBeInTheDocument()
+    expect(
+      screen.getByText(/Development starts when the delivery manager approves it/),
+    ).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Open the implementation plan' }))
+    expect(openPlan).toHaveBeenCalled()
+  })
+
+  it('opens the idea and the opportunity with a way back to the workspace', () => {
+    function WayBack() {
+      const back = readReturnTo(useLocation().state)
+      return <p>{back ? `${back.label} -> ${back.path}` : 'no way back'}</p>
+    }
+    render(
+      <MemoryRouter initialEntries={['/app/automation/workspace/9?tab=plan']}>
+        <Routes>
+          <Route
+            path="/app/automation/workspace/:projectId"
+            element={<ProjectOverview project={project()} onChanged={() => undefined} />}
+          />
+          <Route path="/app/ideas/:ideaId" element={<WayBack />} />
+          <Route path="/app/automation/opportunities/:id" element={<WayBack />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    fireEvent.click(screen.getByRole('link', { name: 'View original idea' }))
+
+    // Back to the same project, on the Overview tab where the link was.
+    expect(
+      screen.getByText('Back to your workspace -> /app/automation/workspace/9?tab=overview'),
+    ).toBeInTheDocument()
   })
 
   it('does not invent progress when there are no tasks', () => {
@@ -401,37 +535,5 @@ describe('ImpactTab', () => {
 
     await screen.findByText('No impact data yet.')
     expect(screen.queryByRole('form', { name: 'Record impact' })).not.toBeInTheDocument()
-  })
-})
-
-describe('console', () => {
-  it('lists opportunities and projects read-only, in words', async () => {
-    mocked.adminOpportunitiesRequest.mockResolvedValue([opportunity()])
-    mocked.adminProjectsRequest.mockResolvedValue([project()])
-    render(
-      <MemoryRouter>
-        <AdminAutomationPage />
-      </MemoryRouter>,
-    )
-
-    const opportunities = await screen.findByRole('table', { name: 'Automation opportunities' })
-    expect(within(opportunities).getByText('Ready for assignment')).toBeInTheDocument()
-    expect(within(opportunities).getByText('Organization idea')).toBeInTheDocument()
-    const projects = await screen.findByRole('table', { name: 'Automation projects' })
-    expect(within(projects).getByText('Testing')).toBeInTheDocument()
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
-  })
-
-  it('says plainly when there is nothing to inspect', async () => {
-    mocked.adminOpportunitiesRequest.mockResolvedValue([])
-    mocked.adminProjectsRequest.mockResolvedValue([])
-    render(
-      <MemoryRouter>
-        <AdminAutomationPage />
-      </MemoryRouter>,
-    )
-
-    expect(await screen.findByText('No automation opportunities.')).toBeInTheDocument()
-    expect(await screen.findByText('No projects.')).toBeInTheDocument()
   })
 })

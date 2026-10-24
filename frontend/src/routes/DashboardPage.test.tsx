@@ -10,6 +10,7 @@ import {
 } from '../features/organizations/api/organizationApi'
 import { logoutRequest, meRequest, refreshTokenRequest } from '../features/identity/auth/authApi'
 import { viewerCanReviewInRequest } from '../features/reviews/api/reviewsApi'
+import { dashboardCountsRequest } from '../features/dashboard/api/dashboardApi'
 import { AppLayout } from '../layouts/AppLayout'
 import { useOrganization } from '../features/organizations/context/useOrganization'
 import { DashboardPage } from './DashboardPage'
@@ -33,6 +34,9 @@ vi.mock('../features/ideas/api/ideasApi', async (importOriginal) => ({
       },
     }),
 }))
+vi.mock('../features/dashboard/api/dashboardApi', () => ({
+  dashboardCountsRequest: vi.fn(),
+}))
 vi.mock('../features/reviews/api/reviewsApi', () => ({
   viewerCanReviewInRequest: vi.fn(),
 }))
@@ -51,6 +55,9 @@ const mockedLogout = vi.mocked(logoutRequest)
 const mockedOrganizations = vi.mocked(organizationsRequest)
 const mockedCreateOrganization = vi.mocked(createOrganizationRequest)
 const mockedCanReview = vi.mocked(viewerCanReviewInRequest)
+const mockedCounts = vi.mocked(dashboardCountsRequest)
+
+const COUNTS = { ideas: 14, reviewQueue: 3, myIdeasInReview: 2, opportunities: 1, projects: 5 }
 
 const USER = {
   id: '1',
@@ -114,7 +121,7 @@ function OrganizationProbe({ label }: { label: string }) {
   )
 }
 
-function renderDashboard(path = '/app') {
+function renderDashboard(path: string | { pathname: string; state?: unknown } = '/app') {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <AuthProvider>
@@ -125,6 +132,9 @@ function renderDashboard(path = '/app') {
             <Route path="ideas" element={<OrganizationProbe label="Ideas page" />} />
             <Route path="ideas/new" element={<OrganizationProbe label="New idea page" />} />
             <Route path="reviews" element={<OrganizationProbe label="Reviews page" />} />
+            <Route path="ideas/:ideaId" element={<p>Idea page</p>} />
+            <Route path="ideas/:ideaId/proposal" element={<p>Proposal page</p>} />
+            <Route path="automation/workspace/:projectId" element={<p>Workspace page</p>} />
           </Route>
         </Routes>
       </AuthProvider>
@@ -147,6 +157,7 @@ describe('DashboardPage', () => {
     })
     mockedMe.mockResolvedValue(USER)
     mockedCanReview.mockResolvedValue(false)
+    mockedCounts.mockResolvedValue(COUNTS)
     mockedLogout.mockResolvedValue(undefined)
     mockedOrganizations.mockResolvedValue([MEMBERSHIP])
     mockedCreateOrganization.mockResolvedValue({
@@ -196,9 +207,9 @@ describe('DashboardPage', () => {
     await screen.findByText('Welcome back, Ada')
 
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/app')
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/app')
     expect(within(nav).getByRole('link', { name: 'Ideas' })).toHaveAttribute('href', '/app/ideas')
-    expect(await screen.findByRole('link', { name: /Put a problem forward/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /Existing ideas/ })).toHaveAttribute(
       'href',
       '/app/ideas',
     )
@@ -213,7 +224,7 @@ describe('DashboardPage', () => {
       'href',
       '/app/reviews',
     )
-    expect(await screen.findByRole('link', { name: /Review queue/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /Pending review/ })).toHaveAttribute(
       'href',
       '/app/reviews',
     )
@@ -221,16 +232,72 @@ describe('DashboardPage', () => {
 
   it('hides the review queue from non-reviewers', async () => {
     renderDashboard()
-    await screen.findByRole('link', { name: /Put a problem forward/ })
+    await screen.findByRole('link', { name: /Existing ideas/ })
     await waitFor(() => expect(mockedCanReview).toHaveBeenCalledWith('10'))
 
     expect(screen.queryByRole('link', { name: 'Reviews' })).not.toBeInTheDocument()
-    // The card is always there so Home has both; it says plainly when you cannot review.
-    expect(await screen.findByText(/You are not a reviewer there yet/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Put a problem forward/ })).toHaveAttribute(
+    // The card is always there; for somebody who cannot review it is about their own
+    // ideas in review, and it says plainly that they are not a reviewer.
+    expect(await screen.findByText(/You are not a reviewer in Acme Labs yet/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Pending review/ })).toHaveAttribute(
       'href',
       '/app/ideas',
     )
+    expect(await screen.findByText('of your ideas in review')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Existing ideas/ })).toHaveAttribute(
+      'href',
+      '/app/ideas',
+    )
+  })
+
+  it('leads each dashboard card to a real page', async () => {
+    renderDashboard()
+    await screen.findByText('Welcome back, Ada')
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Ideas & opportunities' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Approved ideas/ })).toHaveAttribute(
+      'href',
+      '/app/automation/opportunities',
+    )
+    expect(screen.getByRole('link', { name: /Follow implementation/ })).toHaveAttribute(
+      'href',
+      '/app/automation/projects',
+    )
+    expect(screen.getByRole('heading', { name: 'From idea to implementation' })).toBeInTheDocument()
+  })
+
+  it("shows each card's count for the active organization", async () => {
+    renderDashboard()
+    // Asked again once the switcher's organization is known; read the cards after that.
+    await waitFor(() => expect(mockedCounts).toHaveBeenLastCalledWith('10'))
+
+    const card = (name: RegExp) => within(screen.getByRole('link', { name }))
+    await waitFor(() => expect(card(/Existing ideas/).getByText('14')).toBeInTheDocument())
+    expect(card(/Existing ideas/).getByText('ideas you can read')).toBeInTheDocument()
+    expect(card(/Approved ideas/).getByText('1')).toBeInTheDocument()
+    expect(card(/Approved ideas/).getByText('approved idea')).toBeInTheDocument()
+    expect(card(/Follow implementation/).getByText('5')).toBeInTheDocument()
+    expect(card(/Follow implementation/).getByText('projects underway')).toBeInTheDocument()
+  })
+
+  it('shows a reviewer what is waiting for them', async () => {
+    mockedCanReview.mockResolvedValue(true)
+    renderDashboard()
+
+    const pending = await screen.findByRole('link', { name: /Pending review/ })
+    await waitFor(() => expect(pending).toHaveAttribute('href', '/app/reviews'))
+    expect(await within(pending).findByText('3')).toBeInTheDocument()
+    expect(within(pending).getByText('waiting for you')).toBeInTheDocument()
+  })
+
+  it('says a count is unavailable rather than showing a zero', async () => {
+    mockedCounts.mockRejectedValue(new TypeError('Failed to fetch'))
+    renderDashboard()
+
+    expect(await screen.findAllByText('Count unavailable right now')).toHaveLength(4)
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 
   it('offers a breadcrumb back to the workspace from app sub-pages only', async () => {
@@ -257,9 +324,68 @@ describe('DashboardPage', () => {
       name: 'Breadcrumb',
     })
     expect(within(breadcrumb).getByText('New idea')).toHaveAttribute('aria-current', 'page')
-    expect(within(breadcrumb).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/app')
+    // One step up, not home - and the Ideas crumb is the back control, not a second link.
+    const back = within(breadcrumb).getByRole('link', { name: 'Back to ideas' })
+    expect(back).toHaveAttribute('href', '/app/ideas')
+    expect(within(breadcrumb).queryByRole('link', { name: 'Ideas' })).not.toBeInTheDocument()
 
-    fireEvent.click(within(breadcrumb).getByRole('link', { name: 'Ideas' }))
+    fireEvent.click(back)
+    expect(await screen.findByText(/^Ideas page/)).toBeInTheDocument()
+  })
+
+  it('leads back to where the reader came from when the page was opened as a detour', async () => {
+    renderDashboard({
+      pathname: '/app/ideas/4',
+      state: {
+        returnTo: {
+          path: '/app/automation/workspace/9?tab=overview',
+          label: 'Back to your workspace',
+        },
+      },
+    })
+
+    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    const back = within(breadcrumb).getByRole('link', { name: 'Back to your workspace' })
+    expect(back).toHaveAttribute('href', '/app/automation/workspace/9?tab=overview')
+    expect(within(breadcrumb).queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
+
+    fireEvent.click(back)
+    expect(await screen.findByText('Workspace page')).toBeInTheDocument()
+  })
+
+  it('ignores a way back that leads off the platform, and goes up to Ideas instead', async () => {
+    renderDashboard({
+      pathname: '/app/ideas/4',
+      state: { returnTo: { path: 'https://evil.example/phish', label: 'Back to your workspace' } },
+    })
+
+    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(breadcrumb).getByRole('link', { name: 'Back to ideas' })).toHaveAttribute(
+      'href',
+      '/app/ideas',
+    )
+    expect(within(breadcrumb).queryByRole('link', { name: /evil|workspace/i })).toBeNull()
+  })
+
+  it("leads from an idea's proposal back to that idea", async () => {
+    renderDashboard('/app/ideas/4/proposal')
+
+    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    expect(within(breadcrumb).getByRole('link', { name: 'Back to idea' })).toHaveAttribute(
+      'href',
+      '/app/ideas/4',
+    )
+    expect(within(breadcrumb).getByRole('link', { name: 'Ideas' })).toHaveAttribute(
+      'href',
+      '/app/ideas',
+    )
+  })
+
+  it('leads from an idea back to Ideas, however the idea was opened', async () => {
+    renderDashboard('/app/ideas/4')
+
+    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
+    fireEvent.click(within(breadcrumb).getByRole('link', { name: 'Back to ideas' }))
     expect(await screen.findByText(/^Ideas page/)).toBeInTheDocument()
   })
 

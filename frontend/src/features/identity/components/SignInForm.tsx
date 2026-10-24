@@ -7,8 +7,10 @@ import { validateSignIn, hasErrors, type FieldErrors } from '../schemas/authVali
 import type { SignInFormValues } from '../types/auth'
 import { GoogleAuthButton } from './GoogleAuthButton'
 import { PasswordField } from './PasswordField'
-import { SpinnerIcon } from './icons'
+import { AuthHeading } from './AuthCardParts'
+import { LockIcon, MailIcon, SpinnerIcon } from './icons'
 import { TextField } from './TextField'
+import { primaryButtonClasses } from './fieldStyles'
 
 interface SignInFormProps {
   onSwitchToSignUp: () => void
@@ -89,10 +91,49 @@ export function SignInForm({
 
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Welcome back</h1>
-      <p className="mt-2 text-sm text-gray-500">Continue to your Automation Platform account.</p>
+      <AuthHeading title="Welcome back" subtitle="Sign in to continue" />
 
-      <div className="mt-7">
+      <form noValidate onSubmit={handleSubmit} aria-busy={isSubmitting} className="mt-7 space-y-5">
+        <TextField
+          id="signin-email"
+          label="Email"
+          type="email"
+          autoComplete="email"
+          value={values.email}
+          onChange={(value) => updateField('email', value)}
+          error={errors.email}
+          placeholder="Email address"
+          disabled={isSubmitting}
+          icon={<MailIcon className="h-5 w-5" />}
+          hideLabel
+        />
+
+        <PasswordField
+          id="signin-password"
+          label="Password"
+          autoComplete="current-password"
+          value={values.password}
+          onChange={(value) => updateField('password', value)}
+          error={errors.password}
+          placeholder="Password"
+          disabled={isSubmitting}
+          icon={<LockIcon className="h-5 w-5" />}
+          hideLabel
+        />
+
+        {authError && (
+          <p role="alert" className="rounded-xl bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
+            {authError}
+          </p>
+        )}
+
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClasses}>
+          {isSubmitting && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
+          <span>{isSubmitting ? 'Logging in…' : 'Login'}</span>
+        </button>
+      </form>
+
+      <div className="mt-5">
         <GoogleAuthButton
           disabled={isSubmitting || !googleSignIn.isConfigured}
           onClick={googleSignIn.trigger}
@@ -104,70 +145,21 @@ export function SignInForm({
         <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
       </div>
 
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-gray-200" />
-        <span className="text-xs font-medium uppercase tracking-wide text-gray-400">Or</span>
-        <div className="h-px flex-1 bg-gray-200" />
-      </div>
-
-      <form noValidate onSubmit={handleSubmit} aria-busy={isSubmitting} className="space-y-5">
-        <TextField
-          id="signin-email"
-          label="Email"
-          type="email"
-          autoComplete="email"
-          value={values.email}
-          onChange={(value) => updateField('email', value)}
-          error={errors.email}
-          placeholder="you@company.com"
-          disabled={isSubmitting}
-        />
-
-        <div>
-          <PasswordField
-            id="signin-password"
-            label="Password"
-            autoComplete="current-password"
-            value={values.password}
-            onChange={(value) => updateField('password', value)}
-            error={errors.password}
-            disabled={isSubmitting}
-          />
-          <div className="mt-2 text-right">
-            <button
-              type="button"
-              className="-my-3 py-3 text-sm font-medium text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
-              onClick={onForgotPassword}
-            >
-              Forgot password?
-            </button>
-          </div>
-        </div>
-
-        {authError && (
-          <p role="alert" className="rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
-            {authError}
-          </p>
-        )}
-
+      <p className="mt-6 text-center text-sm font-semibold text-sage">
         <button
-          type="submit"
-          disabled={isSubmitting}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-300 disabled:shadow-none"
+          type="button"
+          className="-my-3 py-3 hover:text-jade focus:outline-none focus-visible:underline"
+          onClick={onForgotPassword}
         >
-          {isSubmitting && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
-          <span>{isSubmitting ? 'Signing in…' : 'Sign In'}</span>
-        </button>
-      </form>
-
-      <p className="mt-6 text-center text-sm text-gray-500">
-        Don&apos;t have an account?{' '}
+          Forgot password?
+        </button>{' '}
+        <span className="font-bold text-ink">or</span>{' '}
         <button
           type="button"
           onClick={onSwitchToSignUp}
-          className="-my-3 inline-block py-3 font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+          className="-my-3 py-3 hover:text-jade focus:outline-none focus-visible:underline"
         >
-          Create account
+          Sign Up
         </button>
       </p>
     </div>

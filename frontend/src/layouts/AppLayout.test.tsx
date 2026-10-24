@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -79,6 +79,9 @@ function renderAt(path = '/app') {
           { path: 'reviews', element: <p>Reviews content</p> },
           { path: 'teams', element: <p>Teams content</p> },
           { path: 'messages', element: <p>Messages content</p> },
+          { path: 'admin', element: <p>Console content</p> },
+          { path: 'automation', element: <p>Automation content</p> },
+          { path: 'automation/projects', element: <p>Projects content</p> },
         ],
       },
     ],
@@ -111,11 +114,24 @@ describe('AppLayout', () => {
     expect(screen.getByRole('link', { name: 'Messages' })).toHaveAttribute('href', '/app/messages')
   })
 
-  it('still offers Reviews and Admin only when something says they apply', () => {
+  it('offers Reviews only when something says it applies, and the marketplace to everyone', () => {
     renderAt()
     expect(screen.queryByRole('link', { name: 'Reviews' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Marketplace' })).toHaveAttribute(
+      'href',
+      '/app/marketplace',
+    )
 
+    vi.mocked(useCanReview).mockReturnValue(true)
+    renderAt()
+    expect(screen.getAllByRole('link', { name: 'Reviews' })[0]).toHaveAttribute(
+      'href',
+      '/app/reviews',
+    )
+  })
+
+  it('shows an administrator the console alone', async () => {
     vi.mocked(useCanReview).mockReturnValue(true)
     vi.mocked(useAdminCapabilities).mockReturnValue({
       status: 'ready',
@@ -124,8 +140,11 @@ describe('AppLayout', () => {
     })
     renderAt()
 
-    expect(screen.getByRole('link', { name: 'Reviews' })).toHaveAttribute('href', '/app/reviews')
-    expect(screen.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/app/admin')
+    // Their home is the console: /app goes straight there.
+    expect(await screen.findByText('Console content')).toBeInTheDocument()
+    const main = within(screen.getByRole('navigation', { name: 'Main' }))
+    expect(main.getAllByRole('link').map((link) => link.textContent)).toEqual(['Admin'])
+    expect(main.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/app/admin')
   })
 
   it('says how many conversations are unread, and asks the server for it once', async () => {
@@ -164,7 +183,7 @@ describe('AppLayout', () => {
     // Scoped to the main bar: the breadcrumb above the content links to
     // "Workspace" too, and that is a second, deliberate way back.
     const nav = screen.getByRole('navigation', { name: 'Main' })
-    expect(within(nav).getByRole('link', { name: 'Home' })).toHaveAttribute('href', '/app')
+    expect(within(nav).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('href', '/app')
     expect(within(nav).getByRole('link', { name: 'Ideas' })).toHaveAttribute('href', '/app/ideas')
   })
 
@@ -178,5 +197,62 @@ describe('AppLayout', () => {
     expect(
       within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Ideas' }),
     ).not.toHaveAttribute('aria-current')
+  })
+
+  it('groups the menu by the kind of work, with Implementation leading to projects', () => {
+    renderAt('/app')
+
+    const nav = within(screen.getByRole('navigation', { name: 'Main' }))
+    for (const section of ['Workspace', 'Collaboration', 'Review & delivery', 'Market']) {
+      expect(nav.getByText(section)).toBeInTheDocument()
+    }
+    expect(nav.getByRole('link', { name: 'Implementation' })).toHaveAttribute(
+      'href',
+      '/app/automation/projects',
+    )
+  })
+
+  it('marks Implementation, not Automation, on the projects page', () => {
+    renderAt('/app/automation/projects')
+
+    const nav = within(screen.getByRole('navigation', { name: 'Main' }))
+    expect(nav.getByRole('link', { name: 'Implementation' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(nav.getByRole('link', { name: 'Automation' }).className).not.toMatch(/font-semibold/)
+  })
+
+  it('sends a header search to the ideas list', async () => {
+    const router = renderAt('/app')
+
+    fireEvent.change(screen.getByLabelText('Search ideas'), { target: { value: ' water pumps ' } })
+    fireEvent.submit(screen.getByLabelText('Search ideas').closest('form')!)
+
+    expect(await screen.findByText('Ideas content')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/ideas')
+    expect(router.state.location.search).toBe('?search=water%20pumps')
+  })
+
+  it('puts the cursor in the search box on Ctrl+K', () => {
+    renderAt('/app')
+
+    fireEvent.keyDown(window, { key: 'k', ctrlKey: true })
+
+    expect(screen.getByLabelText('Search ideas')).toHaveFocus()
+  })
+
+  it('opens the menu as a drawer on small screens, and closes it on Escape', () => {
+    renderAt('/app')
+
+    const toggle = screen.getByRole('button', { name: 'Open navigation' })
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.getByRole('button', { name: 'Open navigation' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
   })
 })

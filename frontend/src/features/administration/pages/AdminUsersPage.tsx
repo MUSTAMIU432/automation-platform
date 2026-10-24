@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { Avatar } from '../../identity/components/Avatar'
 import { adminUsersRequest, type AdminUser } from '../api/administrationApi'
 import {
   AdminPageHeader,
@@ -16,6 +17,9 @@ import { SearchBox } from '../components/SearchBox'
 import { useAdminQuery } from '../hooks/useAdminQuery'
 import { useUrlFilters } from '../hooks/useUrlFilters'
 import { formatDay, formatDateTime, fullName } from '../utils/format'
+
+// Rows are centred vertically so the name and email line up with the photo.
+const rowCell = cellClasses.replace('align-top', 'align-middle')
 
 export function UserStatusBadges({ user }: { user: AdminUser }) {
   return (
@@ -102,11 +106,25 @@ export function AdminUsersPage() {
         <>
           <AdminTable
             label="Users"
-            columns={['Account', 'Status', 'Organizations and roles', 'Joined', 'Last active']}
+            columns={[
+              'Photo',
+              'Name',
+              'Email',
+              'Status',
+              'Organizations and roles',
+              'Joined',
+              'Last active',
+            ]}
           >
             {data.items.map((user) => (
-              <tr key={user.id}>
-                <td className={cellClasses}>
+              <tr key={user.id} className="hover:bg-slate-50">
+                <td className={`${rowCell} w-14`}>
+                  <Avatar
+                    user={user}
+                    className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-600 text-xs font-bold text-white ring-2 ring-white"
+                  />
+                </td>
+                <td className={`${rowCell} whitespace-nowrap`}>
                   <Link
                     to={`/app/admin/users/${user.id}`}
                     state={filters.here}
@@ -114,12 +132,19 @@ export function AdminUsersPage() {
                   >
                     {fullName(user)}
                   </Link>
-                  <p className="text-xs text-slate-500">{user.email}</p>
                 </td>
-                <td className={cellClasses}>
+                <td className={rowCell}>
+                  <a
+                    href={`mailto:${user.email}`}
+                    className="break-all text-slate-600 hover:text-slate-900 hover:underline"
+                  >
+                    {user.email}
+                  </a>
+                </td>
+                <td className={rowCell}>
                   <UserStatusBadges user={user} />
                 </td>
-                <td className={cellClasses}>
+                <td className={rowCell}>
                   {user.memberships.length === 0 ? (
                     <span className="text-slate-400">None</span>
                   ) : (
@@ -135,8 +160,8 @@ export function AdminUsersPage() {
                     </ul>
                   )}
                 </td>
-                <td className={`${cellClasses} whitespace-nowrap`}>{formatDay(user.createdAt)}</td>
-                <td className={`${cellClasses} whitespace-nowrap`}>
+                <td className={`${rowCell} whitespace-nowrap`}>{formatDay(user.createdAt)}</td>
+                <td className={`${rowCell} whitespace-nowrap`}>
                   {formatDateTime(user.lastActiveAt)}
                 </td>
               </tr>

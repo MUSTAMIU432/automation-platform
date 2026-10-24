@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom'
 
 import { useAdminCapabilities } from '../features/administration/context/useAdminCapabilities'
+import { DevelopmentWorkSection } from '../features/automation/components/DevelopmentWork'
 import { MyWork } from '../features/reviews/components/MyWork'
 import {
   PlatformReviewWorkspace,
@@ -79,7 +80,10 @@ export function ReviewsPage() {
       </div>
 
       {tab === 'work' ? (
-        <MyWork />
+        <>
+          <DevelopmentWorkSection />
+          <MyWork />
+        </>
       ) : (
         <>
           <PlatformReviewWorkspace />

@@ -60,6 +60,7 @@ export function useIdeaDiscovery(filters: IdeaFilters, reloadToken: number): Ide
   const submissionContext = filters.submissionContext ?? null
   const visibility = filters.visibility ?? null
   const mine = filters.mine ?? null
+  const sort = filters.sort ?? null
   const offset = filters.offset ?? 0
   const limit = filters.limit
 
@@ -81,6 +82,7 @@ export function useIdeaDiscovery(filters: IdeaFilters, reloadToken: number): Ide
     submissionContext,
     visibility,
     mine,
+    sort,
     offset,
     limit,
     reloadToken,
@@ -102,6 +104,7 @@ export function useIdeaDiscovery(filters: IdeaFilters, reloadToken: number): Ide
       submissionContext,
       visibility,
       mine,
+      sort,
       offset,
       limit,
     })
@@ -123,7 +126,7 @@ export function useIdeaDiscovery(filters: IdeaFilters, reloadToken: number): Ide
     // query, go and ask again" after a write. It changes nothing about the
     // request, so the linter is right that the effect does not read it.
     // oxlint-disable-next-line react/exhaustive-effect-dependencies
-  }, [search, categoryId, status, submissionContext, visibility, mine, offset, limit, key])
+  }, [search, categoryId, status, submissionContext, visibility, mine, sort, offset, limit, key])
 
   const current = answer !== null && answer.key === key
   const failed = errorKey === key

@@ -274,7 +274,7 @@ export function PaperclipIcon({ size }: { size?: 'sm' | 'md' }) {
   )
 }
 
-function ReviewIcon({ size }: { size?: 'sm' | 'md' }) {
+export function ReviewIcon({ size }: { size?: 'sm' | 'md' }) {
   return (
     <CellIcon size={size}>
       {/*

@@ -1,17 +1,35 @@
 import {
   Fragment,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
+  type ComponentType,
   type CSSProperties,
+  type FormEvent,
   type RefObject,
 } from 'react'
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
+import {
+  BuildingIcon,
+  BulbIcon,
+  ChatIcon,
+  ChecklistIcon,
+  CloseIcon,
+  CodeIcon,
+  FlowIcon,
+  GridIcon,
+  MenuIcon,
+  SearchIcon,
+  StoreIcon,
+  UsersIcon,
+} from '../components/AppIcons'
 import { Logo } from '../components/Logo'
 import { AdminCapabilitiesProvider } from '../features/administration/context/AdminCapabilitiesProvider'
 import { useAdminCapabilities } from '../features/administration/context/useAdminCapabilities'
 import { useAuth } from '../features/identity/auth/AuthContext'
+import { readReturnTo } from '../lib/returnTo'
 import { UserMenu } from '../features/identity/components/UserMenu'
 import { OrganizationProvider } from '../features/organizations/context/OrganizationProvider'
 import { useOrganization } from '../features/organizations/context/useOrganization'
@@ -40,19 +58,25 @@ export function AppLayout() {
   )
 }
 
-function navLinkClass({ isActive }: { isActive: boolean }): string {
-  return `rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
+/** The administrator's one link, in the header (the console has its own sidebar). */
+function adminLinkClass({ isActive }: { isActive: boolean }): string {
+  return `rounded-xl px-3 py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${
     isActive
       ? 'bg-white text-brand-800 shadow-sm'
-      : 'text-brand-100 hover:bg-white/10 hover:text-white'
+      : 'text-white/85 hover:bg-white/10 hover:text-white'
   }`
 }
 
 interface Crumb {
   label: string
-  /** Where the crumb links to; the last crumb is the current page and has none. */
-  to?: string
+  /**
+   * Where the crumb links to; the last crumb is the current page and has none. A
+   * function builds the address from the page's own (the idea a proposal belongs to).
+   */
+  to?: string | ((match: RegExpMatchArray) => string)
 }
+
+const ideaOf = (match: RegExpMatchArray) => `/app/ideas/${match[1]}`
 
 /** The trail after "Workspace" for each `/app` sub-path. */
 /*
@@ -65,14 +89,21 @@ interface Crumb {
 */
 const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
   [/^\/app\/ideas\/new$/, [{ label: 'Ideas', to: '/app/ideas' }, { label: 'New idea' }]],
-  [/^\/app\/ideas\/[^/]+\/edit$/, [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Edit idea' }]],
   [
-    /^\/app\/ideas\/[^/]+\/report$/,
-    [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Review report' }],
+    /^\/app\/ideas\/([^/]+)\/edit$/,
+    [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Idea', to: ideaOf }, { label: 'Edit idea' }],
   ],
   [
-    /^\/app\/ideas\/[^/]+\/proposal$/,
-    [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Proposal' }],
+    /^\/app\/ideas\/([^/]+)\/report$/,
+    [
+      { label: 'Ideas', to: '/app/ideas' },
+      { label: 'Idea', to: ideaOf },
+      { label: 'Review report' },
+    ],
+  ],
+  [
+    /^\/app\/ideas\/([^/]+)\/proposal$/,
+    [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Idea', to: ideaOf }, { label: 'Proposal' }],
   ],
   [/^\/app\/ideas\/[^/]+$/, [{ label: 'Ideas', to: '/app/ideas' }, { label: 'Idea' }]],
   [/^\/app\/ideas$/, [{ label: 'Ideas' }]],
@@ -103,6 +134,11 @@ const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
   ],
   [/^\/app\/messages$/, [{ label: 'Messages' }]],
   [/^\/app\/notifications$/, [{ label: 'Notifications' }]],
+  [
+    /^\/app\/marketplace\/[^/]+$/,
+    [{ label: 'Marketplace', to: '/app/marketplace' }, { label: 'Idea' }],
+  ],
+  [/^\/app\/marketplace$/, [{ label: 'Marketplace' }]],
 ]
 
 const crumbLinkClass =
@@ -112,18 +148,46 @@ const crumbLinkClass =
  * "← Workspace / <page>" above every `/app` sub-page, so the way back to the
  * organization workspace sits right above the content, not only in the header.
  */
-function WorkspaceBreadcrumb() {
-  const { pathname } = useLocation()
+function WorkspaceBreadcrumb({
+  widthClass,
+  indentClass = '',
+}: {
+  widthClass: string
+  /** Lines the trail up with the content column when the sidebar is beside it. */
+  indentClass?: string
+}) {
+  const { pathname, state } = useLocation()
+  // A page opened as a detour - "View original idea" from a project, say - leads back to
+  // where the reader was rather than home.
+  const detour = readReturnTo(state)
   const normalized = pathname.replace(/\/+$/, '')
-  const trail = SECTION_TRAILS.find(([pattern]) => pattern.test(normalized))?.[1]
-  if (!trail) return null
+  const entry = SECTION_TRAILS.find(([pattern]) => pattern.test(normalized))
+  if (!entry) return null
+  const match = normalized.match(entry[0]) as RegExpMatchArray
+  const fullTrail = entry[1].map((crumb) => ({
+    label: crumb.label,
+    to: typeof crumb.to === 'function' ? crumb.to(match) : crumb.to,
+  }))
+  // Otherwise the way back is one step up - from an idea to Ideas, from a team to
+  // Teams - and only a section's own top page leads home. So the arrow goes where
+  // the reader expects however they arrived: a refresh, a notification, a bookmark.
+  const parent = [...fullTrail].reverse().find((crumb) => crumb.to)
+  const back =
+    detour ??
+    (parent?.to ? { path: parent.to, label: `Back to ${parent.label.toLowerCase()}` } : null)
+  // A crumb the back control already leads to is left out: "Back to ideas / Ideas"
+  // would name one page twice, and the plain crumb would drop the filters the back
+  // control returns to.
+  const backPathname = back?.path.split('?')[0]
+  const trail = fullTrail.filter((crumb) => !crumb.to || crumb.to !== backPathname)
 
   return (
-    <nav aria-label="Breadcrumb" className="mx-auto max-w-[96rem] pt-6 pb-2">
+    <nav aria-label="Breadcrumb" className={`mx-auto ${widthClass} ${indentClass} pt-5 pb-2`}>
       <ol className="flex items-center gap-2 text-sm">
         <li>
           <Link
-            to="/app"
+            to={back?.path ?? '/app'}
+            state={back?.state}
             className="group inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-white px-3 py-1.5 font-semibold text-brand-700 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
           >
             <svg
@@ -138,7 +202,7 @@ function WorkspaceBreadcrumb() {
             >
               <path d="M12.5 15 7.5 10l5-5" />
             </svg>
-            Home
+            {back?.label ?? 'Home'}
           </Link>
         </li>
         {trail.map((crumb) => (
@@ -234,8 +298,174 @@ function NotificationBell() {
   )
 }
 
+interface SidebarItem {
+  to: string
+  label: string
+  Icon: ComponentType<{ className?: string }>
+  /** Exact match only (the dashboard), or a custom rule for a shared prefix. */
+  end?: boolean
+  isActive?: (pathname: string) => boolean
+  badge?: number
+  ariaLabel?: string
+}
+
+interface SidebarSection {
+  title: string
+  items: SidebarItem[]
+}
+
+function sidebarLinkClass(active: boolean): string {
+  return `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
+    active
+      ? 'bg-gradient-to-r from-mint/45 to-mint/15 font-semibold text-forest shadow-[inset_0_0_0_1px_rgba(11,143,101,0.15)]'
+      : 'text-ink/75 hover:bg-white/80 hover:text-forest'
+  }`
+}
+
+/**
+ * The signed-in app's navigation: what there is to do, grouped by the kind of
+ * work. Reviews is offered only to someone who can review (the server still
+ * authorizes the queue); everything else needs nothing but a session.
+ */
+function Sidebar({
+  sections,
+  pathname,
+  open,
+  onNavigate,
+}: {
+  sections: SidebarSection[]
+  pathname: string
+  open: boolean
+  onNavigate: () => void
+}) {
+  return (
+    <aside
+      id="app-sidebar"
+      className={`${
+        open
+          ? 'fixed inset-y-0 left-0 z-50 flex w-72 overflow-y-auto bg-white p-4 shadow-2xl'
+          : 'hidden'
+      } flex-col lg:sticky lg:top-[calc(var(--app-chrome-height)+1rem)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--app-chrome-height)-2rem)] lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-white lg:bg-white/70 lg:p-3 lg:shadow-[0_20px_50px_-30px_rgba(8,75,56,0.45)] lg:backdrop-blur-xl`}
+    >
+      <nav aria-label="Main" className="flex-1">
+        {sections.map((section, index) => (
+          <div key={section.title} className={index > 0 ? 'mt-4 border-t border-jade/10 pt-4' : ''}>
+            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sage">
+              {section.title}
+            </p>
+            <ul className="space-y-1">
+              {section.items.map(({ to, label, Icon, end, isActive, badge, ariaLabel }) => (
+                <li key={to}>
+                  <NavLink
+                    to={to}
+                    end={end}
+                    onClick={onNavigate}
+                    aria-label={ariaLabel}
+                    className={({ isActive: routeActive }) =>
+                      sidebarLinkClass(isActive ? isActive(pathname) : routeActive)
+                    }
+                  >
+                    <Icon className="h-5 w-5 shrink-0" />
+                    <span className="flex-1">{label}</span>
+                    {badge !== undefined && badge > 0 && (
+                      <span
+                        aria-hidden="true"
+                        className="min-w-[1.25rem] rounded-full bg-amber-400 px-1.5 text-center text-[11px] font-bold text-amber-950 tabular-nums"
+                      >
+                        {badge > 99 ? '99+' : badge}
+                      </span>
+                    )}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </nav>
+
+      {/* The platform's promise, as a quiet card at the foot of the menu. */}
+      <div className="relative mt-4 hidden overflow-hidden rounded-2xl bg-gradient-to-br from-jade via-pine to-forest p-4 text-white lg:block">
+        <span
+          aria-hidden="true"
+          className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.8),rgba(85,230,176,0.45)_35%,rgba(11,143,101,0.2)_70%)]"
+        />
+        <svg
+          aria-hidden="true"
+          viewBox="0 0 200 80"
+          className="absolute inset-x-0 bottom-0 h-16 w-full text-mint/40"
+          fill="none"
+          preserveAspectRatio="none"
+        >
+          <path d="M0 60 C 50 30, 90 80, 140 50 S 200 40, 200 40" stroke="currentColor" />
+          <path d="M0 70 C 60 45, 100 90, 150 62 S 200 55, 200 55" stroke="currentColor" />
+        </svg>
+        <p className="relative text-base font-semibold leading-snug">
+          Turning Ideas into Real Solutions
+        </p>
+        <span aria-hidden="true" className="relative mt-3 block h-0.5 w-8 rounded-full bg-mint" />
+      </div>
+    </aside>
+  )
+}
+
+/**
+ * The header's search box: looks for ideas, on the ideas page (`?search=`,
+ * which `IdeasWorkspace` reads). Ctrl+K (⌘K on a Mac) puts the cursor in it
+ * from anywhere in the app.
+ */
+function HeaderSearch() {
+  const navigate = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const term = query.trim()
+    navigate(term ? `/app/ideas?search=${encodeURIComponent(term)}` : '/app/ideas')
+  }
+
+  return (
+    <search className="relative hidden min-w-0 flex-1 md:block md:max-w-md lg:max-w-lg">
+      <form onSubmit={handleSubmit}>
+        <label htmlFor="app-search" className="sr-only">
+          Search ideas
+        </label>
+        <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/60" />
+        <input
+          ref={inputRef}
+          id="app-search"
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search ideas…"
+          className="h-11 w-full rounded-xl border border-white/20 bg-white/10 pl-10 pr-20 text-sm text-white placeholder:text-white/55 focus:border-white/40 focus:bg-white/15 focus:outline-none focus:ring-2 focus:ring-mint/40"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 gap-1 text-[11px] font-semibold text-white/60"
+        >
+          <kbd className="rounded-md border border-white/25 px-1.5 py-0.5 font-sans">Ctrl</kbd>
+          <kbd className="rounded-md border border-white/25 px-1.5 py-0.5 font-sans">K</kbd>
+        </span>
+      </form>
+    </search>
+  )
+}
+
 function AppShell() {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   const { user, logout } = useAuth()
   const { activeOrganization } = useOrganization()
   // Offered, not granted: the queue is authorized by the server.
@@ -243,12 +473,82 @@ function AppShell() {
   // Offered, not granted, like the Reviews link: every console request is
   // authorized by the server.
   const { capabilities: adminCapabilities } = useAdminCapabilities()
+  const isAdmin = adminCapabilities.canAccessConsole
   // The same "the server's number, asked once" bargain as the notifications
-  // bell, for the same reason: this bar renders on every authenticated page.
+  // bell, for the same reason: this menu renders on every authenticated page.
   const unreadThreads = useUnreadMessageThreads()
   const chromeRef = useRef<HTMLDivElement>(null)
-
   const chromeHeight = useElementHeight(chromeRef)
+  const [menuOpen, setMenuOpen] = useState(false)
+
+  /*
+    A platform administrator works in the console, which has its own sidebar: the
+    everyday menu is for the people who use the platform, so an administrator sees
+    the console alone, at the full width of the window.
+  */
+  const showSidebar = !isAdmin
+  /*
+    Every page takes the whole width of the window - the menu on the left, the page
+    beside it - and the header and breadcrumb stretch with it, so their edges stay in
+    line with the content on any screen.
+  */
+  const widthClass = 'max-w-none'
+
+  useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [menuOpen])
+
+  const sections: SidebarSection[] = [
+    {
+      title: 'Workspace',
+      items: [
+        { to: '/app', label: 'Dashboard', Icon: GridIcon, end: true },
+        { to: '/app/ideas', label: 'Ideas', Icon: BulbIcon },
+        {
+          to: '/app/automation',
+          label: 'Automation',
+          Icon: FlowIcon,
+          // Projects have their own entry below, under Implementation.
+          isActive: (path) =>
+            /^\/app\/automation(\/|$)/.test(path) && !/^\/app\/automation\/projects/.test(path),
+        },
+      ],
+    },
+    {
+      title: 'Collaboration',
+      items: [
+        { to: '/app/organizations', label: 'Organizations', Icon: BuildingIcon },
+        { to: '/app/teams', label: 'Teams', Icon: UsersIcon },
+        {
+          to: '/app/messages',
+          label: 'Messages',
+          Icon: ChatIcon,
+          badge: unreadThreads,
+          ariaLabel: unreadThreads === 0 ? 'Messages' : `Messages, ${unreadThreads} unread`,
+        },
+      ],
+    },
+    {
+      title: 'Review & delivery',
+      items: [
+        ...(canReview || adminCapabilities.canReviewPlatformSubmissions
+          ? [{ to: '/app/reviews', label: 'Reviews', Icon: ChecklistIcon }]
+          : []),
+        { to: '/app/automation/projects', label: 'Implementation', Icon: CodeIcon },
+      ],
+    },
+    {
+      // A section of its own: buying ideas the platform publishes is not part of the
+      // reader's own workspace.
+      title: 'Market',
+      items: [{ to: '/app/marketplace', label: 'Marketplace', Icon: StoreIcon }],
+    },
+  ]
 
   function handleLogout() {
     void logout()
@@ -257,95 +557,106 @@ function AppShell() {
 
   return (
     <div
-      className="min-h-screen bg-slate-50"
+      className="relative min-h-screen bg-slate-50"
       // Read by pages that pin their own intro under the chrome, e.g.
       // `sticky top-[var(--app-chrome-height)]` on `/app/ideas/new`.
       style={{ '--app-chrome-height': `${chromeHeight}px` } as CSSProperties}
     >
+      {/* A wash of mint light behind the whole app. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_85%_0%,rgba(85,230,176,0.18),transparent_45%),radial-gradient(ellipse_at_0%_100%,rgba(11,143,101,0.08),transparent_40%)]"
+      />
+
       {/*
-       * The bar and <main> share one centered width (`max-w-[96rem]`) and the same
-       * gutters, so the bar's edges line up with the page content at any
-       * screen size. The breadcrumb is pinned with the bar: the way back stays
-       * in reach however far down the page the reader is.
+       * The header and the content share one centered width, so the bar's edges
+       * line up with the page at any screen size. The breadcrumb is pinned with
+       * the bar: the way back stays in reach however far down the page the
+       * reader is.
        */}
-      <div ref={chromeRef} className="sticky top-0 z-30 bg-slate-50 px-4 pt-3 sm:px-6 lg:px-8">
-        <header className="mx-auto flex max-w-[96rem] flex-wrap items-center justify-between gap-x-4 gap-y-3 bg-gradient-to-r from-brand-800 via-brand-700 to-brand-600 px-4 py-3 shadow-lg shadow-brand-900/20 ring-1 ring-white/10 sm:px-5">
-          {/* Brand alone on the left; navigation, organization and account grouped on the right. */}
-          <Link
-            to="/app"
-            aria-label="MUSTANET home"
-            className="shrink-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-          >
-            <Logo />
-          </Link>
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-3 sm:gap-x-6">
-            <nav aria-label="Main" className="flex min-w-0 items-center gap-1 overflow-x-auto">
-              <NavLink to="/app" end className={navLinkClass}>
-                Home
-              </NavLink>
-              <NavLink to="/app/ideas" className={navLinkClass}>
-                Ideas
-              </NavLink>
-              {(canReview || adminCapabilities.canReviewPlatformSubmissions) && (
-                <NavLink to="/app/reviews" className={navLinkClass}>
-                  Reviews
-                </NavLink>
-              )}
-              {/*
-                Teams and Messages are always offered, unlike Reviews and Admin.
-                Both are gated by nothing but a session: a team is a
-                collaboration boundary rather than a tenant, and a private
-                message belongs to its participants - so there is no
-                organization permission that could decide whether to show them,
-                and a reader with no organization at all is exactly the reader
-                the Teams link exists for.
-              */}
-              <NavLink to="/app/automation" className={navLinkClass}>
-                Automation
-              </NavLink>
-              <NavLink to="/app/organizations" className={navLinkClass}>
-                Organizations
-              </NavLink>
-              <NavLink to="/app/teams" className={navLinkClass}>
-                Teams
-              </NavLink>
-              <NavLink
-                to="/app/messages"
-                className={navLinkClass}
-                aria-label={unreadThreads === 0 ? 'Messages' : `Messages, ${unreadThreads} unread`}
+      <div
+        ref={chromeRef}
+        className="sticky top-0 z-30 bg-slate-50/80 px-3 pt-3 backdrop-blur-xl sm:px-4 lg:px-6"
+      >
+        <header
+          className={`mx-auto flex ${widthClass} items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-forest via-pine to-jade px-3 py-2.5 shadow-[0_18px_40px_-20px_rgba(6,47,37,0.8)] ring-1 ring-white/10 sm:gap-4 sm:px-5`}
+        >
+          <div className="flex shrink-0 items-center gap-2">
+            {showSidebar && (
+              <button
+                type="button"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70 lg:hidden"
+                aria-expanded={menuOpen}
+                aria-controls="app-sidebar"
+                aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+                onClick={() => setMenuOpen((open) => !open)}
               >
-                <span className="flex items-center gap-1.5">
-                  Messages
-                  {unreadThreads > 0 && (
-                    <span
-                      aria-hidden="true"
-                      className="min-w-[1.1rem] rounded-full bg-amber-400 px-1 text-center text-[10px] font-bold text-amber-950 tabular-nums"
-                    >
-                      {unreadThreads > 99 ? '99+' : unreadThreads}
-                    </span>
-                  )}
-                </span>
-              </NavLink>
-              {adminCapabilities.canAccessConsole && (
-                <NavLink to="/app/admin" className={navLinkClass}>
+                {menuOpen ? <CloseIcon /> : <MenuIcon />}
+              </button>
+            )}
+            <Link
+              to="/app"
+              aria-label="MUSTANET home"
+              className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+            >
+              <Logo tagline="Ideas into real solutions" />
+            </Link>
+          </div>
+
+          {showSidebar && <HeaderSearch />}
+
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            {isAdmin && (
+              <nav aria-label="Main" className="flex items-center">
+                <NavLink to="/app/admin" className={adminLinkClass}>
                   Admin
                 </NavLink>
-              )}
-            </nav>
-            <div className="flex min-w-0 items-center gap-3 sm:border-l sm:border-white/20 sm:pl-6">
-              <NotificationBell />
-              <UserMenu user={user} onSignOut={handleLogout} />
-            </div>
+              </nav>
+            )}
+            <NotificationBell />
+            <UserMenu
+              user={user}
+              onSignOut={handleLogout}
+              showActivity={adminCapabilities.canAccessConsole}
+            />
           </div>
         </header>
-        <WorkspaceBreadcrumb />
+        <WorkspaceBreadcrumb
+          widthClass={widthClass}
+          indentClass={showSidebar ? 'lg:pl-[17.5rem]' : ''}
+        />
       </div>
 
-      <main className="px-4 pt-8 pb-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[96rem]">
-          <Outlet />
-        </div>
-      </main>
+      {menuOpen && (
+        <button
+          type="button"
+          aria-label="Close navigation"
+          tabIndex={-1}
+          className="fixed inset-0 z-40 bg-forest/40 backdrop-blur-sm lg:hidden"
+          onClick={() => setMenuOpen(false)}
+        />
+      )}
+
+      <div
+        className={`relative mx-auto flex ${widthClass} gap-6 px-3 pb-10 pt-4 sm:px-4 lg:box-content lg:px-6`}
+      >
+        {showSidebar && (
+          <Sidebar
+            sections={sections}
+            pathname={pathname}
+            open={menuOpen}
+            onNavigate={() => setMenuOpen(false)}
+          />
+        )}
+        <main className="min-w-0 flex-1 pt-2">
+          {/* An administrator's home is the console. */}
+          {isAdmin && pathname.replace(/\/+$/, '') === '/app' ? (
+            <Navigate to="/app/admin" replace />
+          ) : (
+            <Outlet />
+          )}
+        </main>
+      </div>
     </div>
   )
 }

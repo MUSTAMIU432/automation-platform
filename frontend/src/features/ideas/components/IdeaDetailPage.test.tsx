@@ -223,7 +223,68 @@ describe('IdeaDetailPage', () => {
     )
     renderPage()
 
-    expect(await screen.findByText('Status')).toBeInTheDocument()
+    // The state in the header, and what it means in the journey beneath it.
+    expect(await screen.findByRole('region', { name: "Your idea's journey" })).toBeInTheDocument()
     await waitFor(() => expect(screen.getAllByText('Under review').length).toBeGreaterThan(0))
+  })
+
+  it('keeps the review report and the link to the idea in its menu', async () => {
+    vi.mocked(ideaRequest).mockResolvedValue(
+      makeIdea({ id: '1', title: 'Automate the invoice run' }),
+    )
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'More about this idea' }))
+
+    expect(screen.getByRole('menuitem', { name: 'Review report' })).toHaveAttribute(
+      'href',
+      '/app/ideas/1/report',
+    )
+    expect(screen.getByRole('menuitem', { name: 'Copy link' })).toBeInTheDocument()
+  })
+
+  it('says how far along the way the idea has come', async () => {
+    const idea = makeIdea({
+      id: '1',
+      title: 'Automate the invoice run',
+      status: 'UNDER_REVIEW',
+      submissionContext: 'INDIVIDUAL',
+    })
+    vi.mocked(ideaRequest).mockResolvedValue({
+      ...idea,
+      state: { ...idea.state, stageIndex: 2, stageCount: 4 },
+    })
+    renderPage()
+
+    expect(await screen.findByText('Stage 2 of 4')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: "Your idea's journey" })).toHaveTextContent(
+      'Under review (where it is now)',
+    )
+  })
+
+  it('shows the journey and the project details, not the discussion or the review', async () => {
+    vi.mocked(ideaRequest).mockResolvedValue(
+      makeIdea({ id: '1', title: 'Automate the invoice run', status: 'SUBMITTED' }),
+    )
+    renderPage()
+
+    expect(await screen.findByRole('region', { name: "Your idea's journey" })).toBeInTheDocument()
+    const details = screen.getByRole('region', { name: 'Project details' })
+    expect(details).toHaveTextContent('Decision letter — sent to you when the review team decides.')
+    expect(details).toHaveTextContent('Automation delivery — starts once you give your go-ahead.')
+    expect(screen.queryByLabelText('Add a comment')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /Evidence/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /Review history/ })).not.toBeInTheDocument()
+  })
+
+  it('offers the evidence while changes are requested, for the answer', async () => {
+    vi.mocked(ideaRequest).mockResolvedValue(
+      makeIdea({ id: '1', title: 'Automate the invoice run', status: 'CHANGES_REQUESTED' }),
+    )
+    renderPage()
+
+    expect(
+      await screen.findByRole('region', { name: 'Evidence & attachments' }),
+    ).toBeInTheDocument()
   })
 })

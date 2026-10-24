@@ -8,10 +8,13 @@ import { Avatar } from './Avatar'
 interface UserMenuProps {
   user: AuthUser | null
   onSignOut: () => void
+  /** Platform administrators also get the console's Activity page, right under Profile. */
+  showActivity?: boolean
 }
 
-const ACCOUNT_LINKS = [
-  { to: '/app/settings/profile', label: 'Profile' },
+const PROFILE_LINK = { to: '/app/settings/profile', label: 'Profile' }
+const ACTIVITY_LINK = { to: '/app/admin/activity', label: 'Activity' }
+const SETTINGS_LINKS = [
   { to: '/app/settings/security', label: 'Security' },
   { to: '/app/settings/password', label: 'Change password' },
 ]
@@ -27,12 +30,13 @@ function displayName(user: AuthUser | null): string {
  * returns focus to the avatar so keyboard users are not dropped at the top of
  * the page.
  */
-export function UserMenu({ user, onSignOut }: UserMenuProps) {
+export function UserMenu({ user, onSignOut, showActivity = false }: UserMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const firstItemRef = useRef<HTMLAnchorElement>(null)
   const menuId = useId()
+  const links = [PROFILE_LINK, ...(showActivity ? [ACTIVITY_LINK] : []), ...SETTINGS_LINKS]
 
   useEffect(() => {
     if (!isOpen) return
@@ -94,7 +98,7 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
             </span>
           </div>
           <div className="p-1.5">
-            {ACCOUNT_LINKS.map((link, index) => (
+            {links.map((link, index) => (
               <Link
                 key={link.to}
                 ref={index === 0 ? firstItemRef : undefined}

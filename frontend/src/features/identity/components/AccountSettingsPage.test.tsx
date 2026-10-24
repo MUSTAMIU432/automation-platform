@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -44,7 +44,12 @@ function renderAt(path: string) {
 }
 
 describe('AccountSettingsPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // jsdom has no object URLs; the photo dialog previews the chosen file.
+    URL.createObjectURL = vi.fn(() => 'blob:preview')
+    URL.revokeObjectURL = vi.fn()
+  })
 
   it('saves the profile and updates the signed-in user', async () => {
     const saved = { id: '1', firstName: 'Grace' }
@@ -128,23 +133,77 @@ describe('AccountSettingsPage', () => {
     expect(uploadAvatarMock).not.toHaveBeenCalled()
   })
 
-  it('uploads a valid photo and puts its address on the signed-in user', async () => {
+  function choosePhoto() {
+    const file = new File(['x'], 'me.png', { type: 'image/png' })
+    fireEvent.change(screen.getByLabelText('Profile photo file'), {
+      target: { files: [file] },
+    })
+    return file
+  }
+
+  it('previews a valid photo in a dialog before uploading it', () => {
+    renderAt('/app/settings/profile')
+    choosePhoto()
+
+    const dialog = screen.getByRole('dialog', { name: 'Your new profile photo' })
+    expect(within(dialog).getByRole('img')).toHaveAttribute('src', 'blob:preview')
+    expect(within(dialog).getByText(/me\.png/)).toBeInTheDocument()
+    expect(uploadAvatarMock).not.toHaveBeenCalled()
+  })
+
+  it('uploads the previewed photo, puts its address on the user and shows it', async () => {
     uploadAvatarMock.mockResolvedValue({
       success: true,
       message: 'Your photo has been updated.',
       avatarUrl: '/users/1/avatar/?v=abc',
     })
     renderAt('/app/settings/profile')
+    const file = choosePhoto()
 
-    const file = new File(['x'], 'me.png', { type: 'image/png' })
-    fireEvent.change(screen.getByLabelText('Profile photo file'), {
-      target: { files: [file] },
-    })
+    fireEvent.click(screen.getByRole('button', { name: 'Upload photo' }))
 
-    await waitFor(() =>
-      expect(updateUserMock).toHaveBeenCalledWith(
-        expect.objectContaining({ avatarUrl: '/users/1/avatar/?v=abc' }),
-      ),
+    const dialog = await screen.findByRole('dialog', { name: 'Profile photo updated' })
+    expect(uploadAvatarMock).toHaveBeenCalledWith(file)
+    expect(updateUserMock).toHaveBeenCalledWith(
+      expect.objectContaining({ avatarUrl: '/users/1/avatar/?v=abc' }),
     )
+    expect(within(dialog).getByAltText('Your new profile photo')).toBeInTheDocument()
+    expect(within(dialog).getByText('Your photo has been updated.')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows a refused upload inside the dialog so it can be retried', async () => {
+    uploadAvatarMock.mockResolvedValue({
+      success: false,
+      message: 'That file is not a usable image.',
+      avatarUrl: null,
+    })
+    renderAt('/app/settings/profile')
+    choosePhoto()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload photo' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'That file is not a usable image.',
+    )
+    expect(within(dialog).getByRole('button', { name: 'Try again' })).toBeEnabled()
+    expect(updateUserMock).not.toHaveBeenCalled()
+  })
+
+  it('closes the preview without uploading on Cancel or Escape', () => {
+    renderAt('/app/settings/profile')
+
+    choosePhoto()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    choosePhoto()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    expect(uploadAvatarMock).not.toHaveBeenCalled()
   })
 })

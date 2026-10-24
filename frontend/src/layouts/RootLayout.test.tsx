@@ -14,7 +14,7 @@ describe('RootLayout', () => {
       },
     ])
 
-    expect(screen.getByRole('banner')).toHaveTextContent('Automation Platform')
+    expect(screen.getByRole('banner')).toHaveTextContent('MUSTANET')
     expect(screen.getByRole('main')).toHaveTextContent('child content')
   })
 })

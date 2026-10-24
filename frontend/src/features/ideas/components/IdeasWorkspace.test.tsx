@@ -106,6 +106,8 @@ describe('IdeasWorkspace', () => {
       'mine',
       'offset',
       'search',
+      // An ordering: it arranges the rows the server allowed and narrows nothing.
+      'sort',
       'status',
       'submissionContext',
       'visibility',
@@ -332,7 +334,7 @@ describe('IdeasWorkspace', () => {
 
   // --- editing ------------------------------------------------------------
 
-  it('opens the draft in the guided form on its own page', async () => {
+  it('opens the draft in the guided form, in a dialog over the list', async () => {
     const router = createMemoryRouter(
       [
         { path: '/app/ideas', element: <IdeasWorkspace /> },
@@ -345,22 +347,20 @@ describe('IdeasWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }))
 
-    expect(await screen.findByText('Edit page')).toBeInTheDocument()
-    expect(router.state.location.pathname).toBe('/app/ideas/1/edit')
+    expect(await screen.findByRole('dialog', { name: 'Edit your draft' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/ideas')
   })
 
-  it('has no editor of its own beside the list', async () => {
+  it('edits only inside the dialog, never inline in the list', async () => {
     renderWithRouter(<IdeasWorkspace />)
     await screen.findByText('Automate the invoice run')
+    const list = screen.getByRole('list', { name: 'Ideas' })
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit draft' }))
 
-    expect(screen.queryByRole('heading', { name: 'Edit this draft' })).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('textbox', {
-        name: 'What problem would you like to solve?',
-      }),
-    ).toBeNull()
+    const dialog = await screen.findByRole('dialog', { name: 'Edit your draft' })
+    expect(within(list).queryByRole('textbox')).toBeNull()
+    expect(within(dialog).getAllByRole('textbox').length).toBeGreaterThan(0)
   })
 
   // --- submitting ---------------------------------------------------------

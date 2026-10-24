@@ -12,12 +12,20 @@ export interface Reviewer {
   id: string
   email: string
   name: string
+  firstName: string
+  lastName: string
+  /** Where the profile photo is served from (needs the bearer token), or null. */
+  avatarUrl: string | null
 }
 
 export interface ReviewTeamMember {
   id: string
   email: string
   name: string
+  firstName: string
+  lastName: string
+  /** Where the profile photo is served from (needs the bearer token), or null. */
+  avatarUrl: string | null
   isLead: boolean
 }
 
@@ -35,11 +43,11 @@ export interface Outcome {
   field: string | null
 }
 
-const TEAM = 'id name isActive leadId members { id email name isLead }'
+const TEAM = 'id name isActive leadId members { id email name firstName lastName avatarUrl isLead }'
 
 export async function reviewersRequest(): Promise<Reviewer[]> {
   const data = await graphqlClient.request<{ reviewers: Reviewer[] }>(
-    'query { reviewers { id email name } }',
+    'query { reviewers { id email name firstName lastName avatarUrl } }',
   )
   return data.reviewers
 }

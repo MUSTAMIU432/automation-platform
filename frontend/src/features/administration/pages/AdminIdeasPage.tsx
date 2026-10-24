@@ -81,8 +81,8 @@ export function AdminIdeasPage() {
   return (
     <>
       <AdminPageHeader
-        title="Ideas"
-        description="Problem submissions across every organization, in every lifecycle state."
+        title="Customer ideas"
+        description="Problem submissions customers have made across every organization, in every lifecycle state. The platform's own ideas are under Platform ideas."
       />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <SearchBox

@@ -583,3 +583,270 @@ export const recordImpact = action<'impact', Impact>(
   'projectId: $projectId, status: $status, values: $values',
   `impact { ${IMPACT} }`,
 )
+
+// --- implementation plan, stage approvals and the delivery manager's desk ---------------
+
+/** The developer's technical plan, approved by the delivery manager before implementation. */
+export interface ImplementationPlan {
+  id: string
+  projectId: string
+  approach: string
+  architecture: string
+  technology: string
+  integrations: string
+  environments: string
+  testingStrategy: string
+  risks: string
+  status: 'draft' | 'submitted' | 'changes_requested' | 'approved'
+  reviewFeedback: string
+  submittedByName: string | null
+  submittedAt: string | null
+  decidedByName: string | null
+  decidedAt: string | null
+  updatedAt: string
+  /** What the plan still needs before it can be submitted, in words. */
+  missing: string[]
+  canEdit: boolean
+  canSubmit: boolean
+  canDecide: boolean
+}
+
+export type PlanField =
+  | 'approach'
+  | 'architecture'
+  | 'technology'
+  | 'integrations'
+  | 'environments'
+  | 'testingStrategy'
+  | 'risks'
+
+/** The plan's sections, in reading order. */
+export const PLAN_SECTIONS: ReadonlyArray<{
+  key: PlanField
+  label: string
+  hint: string
+  required: boolean
+}> = [
+  {
+    key: 'approach',
+    label: 'Technical approach',
+    hint: 'How you will build what the proposal agreed, in brief.',
+    required: true,
+  },
+  {
+    key: 'architecture',
+    label: 'Architecture and components',
+    hint: 'The parts of the solution and how they fit together.',
+    required: true,
+  },
+  {
+    key: 'technology',
+    label: 'Technology stack',
+    hint: 'Languages, frameworks, services and tools.',
+    required: true,
+  },
+  {
+    key: 'integrations',
+    label: 'Integrations and data',
+    hint: 'Systems it connects to, and the data it reads and writes.',
+    required: false,
+  },
+  {
+    key: 'environments',
+    label: 'Environments and deployment',
+    hint: 'Where it runs, and how it reaches production.',
+    required: false,
+  },
+  {
+    key: 'testingStrategy',
+    label: 'Testing strategy',
+    hint: 'How it will be tested before acceptance.',
+    required: true,
+  },
+  {
+    key: 'risks',
+    label: 'Technical risks',
+    hint: 'What could go wrong technically, and how you will handle it.',
+    required: false,
+  },
+]
+
+export interface StageReport {
+  id: string
+  milestoneId: string
+  authorName: string
+  summary: string
+  decision: 'pending' | 'approved' | 'returned'
+  feedback: string
+  decidedByName: string | null
+  decidedAt: string | null
+  createdAt: string
+}
+
+/** One stage of the plan (a milestone) with its reports, newest first. */
+export interface Stage {
+  milestone: Milestone
+  reports: StageReport[]
+  canReport: boolean
+  canDecide: boolean
+  tasksTotal: number
+  tasksDone: number
+}
+
+export interface DeveloperOption {
+  id: string
+  name: string
+  email: string
+  activeProjects: number
+}
+
+export interface DeskProject {
+  project: Project
+  planStatus: ImplementationPlan['status']
+  stagesTotal: number
+  stagesApproved: number
+  stagesWaiting: number
+  /** Every stage of the project, in order, with its reports and task counts. */
+  stages: Stage[]
+}
+
+export interface DeliveryDesk {
+  canManage: boolean
+  toAssign: Opportunity[]
+  plans: Array<{ project: Project; plan: ImplementationPlan }>
+  stages: Array<{ project: Project; stage: Stage }>
+  projects: DeskProject[]
+  developers: DeveloperOption[]
+}
+
+const PLAN = `id projectId approach architecture technology integrations environments
+  testingStrategy risks status reviewFeedback submittedByName submittedAt decidedByName
+  decidedAt updatedAt missing canEdit canSubmit canDecide`
+const STAGE = `milestone { ${MILESTONE} } canReport canDecide tasksTotal tasksDone
+  reports { id milestoneId authorName summary decision feedback decidedByName decidedAt createdAt }`
+
+export const implementationPlanRequest = (projectId: string) =>
+  query<ImplementationPlan | null>(
+    'implementationPlan',
+    ID('projectId'),
+    'projectId: $projectId',
+    PLAN,
+    { projectId },
+  )
+export const projectStagesRequest = (projectId: string) =>
+  query<Stage[]>('projectStages', ID('projectId'), 'projectId: $projectId', STAGE, { projectId })
+export const deliveryDeskRequest = () =>
+  query<DeliveryDesk>(
+    'deliveryDesk',
+    '',
+    '',
+    `canManage toAssign { ${OPPORTUNITY} }
+     plans { project { ${PROJECT} } plan { ${PLAN} } }
+     stages { project { ${PROJECT} } stage { ${STAGE} } }
+     projects { project { ${PROJECT} } planStatus stagesTotal stagesApproved stagesWaiting
+       stages { ${STAGE} } }
+     developers { id name email activeProjects }`,
+  )
+
+export const assignDeveloper = action<'project', Project>(
+  'assignDeveloper',
+  `${ID('opportunityId')}, ${ID('developerId')}, $startDate: Date, $targetDate: Date`,
+  'opportunityId: $opportunityId, developerId: $developerId, startDate: $startDate, targetDate: $targetDate',
+  `project { ${PROJECT} }`,
+)
+export const updateImplementationPlan = action<'plan', ImplementationPlan>(
+  'updateImplementationPlan',
+  '$input: ImplementationPlanInput!',
+  'input: $input',
+  `plan { ${PLAN} }`,
+)
+export const submitImplementationPlan = action<'plan', ImplementationPlan>(
+  'submitImplementationPlan',
+  ID('projectId'),
+  'projectId: $projectId',
+  `plan { ${PLAN} }`,
+)
+export const approveImplementationPlan = action<'plan', ImplementationPlan>(
+  'approveImplementationPlan',
+  `${ID('projectId')}, $feedback: String`,
+  'projectId: $projectId, feedback: $feedback',
+  `plan { ${PLAN} }`,
+)
+export const returnImplementationPlan = action<'plan', ImplementationPlan>(
+  'returnImplementationPlan',
+  `${ID('projectId')}, $feedback: String!`,
+  'projectId: $projectId, feedback: $feedback',
+  `plan { ${PLAN} }`,
+)
+export const addStage = action<'stage', Stage>(
+  'addStage',
+  `${ID('projectId')}, $title: String!, $description: String, $dueDate: String`,
+  'projectId: $projectId, title: $title, description: $description, dueDate: $dueDate',
+  `stage { ${STAGE} }`,
+)
+export const removeStage = action<'stage', Stage>(
+  'removeStage',
+  ID('milestoneId'),
+  'milestoneId: $milestoneId',
+  `stage { ${STAGE} }`,
+)
+export const submitStage = action<'stage', Stage>(
+  'submitStage',
+  `${ID('milestoneId')}, $summary: String!`,
+  'milestoneId: $milestoneId, summary: $summary',
+  `stage { ${STAGE} }`,
+)
+export const approveStage = action<'stage', Stage>(
+  'approveStage',
+  `${ID('milestoneId')}, $feedback: String`,
+  'milestoneId: $milestoneId, feedback: $feedback',
+  `stage { ${STAGE} }`,
+)
+export const returnStage = action<'stage', Stage>(
+  'returnStage',
+  `${ID('milestoneId')}, $feedback: String!`,
+  'milestoneId: $milestoneId, feedback: $feedback',
+  `stage { ${STAGE} }`,
+)
+
+/** One project assigned to the caller, and the next step on it. */
+export interface DevelopmentWorkItem {
+  project: Project
+  planStatus: ImplementationPlan['status']
+  stagesTotal: number
+  stagesApproved: number
+  stagesWaiting: number
+  nextAction: string
+  /** The project tab where the next step is taken. */
+  nextTab: string
+  needsMe: boolean
+}
+
+export const myDevelopmentWorkRequest = () =>
+  query<DevelopmentWorkItem[]>(
+    'myDevelopmentWork',
+    '',
+    '',
+    `project { ${PROJECT} } planStatus stagesTotal stagesApproved stagesWaiting nextAction
+     nextTab needsMe`,
+  )
+
+/** Which parts of delivery the signed-in person takes part in. */
+export interface AutomationRoles {
+  isDeveloper: boolean
+  isDeliveryManager: boolean
+  isReviewer: boolean
+}
+
+/** An open task on one of the caller's projects. */
+export interface MyTask {
+  task: Task
+  projectId: string
+  projectTitle: string
+  stageTitle: string | null
+}
+
+export const myAutomationRolesRequest = () =>
+  query<AutomationRoles>('myAutomationRoles', '', '', 'isDeveloper isDeliveryManager isReviewer')
+export const myTasksRequest = () =>
+  query<MyTask[]>('myTasks', '', '', `task { ${TASK} } projectId projectTitle stageTitle`)

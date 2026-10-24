@@ -157,6 +157,8 @@ export interface IdeaPage {
  * sending, because a GraphQL input that carries `undefined` is a document that
  * carries a field the server did not ask for.
  */
+export type IdeaSort = 'NEWEST' | 'OLDEST' | 'MOST_VOTED' | 'RECENTLY_UPDATED'
+
 export interface IdeaFilters {
   categoryId?: string | null
   status?: IdeaStatus | null
@@ -167,6 +169,8 @@ export interface IdeaFilters {
   visibility?: IdeaVisibility | null
   /** This reader's own ideas, and only theirs. */
   mine?: boolean | null
+  /** How the page is ordered; newest first when absent. Never narrows. */
+  sort?: IdeaSort | null
   offset?: number
   limit?: number
 }
@@ -314,6 +318,13 @@ export interface Idea extends IdeaProblemStory {
   voteCount: number
   viewerHasVoted: boolean
   /**
+   * The size of the discussion and of the supporting evidence - what opening
+   * the card's discussion and evidence would list. On the idea itself, like the
+   * vote count, so a page of cards needs no per-idea request.
+   */
+  commentCount: number
+  attachmentCount: number
+  /**
    * Review capabilities for *this viewer* (S3-003), computed by the server from
    * the Reviews domain's eligibility rule. Convenience, never a control: the
    * server asks again when a review is actually claimed.
@@ -395,6 +406,8 @@ export const IDEA_FIELDS = `
   discussionOpen
   voteCount
   viewerHasVoted
+  commentCount
+  attachmentCount
   viewerCanEdit
   viewerCanStartReview
   viewerCanStartOrganizationReview
@@ -718,12 +731,13 @@ function filterVariables(filters: IdeaFilters): Record<string, unknown> {
   if (filters.submissionContext) variables.submissionContext = filters.submissionContext
   if (filters.visibility) variables.visibility = filters.visibility
   if (filters.mine) variables.mine = true
+  if (filters.sort && filters.sort !== 'NEWEST') variables.sort = filters.sort
   if (filters.offset !== undefined) variables.offset = filters.offset
   if (filters.limit !== undefined) variables.limit = filters.limit
   return variables
 }
 
-/** One page of every idea the signed-in user may read, newest first. */
+/** One page of every idea the signed-in user may read, newest first unless `sort` says otherwise. */
 export async function ideasRequest(filters: IdeaFilters = {}): Promise<IdeaPage> {
   const data = await graphqlClient.request<{ ideas: IdeaPage }>(IDEAS_QUERY, {
     filters: filterVariables(filters),

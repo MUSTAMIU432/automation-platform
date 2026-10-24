@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 
+import { Link } from 'react-router-dom'
+
 import type { IdeaStatus } from '../../ideas/api/ideasApi'
 import { statusClasses, statusLabel } from '../../ideas/utils/lifecycle'
 import type { PageInfo } from '../api/administrationApi'
@@ -289,10 +291,8 @@ export type MetricTone = keyof typeof METRIC_TONES
  * each other, and a proportional digit makes two figures of the same length
  * different widths, which is exactly the comparison the row exists to support.
  *
- * Not a link. Every figure here is also reachable from the list it summarises,
- * and a card that navigates somewhere the reader did not ask to go is a card that
- * posts a wrong click - the count stays a fact, and the list stays the place to
- * act on it.
+ * With `to`, the whole card is a link to the list the figure summarises - the
+ * place to act on the number - and lifts on hover so it reads as one.
  */
 export function MetricCard({
   label,
@@ -300,23 +300,35 @@ export function MetricCard({
   hint,
   icon,
   tone = 'brand',
+  to,
 }: {
   label: string
   value: number | string
   hint?: string
   icon: ReactNode
   tone?: MetricTone
+  to?: string
 }) {
   const colors = METRIC_TONES[tone]
-  return (
-    <div className="flex flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+  const body = (
+    <>
       <div className={`flex h-16 items-center justify-center ${colors.band}`}>{icon}</div>
       <div className="px-4 py-3">
         <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">{label}</p>
         <p className={`mt-1 text-3xl font-bold tabular-nums ${colors.value}`}>{value}</p>
         {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
       </div>
-    </div>
+    </>
+  )
+  const card = 'flex flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200'
+  if (!to) return <div className={card}>{body}</div>
+  return (
+    <Link
+      to={to}
+      className={`${card} transition hover:-translate-y-0.5 hover:shadow-md hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500`}
+    >
+      {body}
+    </Link>
   )
 }
 
@@ -343,7 +355,7 @@ export const dangerButtonClasses =
   'rounded-lg bg-red-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50'
 
 export const controlClasses =
-  'h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-200 focus:outline-none'
+  'min-h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 shadow-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-200 focus:outline-none'
 
 export function Notice({ tone, children }: { tone: 'success' | 'error'; children: ReactNode }) {
   if (tone === 'error') {

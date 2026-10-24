@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { READ_ONLY_ADMIN, renderAdminPage } from '../../test/renderAdmin'
 import { AdminProposalsPage } from '../administration/pages/AdminProposalsPage'
-import type { IdeaProposal, ProposalProgress, ProposalState } from './api/proposalsApi'
+import type { IdeaProposal, ProposalProgress, ProposalState, SectionKey } from './api/proposalsApi'
 import { IdeaProposalPanel } from './components/IdeaProposalPanel'
 import { ProposalReadPage } from './components/ProposalReadPage'
 import { ProtectedView } from './components/ProtectedView'
@@ -22,6 +22,8 @@ vi.mock('./api/proposalsApi', async (importOriginal) => ({
   declineProposalRequest: vi.fn(),
   proposalAnswerRequest: vi.fn(async () => null),
   answerProposalRequest: vi.fn(),
+  draftProposalSectionRequest: vi.fn(),
+  downloadProposalPdfRequest: vi.fn(),
 }))
 
 const api = await import('./api/proposalsApi')
@@ -48,8 +50,11 @@ function proposal(overrides: Partial<IdeaProposal> = {}): IdeaProposal {
     financialRequirements: 'Hosting at 40 USD a month.',
     paymentRequired: 'no',
     paymentPlan: 'Should never show: there is no charge.',
+    plannedStart: null,
+    plannedEnd: null,
     status: 'released',
     reviewFeedback: '',
+    startedAt: '2026-09-20T09:00:00Z',
     submittedAt: null,
     decidedAt: null,
     updatedAt: '2026-10-01T00:00:00Z',
@@ -311,7 +316,7 @@ describe('IdeaProposalPanel', () => {
     panel()
 
     expect(await screen.findByRole('form', { name: 'Proposal' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Send to the admin' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Preview and send' })).toBeNull()
     expect(screen.getByText(/Only the team’s lead sends the proposal/)).toBeInTheDocument()
   })
 
@@ -335,6 +340,168 @@ describe('IdeaProposalPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand all' }))
     expect(screen.getByLabelText(/^Executive summary/)).toBeInTheDocument()
+  })
+
+  it('guides each section and counts the words written in it', async () => {
+    vi.mocked(api.proposalStateRequest).mockResolvedValue(
+      state({
+        viewerRole: 'writer',
+        canEdit: true,
+        proposal: proposal({ status: 'draft', feasibility: '' }),
+      }),
+    )
+    panel()
+
+    const field = await screen.findByLabelText(/^Feasibility/)
+    expect(field).toHaveAccessibleDescription('Whether this can be built, and what it depends on.')
+    const surface = within(field.parentElement as HTMLElement)
+    expect(surface.getByText('0 words')).toBeInTheDocument()
+
+    fireEvent.change(field, { target: { value: 'It can be built.' } })
+    expect(surface.getByText('4 words')).toBeInTheDocument()
+  })
+
+  describe('writing a section yourself, or generating it with AI', () => {
+    beforeEach(() => {
+      vi.clearAllMocks()
+      vi.mocked(api.proposalStateRequest).mockResolvedValue(
+        state({
+          viewerRole: 'writer',
+          canEdit: true,
+          proposal: proposal({ status: 'draft', feasibility: '' }),
+        }),
+      )
+    })
+
+    const drafted = (text: string) =>
+      vi.mocked(api.draftProposalSectionRequest).mockResolvedValue({
+        success: true,
+        message: 'Drafted.',
+        field: null,
+        text,
+      })
+
+    async function generateFeasibility(instructions = '') {
+      const modes = within(await screen.findByRole('group', { name: 'How to write Feasibility' }))
+      fireEvent.click(modes.getByRole('button', { name: 'Generate with AI' }))
+      if (instructions) {
+        fireEvent.change(screen.getByLabelText(/^Instructions for the AI/), {
+          target: { value: instructions },
+        })
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Generate Feasibility with AI' }))
+    }
+
+    it('starts in Write mode, with the writer’s own field', async () => {
+      panel()
+
+      const modes = within(await screen.findByRole('group', { name: 'How to write Feasibility' }))
+      expect(modes.getByRole('button', { name: 'Write' })).toHaveAttribute('aria-pressed', 'true')
+      expect(screen.getByLabelText(/^Feasibility/)).toBeInTheDocument()
+    })
+
+    it('shows the AI draft on its own, and uses it only when asked', async () => {
+      drafted('- It can be built with the bank export.')
+      panel()
+
+      fireEvent.change(await screen.findByLabelText(/^Feasibility/), {
+        target: { value: 'My own words.' },
+      })
+      await generateFeasibility('Be brief.')
+
+      const card = await screen.findByRole('region', { name: 'AI draft of Feasibility' })
+      expect(within(card).getByText('It can be built with the bank export.')).toBeInTheDocument()
+      expect(api.draftProposalSectionRequest).toHaveBeenCalledWith(
+        '3',
+        'feasibility',
+        expect.objectContaining({ feasibility: 'My own words.' }),
+        'Be brief.',
+      )
+      expect(api.updateProposalRequest).not.toHaveBeenCalled() // a draft is never saved
+
+      fireEvent.click(within(card).getByRole('button', { name: 'Replace my text with this' }))
+
+      const field = screen.getByLabelText(/^Feasibility/) // back in Write mode
+      expect(field).toHaveValue('- It can be built with the bank export.')
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+      expect(field).toHaveValue('My own words.')
+    })
+
+    it('adds the AI draft after the writer’s own text', async () => {
+      drafted('Second paragraph.')
+      panel()
+
+      fireEvent.change(await screen.findByLabelText(/^Feasibility/), {
+        target: { value: 'First paragraph.' },
+      })
+      await generateFeasibility()
+      fireEvent.click(await screen.findByRole('button', { name: 'Add to my text' }))
+
+      expect(screen.getByLabelText(/^Feasibility/)).toHaveValue(
+        'First paragraph.\n\nSecond paragraph.',
+      )
+    })
+
+    it('keeps the writer’s text when the draft is discarded', async () => {
+      drafted('Not wanted.')
+      panel()
+
+      fireEvent.change(await screen.findByLabelText(/^Feasibility/), {
+        target: { value: 'Mine.' },
+      })
+      await generateFeasibility()
+      fireEvent.click(await screen.findByRole('button', { name: 'Discard' }))
+      expect(screen.queryByRole('region', { name: 'AI draft of Feasibility' })).toBeNull()
+
+      fireEvent.click(
+        within(screen.getByRole('group', { name: 'How to write Feasibility' })).getByRole(
+          'button',
+          { name: 'Write' },
+        ),
+      )
+      expect(screen.getByLabelText(/^Feasibility/)).toHaveValue('Mine.')
+    })
+
+    it('shows the AI service’s refusal and changes nothing', async () => {
+      vi.mocked(api.draftProposalSectionRequest).mockResolvedValue({
+        success: false,
+        message: 'The AI service quota is used up for now. Please try again later.',
+        field: 'feasibility',
+        text: null,
+      })
+      panel()
+
+      await generateFeasibility()
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('quota is used up')
+      expect(screen.queryByRole('region', { name: 'AI draft of Feasibility' })).toBeNull()
+    })
+  })
+
+  it('sets the planned dates in the Schedule, and flags an end before the start', async () => {
+    vi.mocked(api.proposalStateRequest).mockResolvedValue(
+      state({ viewerRole: 'writer', canEdit: true, proposal: proposal({ status: 'draft' }) }),
+    )
+    vi.mocked(api.updateProposalRequest).mockResolvedValue(OK)
+    panel()
+
+    const schedule = within(await screen.findByRole('group', { name: 'Schedule' }))
+    fireEvent.change(schedule.getByLabelText('Planned start'), { target: { value: '2026-11-02' } })
+    fireEvent.change(schedule.getByLabelText('Planned end'), { target: { value: '2026-10-01' } })
+    expect(
+      schedule.getByText('The planned end date cannot be before the start date.'),
+    ).toBeInTheDocument()
+
+    fireEvent.change(schedule.getByLabelText('Planned end'), { target: { value: '2027-01-29' } })
+    expect(schedule.queryByText(/cannot be before/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+
+    await waitFor(() =>
+      expect(api.updateProposalRequest).toHaveBeenCalledWith(
+        '3',
+        expect.objectContaining({ plannedStart: '2026-11-02', plannedEnd: '2027-01-29' }),
+      ),
+    )
   })
 
   it('asks for the payment plan only once the team says the owner pays', async () => {
@@ -374,26 +541,166 @@ describe('IdeaProposalPanel', () => {
     )
   })
 
-  it('shows the lead the send button and reports a refusal', async () => {
-    vi.mocked(api.proposalStateRequest).mockResolvedValue(
-      state({
-        viewerRole: 'writer',
-        canEdit: true,
-        canSubmit: true,
-        proposal: proposal({ status: 'draft' }),
-      }),
-    )
-    vi.mocked(api.submitProposalRequest).mockResolvedValue({
-      success: false,
-      message: 'Fill in the timeline before sending it.',
-      field: 'estimated_timeline',
-      proposal: null,
+  describe('the preview before sending', () => {
+    // Calls only - the responses each test sets stay in place.
+    beforeEach(() => vi.clearAllMocks())
+
+    const COMPLETE = {
+      status: 'draft',
+      proposedSolution: 'A dashboard.',
+      requirementsSummary: 'Bank export.',
+      deliverables: 'Dashboard.',
+      milestones: 'Weeks 1-6.',
+      acceptanceCriteria: 'Finance stops re-typing.',
+    } as const
+
+    function lead(overrides: Partial<IdeaProposal> = {}) {
+      vi.mocked(api.proposalStateRequest).mockResolvedValue(
+        state({
+          viewerRole: 'writer',
+          canEdit: true,
+          canSubmit: true,
+          proposal: proposal({ ...COMPLETE, ...overrides }),
+        }),
+      )
+      panel()
+    }
+
+    async function openPreview() {
+      fireEvent.click(await screen.findByRole('button', { name: 'Preview and send' }))
+      return within(screen.getByRole('dialog', { name: 'Payments dashboard' }))
+    }
+
+    it('shows the whole proposal, and sends it only from the preview', async () => {
+      vi.mocked(api.submitProposalRequest).mockResolvedValue({
+        success: true,
+        message: 'Done.',
+        field: null,
+        proposal: null,
+      })
+      lead()
+
+      const preview = await openPreview()
+      expect(preview.getByText('Automate hostel payments')).toBeInTheDocument()
+      expect(preview.getByText('Team A')).toBeInTheDocument()
+      expect(preview.getByText('Finance stops re-typing.')).toBeInTheDocument()
+      expect(api.submitProposalRequest).not.toHaveBeenCalled()
+
+      fireEvent.click(preview.getByRole('button', { name: 'Send to the admin' }))
+
+      await waitFor(() => expect(api.submitProposalRequest).toHaveBeenCalledWith({ ideaId: '3' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     })
-    panel()
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Send to the admin' }))
+    it('reports a refusal inside the preview', async () => {
+      vi.mocked(api.submitProposalRequest).mockResolvedValue({
+        success: false,
+        message: 'Fill in the timeline before sending it.',
+        field: 'estimated_timeline',
+        proposal: null,
+      })
+      lead()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Fill in the timeline')
+      const preview = await openPreview()
+      fireEvent.click(preview.getByRole('button', { name: 'Send to the admin' }))
+
+      expect(await preview.findByRole('alert')).toHaveTextContent('Fill in the timeline')
+    })
+
+    it('lists what is still missing and will not send it', async () => {
+      lead({ acceptanceCriteria: '', deliverables: '' })
+
+      const preview = await openPreview()
+
+      expect(
+        preview.getByText(
+          '2 required sections are still to write: Deliverables, Acceptance criteria.',
+        ),
+      ).toBeInTheDocument()
+      // Each gap is marked where the section belongs in the document.
+      expect(preview.getAllByText(/^Not written yet/)).toHaveLength(2)
+      expect(preview.getByRole('button', { name: 'Send to the admin' })).toBeDisabled()
+    })
+
+    it('shows unsaved changes, and saves them before sending', async () => {
+      vi.mocked(api.updateProposalRequest).mockResolvedValue({
+        success: true,
+        message: 'Done.',
+        field: null,
+        proposal: null,
+      })
+      vi.mocked(api.submitProposalRequest).mockResolvedValue({
+        success: true,
+        message: 'Done.',
+        field: null,
+        proposal: null,
+      })
+      lead()
+
+      fireEvent.change(await screen.findByLabelText(/^Risks/), {
+        target: { value: '- The bank changes its export.\n- Finance is busy at year end.' },
+      })
+      const preview = await openPreview()
+
+      expect(preview.getByText(/Includes unsaved changes/)).toBeInTheDocument()
+      // Lines starting "- " read as a list.
+      expect(preview.getByText('The bank changes its export.').tagName).toBe('LI')
+      fireEvent.click(preview.getByRole('button', { name: 'Send to the admin' }))
+
+      await waitFor(() => expect(api.submitProposalRequest).toHaveBeenCalledWith({ ideaId: '3' }))
+      expect(api.updateProposalRequest).toHaveBeenCalledWith(
+        '3',
+        expect.objectContaining({ risks: expect.stringContaining('The bank changes') }),
+      )
+      expect(vi.mocked(api.updateProposalRequest).mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(api.submitProposalRequest).mock.invocationCallOrder[0],
+      )
+    })
+
+    it('does not send when saving the changes is refused', async () => {
+      vi.mocked(api.updateProposalRequest).mockResolvedValue({
+        success: false,
+        message: 'Title is required.',
+        field: 'title',
+        proposal: null,
+      })
+      lead()
+
+      fireEvent.change(await screen.findByLabelText(/^Risks/), { target: { value: 'One.' } })
+      const preview = await openPreview()
+      fireEvent.click(preview.getByRole('button', { name: 'Send to the admin' }))
+
+      expect(await preview.findByRole('alert')).toHaveTextContent('Title is required.')
+      expect(api.submitProposalRequest).not.toHaveBeenCalled()
+    })
+
+    it('lets any writer preview it, but only the lead send it', async () => {
+      vi.mocked(api.proposalStateRequest).mockResolvedValue(
+        state({
+          viewerRole: 'writer',
+          canEdit: true,
+          canSubmit: false,
+          proposal: proposal({ ...COMPLETE }),
+        }),
+      )
+      panel()
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Preview the proposal' }))
+      const preview = within(screen.getByRole('dialog', { name: 'Payments dashboard' }))
+
+      expect(preview.getByText('Finance stops re-typing.')).toBeInTheDocument()
+      expect(preview.queryByRole('button', { name: 'Send to the admin' })).toBeNull()
+    })
+
+    it('goes back to editing without sending', async () => {
+      lead()
+
+      const preview = await openPreview()
+      fireEvent.click(preview.getAllByRole('button', { name: 'Back to editing' })[0])
+
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(api.submitProposalRequest).not.toHaveBeenCalled()
+    })
   })
 
   it('shows the admin’s feedback when the proposal was sent back', async () => {
@@ -468,12 +775,67 @@ describe('AdminProposalsPage', () => {
     expect(people).toHaveTextContent('3 contributions · Scope, Overall timeline')
     expect(people).toHaveTextContent('Has not contributed yet')
 
+    // The cover says who did what and when; there is no separate activity list.
+    const cover = screen.getByLabelText('About the proposal for Automate hostel payments')
+    expect(cover).toHaveTextContent('Review teamTeam A')
+    expect(cover).toHaveTextContent('LeadLena Lead')
+    expect(cover).toHaveTextContent('Last updated')
+    expect(cover).toHaveTextContent('· Lena Lead') // the newest activity is hers
+    expect(cover).toHaveTextContent('Planned startTo be confirmed')
+    expect(screen.queryByRole('list', { name: 'Recent activity' })).toBeNull()
+
     // Readable while it is written, but nothing to decide until the lead sends it.
     fireEvent.click(screen.getByRole('button', { name: 'Read' }))
-    expect(await screen.findByRole('list', { name: 'Recent activity' })).toHaveTextContent(
-      'Max Member edited Scope',
-    )
     expect(screen.queryByRole('button', { name: 'Release to the owner' })).toBeNull()
+  })
+
+  it('shortens long section lists, keeping the whole list on hover', async () => {
+    const many: SectionKey[] = ['executiveSummary', 'problem', 'feasibility', 'scope', 'risks']
+    vi.mocked(api.proposalProgressRequest).mockResolvedValue([
+      progress({
+        participants: [
+          {
+            name: 'Lena Lead',
+            email: 'lena@example.com',
+            role: 'lead',
+            contributions: 3,
+            sections: many,
+            lastContributedAt: '2026-10-16T10:00:00Z',
+          },
+        ],
+        activity: [
+          { name: 'Lena Lead', action: 'edited', sections: many, at: '2026-10-16T10:00:00Z' },
+        ],
+        proposal: proposal({ status: 'submitted' }),
+      }),
+    ])
+    renderAdminPage(<AdminProposalsPage />)
+
+    const people = await screen.findByRole('list', { name: 'Participants' })
+    const summary = within(people).getByText(/Executive summary, Problem, Feasibility and 2 more/)
+    expect(summary).toHaveAttribute(
+      'title',
+      'Executive summary, Problem, Feasibility, Scope, Risks',
+    )
+  })
+
+  it('shows the planned dates and how long they span on the cover', async () => {
+    vi.mocked(api.proposalProgressRequest).mockResolvedValue([
+      progress({
+        proposal: proposal({
+          status: 'submitted',
+          plannedStart: '2026-11-02',
+          plannedEnd: '2027-01-29',
+          submittedAt: '2026-10-16T10:00:00Z',
+        }),
+      }),
+    ])
+    renderAdminPage(<AdminProposalsPage />)
+
+    const cover = await screen.findByLabelText('About the proposal for Automate hostel payments')
+    expect(cover).toHaveTextContent('Duration12 weeks 5 days')
+    expect(cover).toHaveTextContent('Sent to the admin')
+    expect(cover).not.toHaveTextContent('To be confirmed')
   })
 
   it('shows an approved idea whose team has not started, and filters by stage', async () => {
@@ -496,6 +858,34 @@ describe('AdminProposalsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Being prepared (1)' }))
     expect(screen.getByText('Automate the rota')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Read' })).toBeNull()
+  })
+
+  it('lets an admin download the proposal as a PDF', async () => {
+    vi.mocked(api.downloadProposalPdfRequest).mockResolvedValue(undefined)
+    renderAdminPage(<AdminProposalsPage />)
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /^Download the proposal .* as a PDF$/ }),
+    )
+
+    await waitFor(() => expect(api.downloadProposalPdfRequest).toHaveBeenCalledWith('3'))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('says so when the PDF cannot be downloaded', async () => {
+    vi.mocked(api.downloadProposalPdfRequest).mockRejectedValue(new Error('404'))
+    renderAdminPage(<AdminProposalsPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /^Download the proposal/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not download the PDF.')
+  })
+
+  it('offers no download to an admin who cannot release proposals', async () => {
+    renderAdminPage(<AdminProposalsPage />, { capabilities: READ_ONLY_ADMIN })
+
+    await screen.findByRole('button', { name: 'Read' })
+    expect(screen.queryByRole('button', { name: /^Download the proposal/ })).toBeNull()
   })
 
   it('lets an admin read a proposal and release it', async () => {

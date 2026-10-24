@@ -8,8 +8,11 @@ import { AuthPage } from '../features/identity/components/AuthPage'
 import { RequireAuth } from '../features/identity/components/RequireAuth'
 import { ResetPasswordPage } from '../features/identity/components/ResetPasswordPage'
 import { AcceptInvitationPage } from '../features/invitations/components/AcceptInvitationPage'
+import { LandingPage } from '../features/landing/components/LandingPage'
 import { MessageThreadPage } from '../features/messaging/components/MessageThreadPage'
 import { MessagesPage } from '../features/messaging/components/MessagesPage'
+import { MarketIdeaPage } from '../features/marketplace/components/MarketIdeaPage'
+import { MarketplacePage } from '../features/marketplace/components/MarketplacePage'
 import { NotificationsPage } from '../features/notifications/components/NotificationsPage'
 import { IdeaDetailPage } from '../features/ideas/components/IdeaDetailPage'
 import { IdeaReportPage } from '../features/reviews/components/IdeaReportPage'
@@ -18,15 +21,21 @@ import { AppLayout } from '../layouts/AppLayout'
 import { RootLayout } from '../layouts/RootLayout'
 import { DashboardPage } from '../routes/DashboardPage'
 import { EditIdeaPage } from '../routes/EditIdeaPage'
-import { HomePage } from '../routes/HomePage'
 import { IdeasPage } from '../routes/IdeasPage'
 import { NewIdeaPage } from '../routes/NewIdeaPage'
 import { NotFoundPage } from '../routes/NotFoundPage'
+import { PageErrorPage } from '../routes/PageErrorPage'
 import { ReviewsPage } from '../routes/ReviewsPage'
 import { OrganizationDetailPage } from '../features/organizations/components/OrganizationDetailPage'
 import { TeamDetailPage } from '../routes/TeamDetailPage'
 import { ProposalReadPage } from '../features/proposals/components/ProposalReadPage'
 import { AutomationLayout } from '../features/automation/components/AutomationLayout'
+import {
+  AutomationHome,
+  MyTasksPage,
+  ReviewQueuePage,
+  WorkspacePage,
+} from '../features/automation/components/DevelopmentWork'
 import { DeveloperQueuePage } from '../features/automation/components/DeveloperQueuePage'
 import { OpportunitiesPage } from '../features/automation/components/OpportunitiesPage'
 import { OpportunityPage } from '../features/automation/components/OpportunityPage'
@@ -40,7 +49,11 @@ import { TeamsPage } from '../routes/TeamsPage'
  * ideas, ...) each get their own route module under src/features/<domain>
  * and are wired in here.
  *
- * /auth, /reset-password and /activate-account are top-level routes rather
+ * `/` is the public MUSTANET website (`LandingPage`). Its account links lead
+ * to /auth, the combined sign in / sign up / forgot-password page, opened on
+ * a view by `?mode=` (see `AuthPage`).
+ *
+ * /, /auth, /reset-password and /activate-account are top-level routes rather
  * than RootLayout children: the auth system owns the full viewport
  * (split-screen brand + form panel) instead of sitting inside the shared app
  * shell/header. The latter two are the pages the emailed links point at -
@@ -80,14 +93,18 @@ function adminPage(name: AdminPageName) {
   })
 }
 
+/** The in-page tabs shared by console pages that have one sidebar entry. */
+function adminTabs(name: 'ReviewTabsLayout') {
+  return async () => ({
+    Component: (await import('../features/administration/components/AdminSectionTabs'))[name],
+  })
+}
+
 export const router = createBrowserRouter([
+  { path: '/', element: <LandingPage /> },
   {
-    path: '/',
     element: <RootLayout />,
-    children: [
-      { index: true, element: <HomePage /> },
-      { path: '*', element: <NotFoundPage /> },
-    ],
+    children: [{ path: '*', element: <NotFoundPage /> }],
   },
   { path: '/auth', element: <AuthPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
@@ -108,9 +125,17 @@ export const router = createBrowserRouter([
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: 'ideas', element: <IdeasPage /> },
-          /*
+          {
+            /*
+              Every page, wrapped once: a page that fails to render shows a plain error
+              inside the app's header and navigation, instead of the router's developer
+              screen replacing everything.
+            */
+            errorElement: <PageErrorPage />,
+            children: [
+              { index: true, element: <DashboardPage /> },
+              { path: 'ideas', element: <IdeasPage /> },
+              /*
             One idea. Three places already linked here and all three were a 404,
             because ideas existed only as rows in a list - so this is the fix as
             much as the feature. Its query parameters carry the ownership the
@@ -118,105 +143,133 @@ export const router = createBrowserRouter([
             which is what makes a Team page's "Create Idea" a link rather than a
             second copy of the ownership question.
           */
-          { path: 'ideas/:ideaId', element: <IdeaDetailPage /> },
-          { path: 'ideas/new', element: <NewIdeaPage /> },
-          { path: 'ideas/:ideaId/edit', element: <EditIdeaPage /> },
-          /*
+              { path: 'ideas/:ideaId', element: <IdeaDetailPage /> },
+              { path: 'ideas/new', element: <NewIdeaPage /> },
+              { path: 'ideas/:ideaId/edit', element: <EditIdeaPage /> },
+              /*
             The platform's report on an idea, and the author's own decision to
             act on it. It is a page of its own rather than a section on the
             card because the report is long and the decision it ends in deserves
             the reader's whole attention — the same reasoning as the create and
             edit forms.
           */
-          { path: 'ideas/:ideaId/report', element: <IdeaReportPage /> },
-          { path: 'ideas/:ideaId/proposal', element: <ProposalReadPage /> },
-          { path: 'reviews', element: <ReviewsPage /> },
-          { path: 'reviews/proposals/:ideaId', element: <ProposalWorkspacePage /> },
-          /*
+              { path: 'ideas/:ideaId/report', element: <IdeaReportPage /> },
+              { path: 'ideas/:ideaId/proposal', element: <ProposalReadPage /> },
+              { path: 'reviews', element: <ReviewsPage /> },
+              { path: 'reviews/proposals/:ideaId', element: <ProposalWorkspacePage /> },
+              /*
             Teams and messages are `/app` children but read nothing from
             `OrganizationProvider`: a team is a collaboration boundary rather than
             a tenant, and a private message belongs to its participants, so
             neither has an organization to scope itself to. Putting them under
             `/app` is still what gives them the sign-in gate.
           */
-          { path: 'organizations', element: <OrganizationsPage /> },
-          {
-            path: 'automation',
-            element: <AutomationLayout />,
-            children: [
-              { index: true, element: <Navigate to="opportunities" replace /> },
-              { path: 'opportunities', element: <OpportunitiesPage /> },
-              { path: 'opportunities/:opportunityId', element: <OpportunityPage /> },
-              { path: 'queue', element: <DeveloperQueuePage /> },
-              { path: 'projects', element: <ProjectsPage /> },
-              { path: 'projects/:projectId', element: <ProjectPage /> },
-            ],
-          },
-          { path: 'teams', element: <TeamsPage /> },
-          { path: 'teams/:teamId', element: <TeamDetailPage /> },
-          {
-            path: 'organizations/:organizationId',
-            element: <OrganizationDetailPage />,
-          },
-          { path: 'messages', element: <MessagesPage /> },
-          { path: 'messages/:threadId', element: <MessageThreadPage /> },
-          { path: 'notifications', element: <NotificationsPage /> },
-          {
-            path: 'settings',
-            element: <Navigate to="/app/settings/profile" replace />,
-          },
-          { path: 'settings/:section', element: <AccountSettingsPage /> },
-          {
-            path: 'admin',
-            lazy: async () => ({
-              Component: (await import('../features/administration/components/AdminLayout'))
-                .AdminLayout,
-            }),
-            children: [
-              { index: true, lazy: adminPage('AdminDashboardPage') },
-              { path: 'users', lazy: adminPage('AdminUsersPage') },
-              { path: 'users/:userId', lazy: adminPage('AdminUserDetailPage') },
+              { path: 'organizations', element: <OrganizationsPage /> },
               {
-                path: 'organizations',
-                lazy: adminPage('AdminOrganizationsPage'),
+                path: 'automation',
+                element: <AutomationLayout />,
+                children: [
+                  { index: true, element: <AutomationHome /> },
+                  { path: 'workspace', element: <WorkspacePage /> },
+                  { path: 'workspace/:projectId', element: <WorkspacePage /> },
+                  { path: 'tasks', element: <MyTasksPage /> },
+                  { path: 'review-queue', element: <ReviewQueuePage /> },
+                  { path: 'my-work', element: <Navigate to="../workspace" replace /> },
+                  { path: 'opportunities', element: <OpportunitiesPage /> },
+                  { path: 'opportunities/:opportunityId', element: <OpportunityPage /> },
+                  { path: 'queue', element: <DeveloperQueuePage /> },
+                  { path: 'projects', element: <ProjectsPage /> },
+                  { path: 'projects/:projectId', element: <ProjectPage /> },
+                ],
               },
+              { path: 'teams', element: <TeamsPage /> },
+              { path: 'teams/:teamId', element: <TeamDetailPage /> },
               {
                 path: 'organizations/:organizationId',
-                lazy: adminPage('AdminOrganizationDetailPage'),
+                element: <OrganizationDetailPage />,
               },
-              { path: 'ideas', lazy: adminPage('AdminIdeasPage') },
-              { path: 'ideas/:ideaId', lazy: adminPage('AdminIdeaDetailPage') },
-              { path: 'reviews', lazy: adminPage('AdminReviewsPage') },
+              { path: 'messages', element: <MessagesPage /> },
+              { path: 'messages/:threadId', element: <MessageThreadPage /> },
+              { path: 'notifications', element: <NotificationsPage /> },
+              { path: 'marketplace', element: <MarketplacePage /> },
+              { path: 'marketplace/:ideaId', element: <MarketIdeaPage /> },
               {
-                path: 'reviews/:reviewId',
-                lazy: adminPage('AdminReviewDetailPage'),
+                path: 'settings',
+                element: <Navigate to="/app/settings/profile" replace />,
               },
-              { path: 'approvals', lazy: adminPage('AdminApprovalsPage') },
-              { path: 'reviewers', lazy: adminPage('AdminReviewersPage') },
-              { path: 'roles', lazy: adminPage('AdminPlatformRolesPage') },
-              { path: 'decisions', lazy: adminPage('AdminDecisionsPage') },
-              { path: 'proposals', lazy: adminPage('AdminProposalsPage') },
-              { path: 'automation', lazy: adminPage('AdminAutomationPage') },
-              /*
+              { path: 'settings/:section', element: <AccountSettingsPage /> },
+              {
+                path: 'admin',
+                lazy: async () => ({
+                  Component: (await import('../features/administration/components/AdminLayout'))
+                    .AdminLayout,
+                }),
+                children: [
+                  { index: true, lazy: adminPage('AdminDashboardPage') },
+                  { path: 'activity', lazy: adminPage('AdminActivityPage') },
+                  { path: 'users', lazy: adminPage('AdminUsersPage') },
+                  { path: 'users/:userId', lazy: adminPage('AdminUserDetailPage') },
+                  {
+                    path: 'organizations',
+                    lazy: adminPage('AdminOrganizationsPage'),
+                  },
+                  {
+                    path: 'organizations/:organizationId',
+                    lazy: adminPage('AdminOrganizationDetailPage'),
+                  },
+                  /*
+                Pages that share one sidebar entry are tabs of a pathless
+                layout route: each keeps its own address, and the detail page
+                (a review) stays outside it, under its back link.
+              */
+                  { path: 'ideas', lazy: adminPage('AdminIdeasPage') },
+                  { path: 'ideas/:ideaId', lazy: adminPage('AdminIdeaDetailPage') },
+                  {
+                    lazy: adminTabs('ReviewTabsLayout'),
+                    children: [
+                      { path: 'reviews', lazy: adminPage('AdminReviewsPage') },
+                      { path: 'approvals', lazy: adminPage('AdminApprovalsPage') },
+                      { path: 'decisions', lazy: adminPage('AdminDecisionsPage') },
+                    ],
+                  },
+                  {
+                    path: 'reviews/:reviewId',
+                    lazy: adminPage('AdminReviewDetailPage'),
+                  },
+                  { path: 'reviewers', lazy: adminPage('AdminReviewersPage') },
+                  { path: 'roles', lazy: adminPage('AdminPlatformRolesPage') },
+                  { path: 'proposals', lazy: adminPage('AdminProposalsPage') },
+                  { path: 'automation', lazy: adminPage('AdminAutomationPage') },
+                  /*
                 The collaboration set: teams, and the three record sets that
                 answer how people got into them, how they talk, and what the
                 platform has told them. All read-only, and Teams is a sibling of
                 Organizations rather than a child of it - a team is a
                 collaboration boundary, not a tenant.
               */
-              { path: 'teams', lazy: adminPage('AdminTeamsPage') },
-              { path: 'teams/:teamId', lazy: adminPage('AdminTeamDetailPage') },
-              { path: 'invitations', lazy: adminPage('AdminInvitationsPage') },
-              { path: 'messages', lazy: adminPage('AdminMessagesPage') },
-              {
-                path: 'messages/:threadId',
-                lazy: adminPage('AdminMessageDetailPage'),
+                  { path: 'teams', lazy: adminPage('AdminTeamsPage') },
+                  { path: 'teams/:teamId', lazy: adminPage('AdminTeamDetailPage') },
+                  { path: 'invitations', lazy: adminPage('AdminInvitationsPage') },
+                  { path: 'messages', lazy: adminPage('AdminMessagesPage') },
+                  {
+                    path: 'messages/:threadId',
+                    lazy: adminPage('AdminMessageDetailPage'),
+                  },
+                  {
+                    path: 'notifications',
+                    lazy: adminPage('AdminNotificationsPage'),
+                  },
+                  { path: 'categories', lazy: adminPage('AdminCategoriesPage') },
+                  /*
+                The marketplace: ideas for sale, the payments buyers make for them, and
+                the accounts they pay into.
+              */
+                  { path: 'marketplace/ideas', lazy: adminPage('AdminMarketIdeasPage') },
+                  { path: 'marketplace/payments', lazy: adminPage('AdminMarketPaymentsPage') },
+                  { path: 'marketplace/enquiries', lazy: adminPage('AdminMarketEnquiriesPage') },
+                  { path: 'marketplace/methods', lazy: adminPage('AdminPaymentMethodsPage') },
+                ],
               },
-              {
-                path: 'notifications',
-                lazy: adminPage('AdminNotificationsPage'),
-              },
-              { path: 'categories', lazy: adminPage('AdminCategoriesPage') },
             ],
           },
         ],

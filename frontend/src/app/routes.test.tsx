@@ -152,10 +152,50 @@ describe('route tree', () => {
     setAccessToken(null)
   })
 
-  it('renders the home page at /', () => {
+  it('renders the public website at /, linking to the real auth views', () => {
     renderRoutes(router.routes, '/')
 
-    expect(screen.getByText('Frontend foundation is running.')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'From Real Problems to Real Solutions' }),
+    ).toBeInTheDocument()
+    const header = within(screen.getByRole('banner'))
+    expect(header.getByRole('link', { name: 'Sign In' })).toHaveAttribute('href', '/auth')
+    expect(header.getByRole('link', { name: 'Sign Up' })).toHaveAttribute(
+      'href',
+      '/auth?mode=sign-up',
+    )
+  })
+
+  it('opens /auth?mode=sign-up on the sign up view', () => {
+    renderRoutes(router.routes, '/auth?mode=sign-up')
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Create your account' }),
+    ).toBeInTheDocument()
+  })
+
+  it('opens /auth?mode=forgot-password on the forgot-password view', () => {
+    renderRoutes(router.routes, '/auth?mode=forgot-password')
+
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Reset your password' }),
+    ).toBeInTheDocument()
+  })
+
+  it('sends a signed-in visitor from /auth straight on to the app', async () => {
+    mockedRefresh.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      session: { accessToken: 'token', accessTokenExpiresAt: '2099-01-01', user: USER },
+    })
+    mockedMe.mockResolvedValue(USER)
+
+    renderRoutes(router.routes, '/auth')
+
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Welcome back' })).not.toBeInTheDocument(),
+    )
+    expect(await screen.findByRole('banner')).toBeInTheDocument()
   })
 
   it('renders the not-found page for unknown paths, inside the layout', () => {
@@ -348,10 +388,14 @@ describe('route tree', () => {
 
       renderRoutes(router.routes, '/app')
 
-      const main = await screen.findByRole('navigation', { name: 'Main' })
-      expect(await within(main).findByRole('link', { name: 'Admin' })).toHaveAttribute(
-        'href',
-        '/app/admin',
+      // The everyday menu is drawn until the capabilities arrive, then gives way to the
+      // administrator's header link - so the "Main" navigation is looked up again.
+      await waitFor(() =>
+        expect(
+          within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', {
+            name: 'Admin',
+          }),
+        ).toHaveAttribute('href', '/app/admin'),
       )
     })
 

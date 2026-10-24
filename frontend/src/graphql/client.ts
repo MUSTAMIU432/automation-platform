@@ -1,6 +1,7 @@
 import { GraphQLClient } from 'graphql-request'
 
 import { env } from '../lib/env'
+import { getRequestGuard } from './requestGuard'
 import { getAccessToken } from './tokenStore'
 
 /**
@@ -27,5 +28,22 @@ export const graphqlClient = new GraphQLClient(env.graphqlUrl, {
       headers.Authorization = `Bearer ${token}`
     }
     return headers
+  },
+  /*
+    An expired access token is not refused by the server: it is read as "not signed in",
+    and a list of "my" things then comes back empty rather than failing - the screen
+    says "nothing assigned to you" to someone who has work. That happens whenever the
+    proactive refresh timer is late, which a sleeping laptop makes certain. So before
+    each request the guard renews a token that is due, and the header is written from
+    the token as it is after that.
+  */
+  requestMiddleware: async (request) => {
+    const guard = getRequestGuard()
+    if (guard) await guard(request.operationName)
+    const headers = new Headers(request.headers)
+    const token = getAccessToken()
+    if (token) headers.set('Authorization', `Bearer ${token}`)
+    else headers.delete('Authorization')
+    return { ...request, headers }
   },
 })

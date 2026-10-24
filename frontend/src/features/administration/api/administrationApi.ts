@@ -100,6 +100,31 @@ export type AdminAuditAction =
   | 'ATTACHMENT_DOWNLOADED'
   | 'PLATFORM_ADMIN_GRANTED'
   | 'PLATFORM_ADMIN_REVOKED'
+  | 'PLATFORM_REVIEWER_ASSIGNED'
+  | 'PLATFORM_REVIEWER_UNASSIGNED'
+  | 'PLATFORM_SUBMISSION_LOCKED'
+  | 'PLATFORM_REVIEW_APPROVED'
+  | 'PLATFORM_REVIEW_CHANGES_REQUESTED'
+  | 'PLATFORM_REVIEW_REJECTED'
+  | 'REPORT_GENERATED'
+  | 'IDEA_OWNER_GO_AHEAD'
+  | 'REVIEWER_GRANTED'
+  | 'REVIEWER_REVOKED'
+  | 'REVIEW_TEAM_CREATED'
+  | 'REVIEW_TEAM_UPDATED'
+  | 'REVIEW_TEAM_ASSIGNED'
+  | 'PROPOSAL_SUBMITTED'
+  | 'PROPOSAL_CHANGES_REQUESTED'
+  | 'PROPOSAL_RELEASED'
+  | 'PROPOSAL_DECLINED'
+  | 'PLATFORM_ROLE_GRANTED'
+  | 'PLATFORM_ROLE_REVOKED'
+  | 'DECISION_LETTER_SENT'
+  | 'PROPOSAL_DOWNLOADED'
+  | 'MARKETPLACE_IDEA_PUBLISHED'
+  | 'MARKETPLACE_IDEA_UNPUBLISHED'
+  | 'MARKETPLACE_PAYMENT_CONFIRMED'
+  | 'MARKETPLACE_PAYMENT_REJECTED'
 
 export interface AdminAuditEntry {
   id: string
@@ -109,13 +134,15 @@ export interface AdminAuditEntry {
   targetType: string
   targetId: string
   targetLabel: string
+  /** The organization the target belongs to, when it belongs to one. */
+  organizationId: string | null
   message: string
   createdAt: string
 }
 
 const PERSON = 'id email name'
 const AUDIT_ENTRY_FIELDS = `
-  id action result actor { ${PERSON} } targetType targetId targetLabel message createdAt
+  id action result actor { ${PERSON} } targetType targetId targetLabel organizationId message createdAt
 `
 
 /**
@@ -199,6 +226,8 @@ export interface AdminUser {
   createdAt: string
   lastActiveAt: string | null
   memberships: AdminUserMembership[]
+  /** Where the profile photo is served from (needs the bearer token), or null. */
+  avatarUrl: string | null
 }
 
 export interface AdminUserDetail extends AdminUser {
@@ -219,7 +248,7 @@ export interface AdminUserFilters {
 
 const USER_FIELDS = `
   id email firstName lastName isActive isVerified isPlatformAdmin isSuperuser
-  createdAt lastActiveAt
+  createdAt lastActiveAt avatarUrl
   memberships { id status organization { id name } roles { id name slug isSystem } }
 `
 

@@ -50,7 +50,7 @@ export function ProposalWorkspacePage() {
   }
 
   return (
-    <article className="mt-8 max-w-5xl">
+    <article className="mt-8 w-full">
       <p className="text-xs font-bold tracking-[0.18em] text-brand-700 uppercase">Proposal</p>
       <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">{idea.title}</h1>
       <p className="mt-1 text-sm text-gray-600">

@@ -50,6 +50,8 @@ const TONES: Record<string, Tone> = {
   submitted: 'warn',
   accepted: 'good',
   changes_requested: 'warn',
+  approved: 'good',
+  returned: 'warn',
   pass: 'good',
   passed: 'good',
   fail: 'bad',

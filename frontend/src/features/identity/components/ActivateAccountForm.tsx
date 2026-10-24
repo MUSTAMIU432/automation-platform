@@ -5,9 +5,7 @@ import { activateAccountRequest, resendActivationEmailRequest } from '../auth/au
 import { validateEmail } from '../schemas/authValidation'
 import { SpinnerIcon } from './icons'
 import { TextField } from './TextField'
-
-const PRIMARY_BUTTON_CLASSES =
-  'flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-300 disabled:shadow-none'
+import { primaryButtonClasses } from './fieldStyles'
 
 /**
  * `idle` is the armed state - a usable link, waiting for a deliberate press.
@@ -109,12 +107,14 @@ export function ActivateAccountForm() {
   if (status === 'confirmed') {
     return (
       <div>
-        <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Email confirmed</h1>
-        <p className="mt-2 text-sm text-gray-500">Your email address has been confirmed.</p>
-        <p className="mt-2 text-sm text-gray-500">
+        <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+          Email confirmed
+        </h1>
+        <p className="mt-2 text-center text-sm text-sage">Your email address has been confirmed.</p>
+        <p className="mt-2 text-center text-sm text-sage">
           You were not signed in by this — confirming an address is not a login. Sign in as usual.
         </p>
-        <Link to="/auth" className={`mt-6 ${PRIMARY_BUTTON_CLASSES}`}>
+        <Link to="/auth" className={`mt-6 ${primaryButtonClasses}`}>
           Sign In
         </Link>
       </div>
@@ -130,10 +130,10 @@ export function ActivateAccountForm() {
   if (showResend) {
     return (
       <div>
-        <h1 className="text-[26px] font-bold tracking-tight text-gray-900">
+        <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
           {status === 'resent' ? 'Check your email' : 'Link invalid'}
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-center text-sm text-sage">
           {status === 'resent'
             ? notice
             : 'This confirmation link is invalid or has expired. It can only be used once.'}
@@ -157,11 +157,7 @@ export function ActivateAccountForm() {
             placeholder="you@company.com"
             disabled={status === 'resending'}
           />
-          <button
-            type="submit"
-            disabled={status === 'resending'}
-            className={PRIMARY_BUTTON_CLASSES}
-          >
+          <button type="submit" disabled={status === 'resending'} className={primaryButtonClasses}>
             {status === 'resending' && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
             <span>{status === 'resending' ? 'Sending…' : 'Send a new link'}</span>
           </button>
@@ -170,7 +166,7 @@ export function ActivateAccountForm() {
         <p className="mt-6 text-center text-sm text-gray-500">
           <Link
             to="/auth"
-            className="font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+            className="font-semibold text-jade hover:text-pine focus:outline-none focus-visible:underline"
           >
             ← Back to Sign In
           </Link>
@@ -181,8 +177,10 @@ export function ActivateAccountForm() {
 
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Confirm your email</h1>
-      <p className="mt-2 text-sm text-gray-500">
+      <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+        Confirm your email
+      </h1>
+      <p className="mt-2 text-center text-sm text-sage">
         One click to confirm this address for your account.
       </p>
 
@@ -196,7 +194,7 @@ export function ActivateAccountForm() {
         type="button"
         onClick={confirm}
         disabled={status === 'confirming'}
-        className={`mt-7 ${PRIMARY_BUTTON_CLASSES}`}
+        className={`mt-7 ${primaryButtonClasses}`}
       >
         {status === 'confirming' && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
         <span>{status === 'confirming' ? 'Confirming…' : 'Confirm my email'}</span>
@@ -205,7 +203,7 @@ export function ActivateAccountForm() {
       <p className="mt-6 text-center text-sm text-gray-500">
         <Link
           to="/auth"
-          className="font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+          className="font-semibold text-jade hover:text-pine focus:outline-none focus-visible:underline"
         >
           ← Back to Sign In
         </Link>

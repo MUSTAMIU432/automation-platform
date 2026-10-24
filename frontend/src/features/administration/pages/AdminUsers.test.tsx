@@ -33,6 +33,7 @@ function user(overrides: Partial<AdminUser> = {}): AdminUser {
     isSuperuser: false,
     createdAt: '2026-01-01T00:00:00Z',
     lastActiveAt: '2026-09-01T00:00:00Z',
+    avatarUrl: null,
     memberships: [
       {
         id: '8',
@@ -80,6 +81,25 @@ describe('AdminUsersPage', () => {
     expect(within(rows[1]).getByRole('link', { name: 'Ada Author' })).toHaveAttribute(
       'href',
       '/app/admin/users/5',
+    )
+  })
+
+  it('gives the photo, name and email a column each', async () => {
+    usersMock.mockResolvedValue(pageOfItems([user()]))
+    renderAdminPage(<AdminUsersPage />)
+
+    const table = await screen.findByRole('table', { name: 'Users' })
+    const headers = within(table)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent)
+    expect(headers.slice(0, 3)).toEqual(['Photo', 'Name', 'Email'])
+
+    const cells = within(within(table).getAllByRole('row')[1]).getAllByRole('cell')
+    expect(cells[0]).toHaveTextContent('AA')
+    expect(within(cells[1]).getByRole('link', { name: 'Ada Author' })).toBeInTheDocument()
+    expect(within(cells[2]).getByRole('link', { name: 'ada@acme.example' })).toHaveAttribute(
+      'href',
+      'mailto:ada@acme.example',
     )
   })
 

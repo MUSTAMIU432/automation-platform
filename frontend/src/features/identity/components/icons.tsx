@@ -79,3 +79,49 @@ export function EyeOffIcon({ className }: IconProps) {
     </svg>
   )
 }
+
+function LineIcon({ className, d }: IconProps & { d: string[] }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {d.map((path) => (
+        <path key={path} d={path} />
+      ))}
+    </svg>
+  )
+}
+
+export function MailIcon({ className }: IconProps) {
+  return <LineIcon className={className} d={['M4 6h16v12H4z', 'm4.5 7 7.5 6 7.5-6']} />
+}
+
+export function LockIcon({ className }: IconProps) {
+  return (
+    <LineIcon
+      className={className}
+      d={['M6 10.5h12v9.5H6z', 'M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5', 'M12 14.5v2']}
+    />
+  )
+}
+
+export function UserIcon({ className }: IconProps) {
+  return (
+    <LineIcon
+      className={className}
+      d={['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z', 'M4.5 20a7.5 7.5 0 0 1 15 0']}
+    />
+  )
+}
+
+export function ArrowRightIcon({ className }: IconProps) {
+  return <LineIcon className={className} d={['M5 12h14', 'm13 6 6 6-6 6']} />
+}

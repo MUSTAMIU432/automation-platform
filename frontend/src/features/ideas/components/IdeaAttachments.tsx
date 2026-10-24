@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '../../identity/auth/AuthContext'
 import { SpinnerIcon } from '../../identity/components/icons'
@@ -52,10 +52,21 @@ export function IdeaAttachments({ idea, open }: { idea: Idea; open: boolean }) {
  * open, and by the intake form's "Supporting documents" step while an
  * existing idea is being edited.
  */
-export function IdeaAttachmentsPanel({ idea }: { idea: Idea }) {
+export function IdeaAttachmentsPanel({
+  idea,
+  onCountChange,
+}: {
+  idea: Idea
+  /** Told how many files there are whenever the server reports it, for a heading's count. */
+  onCountChange?: (count: number) => void
+}) {
   const { user } = useAuth()
   const gallery = useAttachments(idea.id)
   const isOwner = user?.id === idea.authorId
+  const total = gallery.pageInfo?.totalCount
+  useEffect(() => {
+    if (total !== undefined) onCountChange?.(total)
+  }, [total, onCountChange])
 
   return (
     <>

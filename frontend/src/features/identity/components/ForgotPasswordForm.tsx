@@ -2,17 +2,15 @@ import { useState, type FormEvent } from 'react'
 
 import { NETWORK_ERROR_MESSAGE, requestPasswordResetRequest } from '../auth/authApi'
 import { validateEmail } from '../schemas/authValidation'
-import { SpinnerIcon } from './icons'
+import { MailIcon, SpinnerIcon } from './icons'
 import { TextField } from './TextField'
+import { primaryButtonClasses } from './fieldStyles'
 
 interface ForgotPasswordFormProps {
   onBackToSignIn: () => void
 }
 
 type Status = 'idle' | 'submitting' | 'success'
-
-const PRIMARY_BUTTON_CLASSES =
-  'flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-600 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-brand-300 disabled:shadow-none'
 
 /**
  * "Forgot password?" entry point's view. Renders in place of the Sign
@@ -88,12 +86,14 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
   if (status === 'success') {
     return (
       <div>
-        <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Check your email</h1>
-        <p className="mt-2 text-sm text-gray-500">{notice}</p>
-        <p className="mt-2 text-sm text-gray-500">
+        <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+          Check your email
+        </h1>
+        <p className="mt-2 text-center text-sm text-sage">{notice}</p>
+        <p className="mt-2 text-center text-sm text-sage">
           The link can only be used once, and it stops working after a short while.
         </p>
-        <button type="button" onClick={onBackToSignIn} className={`mt-7 ${PRIMARY_BUTTON_CLASSES}`}>
+        <button type="button" onClick={onBackToSignIn} className={`mt-7 ${primaryButtonClasses}`}>
           Back to Sign In
         </button>
       </div>
@@ -102,8 +102,10 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
 
   return (
     <div>
-      <h1 className="text-[26px] font-bold tracking-tight text-gray-900">Reset your password</h1>
-      <p className="mt-2 text-sm text-gray-500">
+      <h1 className="text-center text-[28px] font-bold tracking-tight text-ink">
+        Reset your password
+      </h1>
+      <p className="mt-2 text-center text-sm text-sage">
         Enter your email and we&apos;ll send you a secure password reset link.
       </p>
 
@@ -124,9 +126,10 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
           error={error}
           placeholder="you@company.com"
           disabled={isSubmitting}
+          icon={<MailIcon className="h-5 w-5" />}
         />
 
-        <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON_CLASSES}>
+        <button type="submit" disabled={isSubmitting} className={primaryButtonClasses}>
           {isSubmitting && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
           <span>{isSubmitting ? 'Sending…' : 'Send reset link'}</span>
         </button>
@@ -136,7 +139,7 @@ export function ForgotPasswordForm({ onBackToSignIn }: ForgotPasswordFormProps) 
         <button
           type="button"
           onClick={onBackToSignIn}
-          className="inline-flex items-center gap-1.5 font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:underline"
+          className="inline-flex items-center gap-1.5 font-semibold text-jade hover:text-pine focus:outline-none focus-visible:underline"
         >
           <span aria-hidden="true">←</span> Back to Sign In
         </button>

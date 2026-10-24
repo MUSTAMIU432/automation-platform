@@ -1,24 +1,12 @@
 import { useState } from 'react'
 
 import { useAuth } from '../../identity/auth/AuthContext'
-import { SpinnerIcon } from '../../identity/components/icons'
 import type { Idea, IdeaFilters, IdeaStatus } from '../api/ideasApi'
 import { useCategories } from '../hooks/useCategories'
 import { useIdeaDiscovery } from '../hooks/useIdeaDiscovery'
 import { useIdeaVotes } from '../hooks/useIdeaVotes'
-import {
-  isResubmission,
-  statusClasses,
-  statusDescription,
-  statusLabel,
-  transitionLabel,
-} from '../utils/lifecycle'
-import { IdeaOwnershipSummary } from './IdeaOwnership'
-import { ownerNameFor } from '../utils/ownership'
-import { IdeaAttachments } from './IdeaAttachments'
-import { IdeaDiscussion } from './IdeaDiscussion'
-import { IdeaReviewSection } from '../../reviews/components/IdeaReviewSection'
-import { IdeaCardActions, type IdeaCardSection } from './IdeaCardActions'
+import { IdeaCard, type IdeaListLayout } from './IdeaCard'
+import type { IdeaCardSection } from './IdeaCardActions'
 import { IdeaFiltersBar } from './IdeaFiltersBar'
 import { IdeaPagination } from './IdeaPagination'
 
@@ -57,9 +45,39 @@ interface OpenSection {
  *   edit or a submission it should refuse whether or not the buttons were
  *   rendered, and a failure to render them is not a security control.
  */
-/** Bring the just-filed idea into view once its card is rendered. */
-function scrollIntoView(element: HTMLLIElement | null) {
-  element?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+const LAYOUT_KEY = 'ideas.layout'
+
+/** The reader's list/grid choice, remembered on this device; a list when there is none. */
+function readLayout(): IdeaListLayout {
+  try {
+    return window.localStorage.getItem(LAYOUT_KEY) === 'grid' ? 'grid' : 'list'
+  } catch {
+    return 'list'
+  }
+}
+
+function saveLayout(layout: IdeaListLayout) {
+  try {
+    window.localStorage.setItem(LAYOUT_KEY, layout)
+  } catch {
+    // Storage unavailable (a private window, blocked site data): the choice lasts this visit.
+  }
+}
+
+/** "Your ideas", with how many there are once the server has said. */
+function ListHeading({ total }: { total: number | null }) {
+  return (
+    <div className="flex items-center gap-3">
+      <h2 id="ideas-heading" className="text-2xl font-bold tracking-tight text-ink">
+        Your ideas
+      </h2>
+      {total !== null && (
+        <span className="rounded-full bg-mist px-3 py-1 text-sm font-semibold text-jade ring-1 ring-inset ring-jade/15">
+          {total === 1 ? '1 idea' : `${total.toLocaleString()} ideas`}
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function IdeaList({
@@ -132,6 +150,7 @@ export function IdeaList({
       here rather than inside each panel is what gives it that.
   */
   const [openSection, setOpenSection] = useState<OpenSection | null>(null)
+  const [layout, setLayout] = useState<IdeaListLayout>(readLayout)
   const { categories } = useCategories()
   const { ideas, pageInfo, loading, error } = useIdeaDiscovery(filters, reloadToken)
   // Seeded from the ideas the list was just given, so the vote controls render
@@ -139,16 +158,14 @@ export function IdeaList({
   // to reload when a vote changes.
   const { votes, toggle: toggleVote, dismissError: dismissVoteError } = useIdeaVotes(ideas)
 
-  /** Whether this idea's section is the open one. The only question a row asks. */
-  function isSectionOpen(ideaId: string, section: IdeaCardSection): boolean {
-    return openSection !== null && openSection.ideaId === ideaId && openSection.section === section
-  }
-
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-5" role="alert">
-        <p className="text-sm font-semibold text-red-800">Ideas unavailable</p>
-        <p className="mt-1 text-sm text-red-700">{error}</p>
+      <div>
+        <ListHeading total={null} />
+        <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-5" role="alert">
+          <p className="text-sm font-semibold text-red-800">Ideas unavailable</p>
+          <p className="mt-1 text-sm text-red-700">{error}</p>
+        </div>
       </div>
     )
   }
@@ -165,10 +182,21 @@ export function IdeaList({
   // under a filter that is already different from the rows on screen.
   const firstLoad = pageInfo === null
 
-  if (firstLoad) return <LoadingPanel />
+  if (firstLoad) {
+    return (
+      <div>
+        <ListHeading total={null} />
+        <div className="mt-4">
+          <LoadingPanel />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>
+      <ListHeading total={pageInfo.totalCount} />
+      <div className="mt-4" />
       <IdeaFiltersBar
         filters={filters}
         categories={categories}
@@ -178,9 +206,17 @@ export function IdeaList({
         onContextChange={(submissionContext) => onFiltersChange({ ...filters, submissionContext })}
         onVisibilityChange={(visibility) => onFiltersChange({ ...filters, visibility })}
         onMineChange={(mine) => onFiltersChange({ ...filters, mine })}
+        // An ordering is kept by "Clear all" - it arranges, it does not narrow - and,
+        // like a filter, it starts again from the first page.
+        onSortChange={(sort) => onFiltersChange({ ...filters, sort })}
         onClear={() => {
           onSearchChange('')
-          onFiltersChange({})
+          onFiltersChange(filters.sort ? { sort: filters.sort } : {})
+        }}
+        layout={layout}
+        onLayoutChange={(next) => {
+          setLayout(next)
+          saveLayout(next)
         }}
       />
 
@@ -191,7 +227,7 @@ export function IdeaList({
         results for the term now in the box. `aria-busy` says which it is to
         anything reading the page rather than looking at it.
       */}
-      <div aria-busy={loading} className={loading ? 'mt-3 opacity-60 transition-opacity' : 'mt-3'}>
+      <div aria-busy={loading} className={loading ? 'mt-4 opacity-60 transition-opacity' : 'mt-4'}>
         {ideas.length === 0 ? (
           <EmptyState
             filtered={filtersActive}
@@ -210,214 +246,39 @@ export function IdeaList({
               page, which now includes a filter bar that offers the same words
               the badges use.
             */}
-            <ul className="space-y-3" aria-label="Ideas">
-              {ideas.map((idea) => {
-                const isMine = user?.id === idea.authorId
-                const isDraft = idea.status === 'DRAFT'
-                // Sent back for changes (S3-005): the author revises and
-                // submits again. Either track's changes-requested state counts -
-                // somebody has read the idea and written down what to change, and
-                // which track asked is a question the status badge answers rather
-                // than one the actions have to repeat.
-                //
-                // Authorship is only what decides whether to *offer* the edit;
-                // `updateIdea` checks it again.
-                const isRevisable = isResubmission(idea.status)
-                const canEdit = isMine && (isDraft || isRevisable)
-                return (
-                  <li
-                    key={idea.id}
-                    ref={idea.id === highlightedIdeaId ? scrollIntoView : undefined}
-                    aria-current={idea.id === highlightedIdeaId ? 'true' : undefined}
-                    // Clear of the pinned header and breadcrumb when scrolled to.
-                    className={`scroll-mt-[calc(var(--app-chrome-height)+1rem)] rounded-xl border bg-white p-4 shadow-sm ${
-                      idea.id === highlightedIdeaId
-                        ? 'border-brand-400 ring-2 ring-brand-200'
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-sm font-semibold text-gray-900">
-                          {idea.title}
-                        </h3>
-                        {idea.id === highlightedIdeaId && (
-                          <p className="mt-0.5 text-xs font-semibold text-brand-700">Just filed</p>
-                        )}
-                        <p className="mt-1 line-clamp-2 text-sm text-gray-600">
-                          {idea.description || 'No description yet.'}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusClasses(idea.status)}`}
-                      >
-                        {statusLabel(idea.status, idea.submissionContext)}
-                      </span>
-                    </div>
-
-                    {/*
-                      What the state *means*, not just which state it is. Worth the
-                      extra line for the two states where the next step is the author's
-                      to take: a changes-requested idea says so here, rather than the
-                      author having to infer it from a badge colour.
-                    */}
-                    {idea.status !== 'DRAFT' && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        {statusDescription(idea.status, idea.submissionContext)}
-                      </p>
-                    )}
-
-                    {/*
-                      Ownership and audience, as two badges and never as one.
-
-                      This is the line that answers "whose idea is this?" and it
-                      sits above the metadata because it is the first thing a
-                      reader of a *list* needs - a list of ideas from three
-                      different owners is otherwise unreadable. The status badge
-                      above already says the state, so it is not repeated here.
-                    */}
-                    <div className="mt-3">
-                      <IdeaOwnershipSummary
-                        context={idea.submissionContext}
-                        ownerName={ownerNameFor(
-                          idea.submissionContext,
-                          idea.tenantName,
-                          idea.authorId,
-                          user?.id ?? null,
-                        )}
-                        visibility={idea.visibility}
-                      />
-                    </div>
-
-                    <dl className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
-                      <div className="flex items-center gap-1">
-                        <dt>Category</dt>
-                        <dd className="font-medium text-gray-700">
-                          {idea.category?.name ?? 'None'}
-                        </dd>
-                      </div>
-                      {idea.submittedAt && (
-                        <div className="flex items-center gap-1">
-                          <dt>Submitted on</dt>
-                          <dd className="font-medium text-gray-700">
-                            {new Date(idea.submittedAt).toLocaleDateString()}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-
-                    {/*
-                        Actions are rendered from `availableTransitions`, which the
-                        backend computed for *this* viewer. So there is no client-side
-                        rule saying "the author may submit" or "a reviewer may approve"
-                        that could disagree with the server's, and an author who also
-                        holds the Owner role is offered nothing on their own submitted
-                        idea — because the server declined to allow it.
-
-                        Rendering nothing when the list is empty is a courtesy, not a
-                        control: the server refuses an unlisted move whether or not a
-                        button was drawn.
-                      */}
-                    {canEdit || idea.availableTransitions.length > 0 ? (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {canEdit && (
-                          <button
-                            type="button"
-                            onClick={() => onEdit(idea)}
-                            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-                          >
-                            {isDraft ? 'Edit draft' : 'Revise idea'}
-                          </button>
-                        )}
-                        {idea.availableTransitions.map((target) => {
-                          // A re-submission reads the same whichever track asked
-                          // for the changes: pressing it sends the idea back
-                          // where it came from, and the card's own state says
-                          // where that is.
-                          const label =
-                            isRevisable &&
-                            (target === 'SUBMITTED' || target === 'SUBMITTED_TO_ORGANIZATION')
-                              ? 'Submit again'
-                              : transitionLabel(target)
-                          if (label === null) return null
-                          return (
-                            <button
-                              key={target}
-                              type="button"
-                              disabled={submittingIdeaId === idea.id}
-                              onClick={() => onTransition(idea, target)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {submittingIdeaId === idea.id && submittingTarget === target && (
-                                <SpinnerIcon className="h-3.5 w-3.5 motion-safe:animate-spin" />
-                              )}
-                              {label}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    ) : null}
-                    {/*
-                        The card's footer: the vote control and the three
-                        disclosures that open the discussion, the evidence and
-                        the review history, in one evenly spaced row. It owns
-                        the toggles, so the sections below it are content-only -
-                        see `IdeaCardActions`.
-
-                        Last, because it is the foot of the card and the
-                        lifecycle buttons above it are what the author came
-                        for; a reader scanning for what can be done to an idea
-                        should not have to pass the bar to reach the status.
-                      */}
-                    <IdeaCardActions
-                      idea={idea}
-                      viewerId={user?.id ?? null}
-                      vote={votes[idea.id]}
-                      onToggleVote={toggleVote}
-                      onDismissVoteError={dismissVoteError}
-                      open={{
-                        discussion: isSectionOpen(idea.id, 'discussion'),
-                        evidence: isSectionOpen(idea.id, 'evidence'),
-                        review: isSectionOpen(idea.id, 'review'),
-                      }}
-                      onToggleSection={(section) => {
-                        // The one rule, written once: opening a section closes
-                        // whatever was open, whether that was another section of
-                        // this card or another card's - and opening the section
-                        // that is already open closes it, which is what a
-                        // disclosure that says `aria-expanded` has to do.
-                        setOpenSection((current) =>
-                          current !== null &&
-                          current.ideaId === idea.id &&
-                          current.section === section
-                            ? null
-                            : { ideaId: idea.id, section },
-                        )
-                      }}
-                    />
-                    <IdeaDiscussion idea={idea} open={isSectionOpen(idea.id, 'discussion')} />
-                    {/*
-                        Supporting evidence (S2-007), collapsed and fetched
-                        only while open - the same reasoning as the
-                        discussion above. Rendered after it so a card's
-                        layout stays predictable: status, then discussion,
-                        then evidence, in the order S2-005 and S2-007
-                        shipped.
-                      */}
-                    <IdeaAttachments idea={idea} open={isSectionOpen(idea.id, 'evidence')} />
-                    {/*
-                        Review history (S3-003), for the author once the idea
-                        is put forward and for reviewers - fetched only while
-                        open, like the two sections above.
-                      */}
-                    <IdeaReviewSection
-                      idea={idea}
-                      viewerId={user?.id ?? null}
-                      open={isSectionOpen(idea.id, 'review')}
-                    />
-                  </li>
-                )
-              })}
+            <ul
+              className={
+                layout === 'grid' ? 'grid gap-4 md:grid-cols-2 2xl:grid-cols-3' : 'space-y-4'
+              }
+              aria-label="Ideas"
+            >
+              {ideas.map((idea) => (
+                <IdeaCard
+                  key={idea.id}
+                  idea={idea}
+                  layout={layout}
+                  viewerId={user?.id ?? null}
+                  highlighted={idea.id === highlightedIdeaId}
+                  vote={votes[idea.id]}
+                  onToggleVote={toggleVote}
+                  onDismissVoteError={dismissVoteError}
+                  openSection={openSection?.ideaId === idea.id ? openSection.section : null}
+                  onToggleSection={(section) => {
+                    // The one rule, written once: opening a section closes whatever
+                    // was open, whether that was another section of this card or
+                    // another card's - and opening the open one closes it.
+                    setOpenSection((current) =>
+                      current !== null && current.ideaId === idea.id && current.section === section
+                        ? null
+                        : { ideaId: idea.id, section },
+                    )
+                  }}
+                  onEdit={onEdit}
+                  onTransition={onTransition}
+                  submittingIdeaId={submittingIdeaId}
+                  submittingTarget={submittingTarget}
+                />
+              ))}
             </ul>
 
             {pageInfo && (
@@ -456,7 +317,7 @@ function EmptyState({
 }) {
   if (pastEnd) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5">
+      <div className="rounded-3xl border border-dashed border-jade/25 bg-white/80 p-6">
         <p className="text-sm font-semibold text-gray-900">Nothing on this page</p>
         <p className="mt-1 text-sm leading-6 text-gray-600">
           There are ideas on an earlier page. Ideas change while you read.
@@ -474,7 +335,7 @@ function EmptyState({
 
   if (filtered) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5">
+      <div className="rounded-3xl border border-dashed border-jade/25 bg-white/80 p-6">
         <p className="text-sm font-semibold text-gray-900">Nothing matches those filters</p>
         <p className="mt-1 text-sm leading-6 text-gray-600">
           Ideas you can read exist, but not with this category, status and search together.
@@ -491,7 +352,7 @@ function EmptyState({
   }
 
   return (
-    <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5">
+    <div className="rounded-3xl border border-dashed border-jade/25 bg-white/80 p-6">
       <p className="text-sm font-semibold text-gray-900">No ideas here yet</p>
       <p className="mt-1 text-sm leading-6 text-gray-600">
         File the first one. It stays private to you until you widen its visibility.
@@ -502,7 +363,7 @@ function EmptyState({
 
 function LoadingPanel() {
   return (
-    <output className="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+    <output className="block rounded-3xl border border-white bg-white/85 p-6 shadow-sm">
       <span className="sr-only">Loading ideas…</span>
       <span className="block h-4 w-40 animate-pulse rounded bg-gray-200" />
       <span className="mt-3 block h-3 w-56 animate-pulse rounded bg-gray-100" />

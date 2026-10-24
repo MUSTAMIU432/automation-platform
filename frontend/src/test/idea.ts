@@ -91,6 +91,8 @@ export function makeIdea(overrides: Partial<Idea> = {}): Idea {
     // pretending the reader owns it.
     viewerCanEdit: false,
     voteCount: 0,
+    commentCount: 0,
+    attachmentCount: 0,
     viewerHasVoted: false,
     viewerCanStartReview: false,
     viewerCanStartOrganizationReview: false,
