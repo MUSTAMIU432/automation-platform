@@ -1,4 +1,3 @@
-import { useLandingTheme } from '../hooks/useLandingTheme'
 import { About } from './About'
 import { ContactSection } from './ContactSection'
 import { Hero } from './Hero'
@@ -16,20 +15,15 @@ import { Services } from './Services'
  * White colours in index.css hang off, so only this page changes.
  */
 export function LandingPage() {
-  const [theme, setTheme] = useLandingTheme()
-
   return (
-    <div
-      data-landing-theme={theme}
-      className="min-h-screen bg-white font-sans text-ink antialiased"
-    >
+    <div className="min-h-screen bg-white font-sans text-ink antialiased">
       <a
         href="#main"
         className="sr-only z-50 rounded-full bg-mint px-4 py-2 font-semibold text-forest focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
       >
         Skip to content
       </a>
-      <LandingHeader theme={theme} onThemeChange={setTheme} />
+      <LandingHeader />
       <main id="main">
         <Hero />
         <Services />

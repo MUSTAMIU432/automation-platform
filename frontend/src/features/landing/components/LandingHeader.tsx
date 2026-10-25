@@ -4,10 +4,8 @@ import { Link } from 'react-router-dom'
 import { Logo } from '../../../components/Logo'
 import { useAuth } from '../../identity/auth/AuthContext'
 import { useActiveSection } from '../hooks/useActiveSection'
-import type { LandingTheme } from '../hooks/useLandingTheme'
 import { SECTION_IDS, SECTIONS, SIGN_IN_PATH, SIGN_UP_PATH } from '../sections'
 import { CloseIcon, MenuIcon } from './icons'
-import { ThemeToggle } from './ThemeToggle'
 
 const focusRing =
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-mint focus-visible:ring-offset-2 focus-visible:ring-offset-forest'
@@ -17,13 +15,7 @@ const focusRing =
  * (the page scrolls; nothing navigates), and the account actions are links
  * into the real auth page - or into the app, for someone already signed in.
  */
-export function LandingHeader({
-  theme,
-  onThemeChange,
-}: {
-  theme: LandingTheme
-  onThemeChange: (theme: LandingTheme) => void
-}) {
+export function LandingHeader() {
   const { status } = useAuth()
   const active = useActiveSection(SECTION_IDS)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -123,7 +115,6 @@ export function LandingHeader({
           </nav>
 
           <div className="flex items-center gap-3">
-            <ThemeToggle theme={theme} onChange={onThemeChange} />
             <div className="hidden items-center gap-3 lg:flex">{accountActions('row')}</div>
 
             <button
