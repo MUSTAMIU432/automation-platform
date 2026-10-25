@@ -529,24 +529,20 @@ function AppShell() {
     return () => window.removeEventListener('keydown', onKey)
   }, [menuOpen])
 
+  /*
+    The menu reads as the journey, top to bottom: start at the dashboard, set up
+    the people you work with (a team or organization is chosen when filing), then
+    follow an idea through - shared, reviewed, turned into an automation, built -
+    and end at the market, where finished ideas are sold. Numbered so where to
+    begin and where it ends are plain.
+  */
   const sections: SidebarSection[] = [
     {
-      title: 'Workspace',
-      items: [
-        { to: '/app', label: 'Dashboard', Icon: GridIcon, end: true },
-        { to: '/app/ideas', label: 'Ideas', Icon: BulbIcon },
-        {
-          to: '/app/automation',
-          label: 'Automation',
-          Icon: FlowIcon,
-          // Projects have their own entry below, under Implementation.
-          isActive: (path) =>
-            /^\/app\/automation(\/|$)/.test(path) && !/^\/app\/automation\/projects/.test(path),
-        },
-      ],
+      title: '1 · Start',
+      items: [{ to: '/app', label: 'Dashboard', Icon: GridIcon, end: true }],
     },
     {
-      title: 'Collaboration',
+      title: '2 · Your people',
       items: [
         { to: '/app/organizations', label: 'Organizations', Icon: BuildingIcon },
         { to: '/app/teams', label: 'Teams', Icon: UsersIcon },
@@ -560,18 +556,27 @@ function AppShell() {
       ],
     },
     {
-      title: 'Review & delivery',
+      title: '3 · Idea to solution',
       items: [
+        { to: '/app/ideas', label: 'Ideas', Icon: BulbIcon },
         ...(canReview || adminCapabilities.canReviewPlatformSubmissions
           ? [{ to: '/app/reviews', label: 'Reviews', Icon: ChecklistIcon }]
           : []),
+        {
+          to: '/app/automation',
+          label: 'Automation',
+          Icon: FlowIcon,
+          // Projects have their own entry, Implementation, right after it.
+          isActive: (path) =>
+            /^\/app\/automation(\/|$)/.test(path) && !/^\/app\/automation\/projects/.test(path),
+        },
         { to: '/app/automation/projects', label: 'Implementation', Icon: CodeIcon },
       ],
     },
     {
-      // A section of its own: buying ideas the platform publishes is not part of the
-      // reader's own workspace.
-      title: 'Market',
+      // The end of the journey, and a section of its own: buying ideas the platform
+      // publishes is not part of the reader's own workspace.
+      title: '4 · Market',
       items: [{ to: '/app/marketplace', label: 'Marketplace', Icon: StoreIcon }],
     },
   ]
