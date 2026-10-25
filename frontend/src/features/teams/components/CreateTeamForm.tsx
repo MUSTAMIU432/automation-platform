@@ -1,11 +1,14 @@
 import { useId, useState, type FormEvent } from 'react'
 
+import { ArrowRightIcon, UsersIcon } from '../../../components/AppIcons'
 import { UsersGlyph } from '../../../components/glyphs'
+import { IconField, OwnerNote } from '../../../components/WorkspaceCollection'
 import { GlassBackdropBlobs, GlassFormHeader } from '../../../components/GlassForm'
 import {
   glassButtonClasses,
   glassCardClasses,
   glassInputClasses,
+  requiredMarkClasses,
 } from '../../../components/glassStyles'
 import { fieldErrorClasses, labelClasses } from '../../identity/components/fieldStyles'
 import { createTeamRequest } from '../api/teamsApi'
@@ -27,7 +30,7 @@ import { useTeams } from '../context/useTeams'
  * beside this form has to say so without asking the server a second time for
  * work this page already knows it started.
  */
-export function CreateTeamForm() {
+export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
   const { reload } = useTeams()
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -35,7 +38,8 @@ export function CreateTeamForm() {
   const [field, setField] = useState<string | null>(null)
   const [created, setCreated] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const nameId = useId()
+  const generatedNameId = useId()
+  const nameId = nameInputId ?? generatedNameId
   const descriptionId = useId()
   const messageId = useId()
 
@@ -84,21 +88,27 @@ export function CreateTeamForm() {
         and its owner, and it does not need an organization.
       </GlassFormHeader>
 
-      <div className="mt-5 space-y-4">
+      <div className="mt-6 space-y-5">
         <div>
-          <label className={labelClasses} htmlFor={nameId}>
+          <label className={`${labelClasses} ${requiredMarkClasses}`} htmlFor={nameId}>
             Team name
           </label>
-          <input
-            id={nameId}
-            className={glassInputClasses(field === 'name')}
-            maxLength={200}
-            placeholder="Registrar"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            aria-describedby={message ? messageId : undefined}
-            aria-invalid={field === 'name'}
-          />
+          <IconField Icon={UsersIcon}>
+            <input
+              id={nameId}
+              className={`${glassInputClasses(field === 'name')} pl-10`}
+              maxLength={200}
+              placeholder="e.g. Registrar"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              aria-required="true"
+              aria-describedby={message ? messageId : undefined}
+              aria-invalid={field === 'name'}
+            />
+          </IconField>
+          <p className="mt-1.5 text-xs text-gray-500">
+            Use a name the people in the team will recognize.
+          </p>
         </div>
 
         <div>
@@ -128,13 +138,14 @@ export function CreateTeamForm() {
         </p>
       ) : null}
 
-      <button
-        type="submit"
-        className={glassButtonClasses}
-        disabled={isSubmitting}
-      >
+      <button type="submit" className={glassButtonClasses} disabled={isSubmitting}>
         {isSubmitting ? 'Creating…' : 'Create team'}
+        {!isSubmitting && <ArrowRightIcon className="h-4 w-4" />}
       </button>
+
+      <OwnerNote title="You will become the owner">
+        As the owner, you can invite people, manage the team, and put ideas forward together.
+      </OwnerNote>
 
       {created ? <output className="sr-only">{created}</output> : null}
     </form>

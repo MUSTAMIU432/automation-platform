@@ -18,7 +18,9 @@ import {
   CloseIcon,
   CodeIcon,
   FlowIcon,
+  GearIcon,
   GridIcon,
+  HelpIcon,
   MenuIcon,
   PanelCollapseIcon,
   PanelExpandIcon,
@@ -90,6 +92,7 @@ const ideaOf = (match: RegExpMatchArray) => `/app/ideas/${match[1]}`
   its own entry rather than the bare `/app/ideas/:id` one.
 */
 const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
+  [/^\/app\/help$/, [{ label: 'Help & Support' }]],
   [/^\/app\/ideas\/new$/, [{ label: 'Ideas', to: '/app/ideas' }, { label: 'New idea' }]],
   [
     /^\/app\/ideas\/([^/]+)\/edit$/,
@@ -284,6 +287,11 @@ interface SidebarSection {
   items: SidebarItem[]
 }
 
+const FOOTER_LINKS = [
+  { to: '/app/settings', label: 'Settings', Icon: GearIcon },
+  { to: '/app/help', label: 'Help & Support', Icon: HelpIcon },
+]
+
 function sidebarLinkClass(active: boolean, collapsed: boolean): string {
   return `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
     collapsed ? 'lg:justify-center lg:px-0 lg:py-3' : ''
@@ -430,6 +438,27 @@ function Sidebar({
         </p>
         <span aria-hidden="true" className="relative mt-3 block h-0.5 w-8 rounded-full bg-mint" />
       </div>
+
+      {/* Your account and help: always at the foot, apart from the journey above. */}
+      <nav aria-label="Settings and help" className="mt-3 border-t border-jade/10 pt-3">
+        <ul className="space-y-1">
+          {FOOTER_LINKS.map(({ to, label, Icon }) => (
+            <li key={to}>
+              <NavLink
+                to={to}
+                onClick={onNavigate}
+                title={collapsed ? label : undefined}
+                className={({ isActive }) => sidebarLinkClass(isActive, collapsed)}
+              >
+                <Icon className={`h-5 w-5 shrink-0 ${whenCollapsed('lg:h-6 lg:w-6')}`} />
+                <span className={`flex-1 whitespace-nowrap ${whenCollapsed('lg:sr-only')}`}>
+                  {label}
+                </span>
+              </NavLink>
+            </li>
+          ))}
+        </ul>
+      </nav>
     </aside>
   )
 }
