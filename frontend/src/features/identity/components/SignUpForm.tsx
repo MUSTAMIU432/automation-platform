@@ -319,10 +319,8 @@ export function SignUpForm({ onSwitchToSignIn, returnTo = '/app' }: SignUpFormPr
         <GoogleAuthButton
           disabled={isSubmitting || !googleSignIn.isConfigured}
           onClick={googleSignIn.trigger}
+          googleButtonContainerId={googleSignIn.hiddenButtonContainerId}
         />
-        {/* Google Identity Services renders its own real button here,
-            visually hidden - see SignInForm's matching comment. */}
-        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
         {googleError && (
           <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3.5 py-2.5 text-sm text-red-700">
             {googleError}

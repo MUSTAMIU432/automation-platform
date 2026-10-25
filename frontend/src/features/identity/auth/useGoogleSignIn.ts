@@ -97,7 +97,16 @@ export function useGoogleSignIn(onCredential: (credential: string) => void): Use
           client_id: env.googleClientId,
           callback: (response) => onCredentialRef.current(response.credential),
         })
-        window.google.accounts.id.renderButton(container, { type: 'standard' })
+        // As wide as the button it is laid over (GIS allows 200-400px), so the
+        // reader's click lands on Google's own button wherever they press.
+        const width = container.parentElement?.clientWidth ?? 0
+        window.google.accounts.id.renderButton(container, {
+          type: 'standard',
+          size: 'large',
+          shape: 'pill',
+          text: 'continue_with',
+          width: Math.min(400, Math.max(200, Math.round(width))),
+        })
       })
       .catch(() => {
         // Google's script failed to load (offline, blocked, ...) - the
