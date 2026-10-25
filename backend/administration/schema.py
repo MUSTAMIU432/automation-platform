@@ -357,6 +357,9 @@ class AdminUserType:
     avatar_url: str | None = strawberry.field(
         description='Where the profile photo is served from (needs the bearer token), or null.'
     )
+    sign_in_methods: list[str] = strawberry.field(
+        description="How the account signs in: 'password' (one is set) and/or provider names."
+    )
 
     @staticmethod
     def fields_from(user: User) -> dict:
@@ -381,6 +384,7 @@ class AdminUserType:
                 for membership in user.memberships.all()
             ],
             'avatar_url': avatars.avatar_url(user),
+            'sign_in_methods': selectors.sign_in_methods_of(user),
         }
 
     @staticmethod
@@ -397,9 +401,6 @@ class AdminUserPage:
 @strawberry.type(description='One platform account in detail. Still no credentials.')
 class AdminUserDetailType(AdminUserType):
     phone_number: str
-    sign_in_methods: list[str] = strawberry.field(
-        description="How the account signs in: 'password' (one is set) and/or provider names."
-    )
     idea_count: int
     review_count: int
     comment_count: int
@@ -412,7 +413,6 @@ class AdminUserDetailType(AdminUserType):
         return AdminUserDetailType(
             **AdminUserType.fields_from(detail.user),
             phone_number=detail.user.phone_number,
-            sign_in_methods=detail.sign_in_methods,
             idea_count=detail.idea_count,
             review_count=detail.review_count,
             comment_count=detail.comment_count,

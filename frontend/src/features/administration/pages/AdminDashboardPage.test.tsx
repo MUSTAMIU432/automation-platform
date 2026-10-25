@@ -8,6 +8,7 @@ import { AdminDashboardPage } from './AdminDashboardPage'
 vi.mock('../api/administrationApi', async (importOriginal) => ({
   ...(await importOriginal()),
   adminOverviewRequest: vi.fn(),
+  adminUsersRequest: vi.fn(),
 }))
 
 vi.mock('../../identity/auth/AuthContext', () => ({
@@ -25,8 +26,9 @@ vi.mock('../../identity/auth/AuthContext', () => ({
   }),
 }))
 
-const { adminOverviewRequest } = await import('../api/administrationApi')
+const { adminOverviewRequest, adminUsersRequest } = await import('../api/administrationApi')
 const overviewMock = vi.mocked(adminOverviewRequest)
+const usersMock = vi.mocked(adminUsersRequest)
 
 const OVERVIEW: AdminOverview = {
   userCount: 42,
@@ -89,6 +91,33 @@ const OVERVIEW: AdminOverview = {
 describe('AdminDashboardPage', () => {
   beforeEach(() => {
     overviewMock.mockReset()
+    usersMock.mockReset()
+    usersMock.mockResolvedValue({
+      items: [
+        {
+          id: '9',
+          email: 'new.person@example.com',
+          firstName: 'New',
+          lastName: 'Person',
+          isActive: true,
+          isVerified: true,
+          isPlatformAdmin: false,
+          isSuperuser: false,
+          createdAt: new Date().toISOString(),
+          lastActiveAt: null,
+          memberships: [],
+          avatarUrl: null,
+          signInMethods: ['google'],
+        },
+      ],
+      pageInfo: {
+        offset: 0,
+        limit: 6,
+        totalCount: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    })
   })
 
   it('renders the live platform numbers the server returned', async () => {
@@ -115,6 +144,19 @@ describe('AdminDashboardPage', () => {
     expect(account.getByText('admin@example.com')).toBeInTheDocument()
     expect(account.getByText('Platform administrator')).toBeInTheDocument()
     await screen.findByRole('region', { name: 'Key figures' })
+  })
+
+  it('lists the newest accounts and how they sign in', async () => {
+    overviewMock.mockResolvedValue(OVERVIEW)
+    renderAdminPage(<AdminDashboardPage />)
+
+    const recent = within(await screen.findByRole('list', { name: 'Recent users' }))
+    expect(recent.getByText('New Person')).toBeInTheDocument()
+    expect(recent.getByText('new.person@example.com')).toBeInTheDocument()
+    expect(recent.getByText('Google')).toBeInTheDocument()
+    expect(recent.getByText('Joined Today')).toBeInTheDocument()
+    expect(recent.getByRole('link')).toHaveAttribute('href', '/app/admin/users/9')
+    expect(usersMock).toHaveBeenCalledWith({}, { limit: 6 })
   })
 
   it('links each status count to the filtered idea list', async () => {

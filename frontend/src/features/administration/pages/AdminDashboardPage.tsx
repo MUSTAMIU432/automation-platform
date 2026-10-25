@@ -2,7 +2,12 @@ import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../identity/auth/AuthContext'
 import { Avatar } from '../../identity/components/Avatar'
-import { adminOverviewRequest, type AdminStatusCount } from '../api/administrationApi'
+import {
+  adminOverviewRequest,
+  adminUsersRequest,
+  type AdminStatusCount,
+  type AdminUser,
+} from '../api/administrationApi'
 import {
   AdminPageHeader,
   EmptyState,
@@ -142,6 +147,126 @@ function IdeasByStatus({ counts, total }: { counts: AdminStatusCount[]; total: n
   )
 }
 
+/** How many of the newest accounts the overview shows; the Users page has the rest. */
+const RECENT_USER_LIMIT = 6
+
+/** "Today", "Yesterday", "3 days ago", then the date. */
+function joinedWhen(iso: string, now = new Date()): string {
+  const day = (date: Date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const days = Math.round((day(now) - day(new Date(iso))) / 86_400_000)
+  if (days <= 0) return 'Today'
+  if (days === 1) return 'Yesterday'
+  if (days < 7) return `${days} days ago`
+  return new Date(iso).toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
+/** The way in, as a chip: Google, or email and password. */
+function SignInChips({ methods }: { methods: string[] }) {
+  return (
+    <span className="flex flex-wrap gap-1">
+      {methods.includes('google') && (
+        <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 ring-1 ring-slate-200">
+          Google
+        </span>
+      )}
+      {methods.includes('password') && (
+        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+          Email
+        </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * The newest accounts on the platform, so an administrator sees who has just
+ * joined - and how they sign in - without leaving the overview. The server's own
+ * list (newest first), cut to a handful; each row opens the account.
+ */
+function RecentUsers({ total }: { total: number }) {
+  const { data, loading, error, reload } = useAdminQuery(
+    'recent-users',
+    () => adminUsersRequest({}, { limit: RECENT_USER_LIMIT }),
+    'We could not load the newest accounts.',
+  )
+  const users: AdminUser[] = data?.items ?? []
+
+  return (
+    <section
+      aria-labelledby="recent-users-heading"
+      className={`rounded-3xl p-5 sm:p-6 ${glassSurface}`}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h2 id="recent-users-heading" className="text-lg font-bold text-slate-900">
+            Recent users
+          </h2>
+          <p className="text-sm text-slate-500">
+            {total === 1 ? '1 account on the platform' : `${total} accounts on the platform`}
+          </p>
+        </div>
+        <Link
+          to="/app/admin/users"
+          className="text-sm font-semibold text-brand-700 hover:text-brand-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+        >
+          View all users →
+        </Link>
+      </div>
+
+      {error ? (
+        <div className="mt-4">
+          <ErrorState message={error} onRetry={reload} />
+        </div>
+      ) : loading && !data ? (
+        <p className="mt-4 text-sm text-slate-500">Loading the newest accounts…</p>
+      ) : users.length === 0 ? (
+        <p className="mt-4 text-sm text-slate-500">No accounts yet.</p>
+      ) : (
+        <ul aria-label="Recent users" className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {users.map((user) => {
+            const name = `${user.firstName} ${user.lastName}`.trim() || user.email
+            return (
+              <li key={user.id}>
+                <Link
+                  to={`/app/admin/users/${user.id}`}
+                  className="flex h-full items-center gap-3 rounded-2xl border border-white/80 bg-white/75 p-3 ring-1 ring-slate-900/5 transition hover:-translate-y-0.5 hover:bg-white/95 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-reduce:hover:translate-y-0"
+                >
+                  <Avatar
+                    user={user}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-brand-500 to-teal-500 text-sm font-bold text-white ring-2 ring-white"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-slate-900">{name}</span>
+                      {user.isPlatformAdmin && (
+                        <span className="shrink-0 rounded-full bg-brand-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                          Admin
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-slate-600">{user.email}</span>
+                    <span className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <SignInChips methods={user.signInMethods} />
+                      <span className="text-[11px] text-slate-500">
+                        Joined {joinedWhen(user.createdAt)}
+                      </span>
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 function countOf(counts: AdminStatusCount[], status: AdminStatusCount['status']): number {
   return counts.find((item) => item.status === status)?.count ?? 0
 }
@@ -239,6 +364,7 @@ export function AdminDashboardPage() {
             </div>
           </section>
 
+          <RecentUsers total={data.userCount} />
           <IdeasByStatus counts={data.ideasByStatus} total={data.ideaCount} />
         </div>
       )}
