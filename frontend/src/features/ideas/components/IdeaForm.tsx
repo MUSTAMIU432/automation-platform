@@ -2,11 +2,8 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type React
 
 import { audienceDescription, contextDescription } from '../utils/lifecycle'
 import { useMyTeams } from '../../teams/hooks/useMyTeams'
-import {
-  fieldErrorClasses,
-  inputClasses,
-  labelClasses,
-} from '../../identity/components/fieldStyles'
+import { glassInputClasses } from '../../../components/glassStyles'
+import { fieldErrorClasses, labelClasses } from '../../identity/components/fieldStyles'
 import {
   categoriesRequest,
   createIdeaRequest,
@@ -92,13 +89,13 @@ export { MIN_DESCRIPTION_LENGTH } from './intake/formModel'
  */
 
 const primaryButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white shadow-sm shadow-brand-900/10 motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:bg-brand-300'
+  'inline-flex h-11 items-center justify-center gap-2 rounded-full bg-linear-to-r from-brand-600 to-brand-500 px-6 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_12px_26px_-12px_rgba(20,99,73,0.85)] motion-safe:transition-colors motion-safe:duration-150 hover:from-brand-700 hover:to-brand-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:from-brand-300 disabled:to-brand-300 disabled:shadow-none'
 
 const secondaryButtonClasses =
-  'inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-brand-300 bg-white px-4 text-sm font-semibold text-brand-700 shadow-sm motion-safe:transition-colors motion-safe:duration-150 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex h-11 items-center justify-center gap-2 rounded-full border border-brand-300 bg-white/80 px-5 text-sm font-semibold text-brand-700 shadow-sm backdrop-blur motion-safe:transition-colors motion-safe:duration-150 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed disabled:opacity-60'
 
 const quietButtonClasses =
-  'inline-flex h-11 items-center rounded-lg px-4 text-sm font-semibold text-gray-700 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:opacity-60'
+  'inline-flex h-11 items-center rounded-full px-4 text-sm font-semibold text-gray-700 hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:opacity-60'
 
 interface IdeaFormProps {
   /**
@@ -769,7 +766,7 @@ export function IdeaForm({
                 ) : (
                   <select
                     id={teamIdForLabel}
-                    className={`${inputClasses(Boolean(errors.teamId))} w-full`}
+                    className={glassInputClasses(Boolean(errors.teamId))}
                     value={values.teamId}
                     disabled={disabled || isRevising || contextLocked}
                     onChange={(event) => setField('teamId', event.target.value)}
@@ -795,7 +792,7 @@ export function IdeaForm({
               </p>
               <select
                 id={categoryIdForLabel}
-                className={`${inputClasses(Boolean(errors.categoryId))} w-full`}
+                className={glassInputClasses(Boolean(errors.categoryId))}
                 value={values.categoryId}
                 disabled={disabled || isLoadingCategories}
                 onChange={(event) => setField('categoryId', event.target.value)}
@@ -892,7 +889,7 @@ export function IdeaForm({
       // cannot style the element that declares the container, hence `lg:`), so the page never scrolls here. Everything that
       // does not fit goes into the questions pane instead - see the grid below.
       // Below `@3xl` none of this applies and the page scrolls as it always did.
-      className="@container overflow-hidden rounded-xl border border-gray-200 bg-white p-5 pt-0 shadow-sm sm:p-6 sm:pt-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+      className="@container overflow-hidden rounded-3xl border border-white/80 bg-white/75 p-5 pt-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_24px_60px_-36px_rgba(8,75,56,0.55)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl sm:p-6 sm:pt-0 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
 
       onSubmit={handleSubmit}
       noValidate
@@ -902,7 +899,7 @@ export function IdeaForm({
         // from the server's history, unchanged by anything saved here.
         <section
           aria-label="Reviewer feedback"
-          className="mt-4 shrink-0 rounded-lg border border-amber-200 bg-amber-50 p-3"
+          className="mt-4 shrink-0 rounded-2xl border border-amber-200 bg-amber-50/90 p-4"
         >
           <h3 className="text-sm font-semibold text-amber-900">Reviewer feedback</h3>
           <div className="mt-2">
@@ -914,7 +911,7 @@ export function IdeaForm({
       {formError && (
         <p
           role="alert"
-          className="mt-4 shrink-0 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+          className="mt-4 shrink-0 rounded-2xl bg-red-50/90 px-4 py-3 text-sm text-red-700 ring-1 ring-red-100"
         >
           {formError}
         </p>
@@ -932,7 +929,7 @@ export function IdeaForm({
           // `overflow-clip` rather than `overflow-hidden` for the glow, and
           // `min-h-0` so this grid item may be shorter than its content without
           // pushing the card past the height it is capped at.
-          className="relative isolate -mx-5 overflow-clip border-b-2 border-gray-300 bg-linear-to-br from-brand-50 via-slate-50 to-sky-50 px-4 py-5 sm:-mx-6 sm:px-5 @3xl:mx-0 @3xl:-ml-6 @3xl:min-h-0 @3xl:border-r-2 @3xl:border-b-0 @3xl:py-5 @3xl:pr-5 @3xl:pl-5"
+          className="relative isolate -mx-5 overflow-clip border-b border-white/80 bg-linear-to-br from-brand-50 via-slate-50 to-sky-50 px-4 py-5 sm:-mx-6 sm:px-5 @3xl:mx-0 @3xl:-ml-6 @3xl:min-h-0 @3xl:border-r @3xl:border-b-0 @3xl:py-5 @3xl:pr-5 @3xl:pl-5"
         >
           {/* Soft colour behind the glass, so the blur has something to blur. */}
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
@@ -947,7 +944,7 @@ export function IdeaForm({
             the space it was given. It is a flex column so the step list below
             takes the height that is left over.
           */}
-          <div className="flex flex-col rounded-2xl border border-white/80 bg-white/45 p-3 shadow-lg shadow-slate-900/5 ring-1 ring-slate-900/5 backdrop-blur-xl">
+          <div className="flex flex-col rounded-3xl border border-white/80 bg-white/50 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_40px_-28px_rgba(8,75,56,0.45)] ring-1 ring-slate-900/5 backdrop-blur-xl">
             <StepProgress
               steps={STEPS}
               current={step}
@@ -978,8 +975,8 @@ export function IdeaForm({
             costs the step list nothing and scrolls away with the questions it
             introduces.
           */}
-          <div className="mb-6 border-b border-gray-200 pb-5">
-            <h2 className="text-base font-semibold text-gray-900">
+          <div className="mb-6 border-b border-slate-200/80 pb-5">
+            <h2 className="text-xs font-semibold tracking-[0.16em] text-brand-700 uppercase">
               {isRevising ? 'Revise this idea' : isEditing ? 'Edit this draft' : 'Share a problem'}
             </h2>
             <p className="mt-1 text-sm leading-6 text-gray-600">
@@ -994,7 +991,7 @@ export function IdeaForm({
             id={stepHeadingId}
             ref={stepHeadingRef}
             tabIndex={-1}
-            className="text-lg font-semibold text-gray-900 focus:outline-none"
+            className="text-xl font-bold tracking-tight text-gray-900 focus:outline-none"
           >
             {current.title}
           </h3>
@@ -1007,7 +1004,7 @@ export function IdeaForm({
         {progress}
       </p>
 
-      <div className="@3xl:shrink-0 mt-2 flex flex-wrap items-center justify-between gap-3 border-t-2 border-gray-300 pt-5">
+      <div className="@3xl:shrink-0 mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/80 pt-5">
         <div className="flex flex-wrap items-center gap-2">
           {step > 0 && (
             <button
