@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -78,13 +77,13 @@ interface Crumb {
 
 const ideaOf = (match: RegExpMatchArray) => `/app/ideas/${match[1]}`
 
-/** The trail after "Workspace" for each `/app` sub-path. */
 /*
-  The trail after "Workspace" for each `/app` sub-path.
+  Where each `/app` sub-page sits under "Workspace", for the back arrow: the last
+  crumb with a link is where back leads.
 
   Patterns rather than exact paths, because half these pages carry an id — a
   team, a conversation, an idea's report — and an exact lookup would give them
-  no breadcrumb at all. Ordered longest-first so `/app/ideas/:id/report` matches
+  no way back at all. Ordered longest-first so `/app/ideas/:id/report` matches
   its own entry rather than the bare `/app/ideas/:id` one.
 */
 const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
@@ -141,96 +140,64 @@ const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
   [/^\/app\/marketplace$/, [{ label: 'Marketplace' }]],
 ]
 
-const crumbLinkClass =
-  'rounded font-semibold text-brand-700 hover:text-brand-800 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300'
-
 /**
- * "← Workspace / <page>" above every `/app` sub-page, so the way back to the
- * organization workspace sits right above the content, not only in the header.
+ * The way back from an `/app` sub-page: a round arrow in the header, beside the
+ * logo. No trail of links and no addresses - the page's own title says where the
+ * reader is, and the arrow takes them back.
+ *
+ * Back means one step up - from an idea to Ideas, from a team to Teams - and a
+ * section's own top page leads home. A page opened as a detour ("View original
+ * idea" from a project, say) leads back to where the reader was instead. So the
+ * arrow goes where the reader expects however they arrived: a refresh, a
+ * notification, a bookmark. The workspace home has no arrow: it is home.
  */
-function WorkspaceBreadcrumb({
-  widthClass,
-  indentClass = '',
-}: {
-  widthClass: string
-  /** Lines the trail up with the content column when the sidebar is beside it. */
-  indentClass?: string
-}) {
+function BackButton() {
   const { pathname, state } = useLocation()
-  // A page opened as a detour - "View original idea" from a project, say - leads back to
-  // where the reader was rather than home.
   const detour = readReturnTo(state)
   const normalized = pathname.replace(/\/+$/, '')
   const entry = SECTION_TRAILS.find(([pattern]) => pattern.test(normalized))
   if (!entry) return null
   const match = normalized.match(entry[0]) as RegExpMatchArray
-  const fullTrail = entry[1].map((crumb) => ({
-    label: crumb.label,
-    to: typeof crumb.to === 'function' ? crumb.to(match) : crumb.to,
-  }))
-  // Otherwise the way back is one step up - from an idea to Ideas, from a team to
-  // Teams - and only a section's own top page leads home. So the arrow goes where
-  // the reader expects however they arrived: a refresh, a notification, a bookmark.
-  const parent = [...fullTrail].reverse().find((crumb) => crumb.to)
+  const parent = [...entry[1]]
+    .reverse()
+    .map((crumb) => ({
+      label: crumb.label,
+      to: typeof crumb.to === 'function' ? crumb.to(match) : crumb.to,
+    }))
+    .find((crumb) => crumb.to)
   const back =
     detour ??
-    (parent?.to ? { path: parent.to, label: `Back to ${parent.label.toLowerCase()}` } : null)
-  // A crumb the back control already leads to is left out: "Back to ideas / Ideas"
-  // would name one page twice, and the plain crumb would drop the filters the back
-  // control returns to.
-  const backPathname = back?.path.split('?')[0]
-  const trail = fullTrail.filter((crumb) => !crumb.to || crumb.to !== backPathname)
+    (parent?.to
+      ? { path: parent.to, label: `Back to ${parent.label.toLowerCase()}`, state: undefined }
+      : { path: '/app', label: 'Back to home', state: undefined })
 
   return (
-    <nav aria-label="Breadcrumb" className={`mx-auto ${widthClass} ${indentClass} pt-5 pb-2`}>
-      <ol className="flex items-center gap-2 text-sm">
-        <li>
-          <Link
-            to={back?.path ?? '/app'}
-            state={back?.state}
-            className="group inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-white px-3 py-1.5 font-semibold text-brand-700 shadow-sm transition-colors hover:border-brand-300 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-          >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 20 20"
-              className="h-4 w-4 transition-transform group-hover:-translate-x-0.5"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M12.5 15 7.5 10l5-5" />
-            </svg>
-            {back?.label ?? 'Home'}
-          </Link>
-        </li>
-        {trail.map((crumb) => (
-          <Fragment key={crumb.label}>
-            <li aria-hidden="true" className="text-gray-400">
-              /
-            </li>
-            {crumb.to ? (
-              <li>
-                <Link to={crumb.to} className={crumbLinkClass}>
-                  {crumb.label}
-                </Link>
-              </li>
-            ) : (
-              <li aria-current="page" className="font-medium text-gray-600">
-                {crumb.label}
-              </li>
-            )}
-          </Fragment>
-        ))}
-      </ol>
-    </nav>
+    <Link
+      to={back.path}
+      state={back.state}
+      aria-label={back.label}
+      title={back.label}
+      className="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+    >
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        className="h-5 w-5 transition-transform group-hover:-translate-x-0.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M12.5 15 7.5 10l5-5" />
+      </svg>
+    </Link>
   )
 }
 
 /**
  * The rendered height of an element, kept current as it changes - the header
- * wraps on narrow screens, and the breadcrumb comes and goes between pages.
+ * wraps on narrow screens, and the back arrow comes and goes between pages.
  */
 function useElementHeight(ref: RefObject<HTMLElement | null>): number {
   const [height, setHeight] = useState(0)
@@ -489,7 +456,7 @@ function AppShell() {
   const showSidebar = !isAdmin
   /*
     Every page takes the whole width of the window - the menu on the left, the page
-    beside it - and the header and breadcrumb stretch with it, so their edges stay in
+    beside it - and the header stretches with it, so their edges stay in
     line with the content on any screen.
   */
   const widthClass = 'max-w-none'
@@ -570,13 +537,12 @@ function AppShell() {
 
       {/*
        * The header and the content share one centered width, so the bar's edges
-       * line up with the page at any screen size. The breadcrumb is pinned with
-       * the bar: the way back stays in reach however far down the page the
-       * reader is.
+       * line up with the page at any screen size. The way back is the arrow in
+       * the bar, so it stays in reach however far down the page the reader is.
        */}
       <div
         ref={chromeRef}
-        className="sticky top-0 z-30 bg-slate-50/80 px-3 pt-3 backdrop-blur-xl sm:px-4 lg:px-6"
+        className="sticky top-0 z-30 bg-slate-50/80 px-3 py-3 backdrop-blur-xl sm:px-4 lg:px-6"
       >
         <header
           className={`mx-auto flex ${widthClass} items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-forest via-pine to-jade px-3 py-2.5 shadow-[0_18px_40px_-20px_rgba(6,47,37,0.8)] ring-1 ring-white/10 sm:gap-4 sm:px-5`}
@@ -594,6 +560,7 @@ function AppShell() {
                 {menuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
             )}
+            <BackButton />
             <Link
               to="/app"
               aria-label="MUSTANET home"
@@ -621,10 +588,6 @@ function AppShell() {
             />
           </div>
         </header>
-        <WorkspaceBreadcrumb
-          widthClass={widthClass}
-          indentClass={showSidebar ? 'lg:pl-[17.5rem]' : ''}
-        />
       </div>
 
       {menuOpen && (
