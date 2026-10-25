@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react'
 
 /**
- * The website's two looks: the brand `green`, and `white` - a white page with
- * near-black text, glass and blue accents. Only the public website switches;
+ * The website's two looks: the brand `green`, and `midnight` - black and blue:
+ * a black page, dark cards, white headings and one blue accent. Only the public website switches;
  * the app keeps its own colours.
  */
-export type LandingTheme = 'green' | 'white'
+export type LandingTheme = 'green' | 'midnight'
 
 const STORAGE_KEY = 'mustanet:landing-theme'
 
@@ -16,7 +16,7 @@ const STORAGE_KEY = 'mustanet:landing-theme'
  */
 function readStoredTheme(): LandingTheme {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === 'white' ? 'white' : 'green'
+    return window.localStorage.getItem(STORAGE_KEY) === 'midnight' ? 'midnight' : 'green'
   } catch {
     return 'green'
   }
