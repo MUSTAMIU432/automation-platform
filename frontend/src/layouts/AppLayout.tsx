@@ -144,9 +144,9 @@ const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
 ]
 
 /**
- * The way back from an `/app` sub-page: a round arrow in the header, beside the
- * logo. No trail of links and no addresses - the page's own title says where the
- * reader is, and the arrow takes them back.
+ * The way back from an `/app` sub-page: a round arrow just above the page's
+ * title. No trail of links and no addresses - the title says where the reader
+ * is, and the arrow takes them back.
  *
  * Back means one step up - from an idea to Ideas, from a team to Teams - and a
  * section's own top page leads home. A page opened as a detour ("View original
@@ -180,7 +180,7 @@ function BackButton() {
       state={back.state}
       aria-label={back.label}
       title={back.label}
-      className="group inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] backdrop-blur hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+      className="group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white/80 text-brand-700 shadow-sm backdrop-blur transition-colors hover:border-brand-300 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
     >
       <svg
         aria-hidden="true"
@@ -601,8 +601,7 @@ function AppShell() {
 
       {/*
        * The header and the content share one centered width, so the bar's edges
-       * line up with the page at any screen size. The way back is the arrow in
-       * the bar, so it stays in reach however far down the page the reader is.
+       * line up with the page at any screen size.
        */}
       <div
         ref={chromeRef}
@@ -624,7 +623,6 @@ function AppShell() {
                 {menuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
             )}
-            <BackButton />
             <Link
               to="/app"
               aria-label="MUSTANET home"
@@ -676,6 +674,8 @@ function AppShell() {
           />
         )}
         <main className="min-w-0 flex-1 pt-2">
+          {/* The way back sits with the page it leaves, just above its title. */}
+          <BackButton />
           {/* An administrator's home is the console. */}
           {isAdmin && pathname.replace(/\/+$/, '') === '/app' ? (
             <Navigate to="/app/admin" replace />
