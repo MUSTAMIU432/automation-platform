@@ -367,6 +367,16 @@ export function IdeaForm({
     const nextErrors = validate(values, mode)
     if (hasErrors(nextErrors)) {
       showErrors(nextErrors)
+      // Say why at the top too: the step it jumps to may be one the author
+      // never opened, and a red mark alone does not say what is missing.
+      if (mode === 'submit') {
+        const missing = Object.values(nextErrors).filter(Boolean)
+        setFormError(
+          missing.length === 1
+            ? `Before submitting: ${missing[0]}`
+            : `Before submitting, ${missing.length} answers need attention - see the steps marked "!".`,
+        )
+      }
       return
     }
     setErrors({})

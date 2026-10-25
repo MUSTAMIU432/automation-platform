@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -114,7 +114,7 @@ describe('NewIdeaPage', () => {
     expect(router.state.historyAction).toBe('REPLACE')
   })
 
-  it('submits the idea and redirects to the list with a success alert', async () => {
+  it('submits the idea, confirms it in a dialog, then shows it on the list', async () => {
     vi.mocked(categoriesRequest).mockResolvedValue([
       { id: '10', name: 'Finance', slug: 'finance', description: '' },
     ])
@@ -142,6 +142,13 @@ describe('NewIdeaPage', () => {
     goToStep(EVIDENCE_STEP)
     fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
 
+    const dialog = within(await screen.findByRole('dialog', { name: 'Your idea is submitted' }))
+    expect(dialog.getByText('“A new idea”')).toBeInTheDocument()
+    expect(dialog.getByText('What happens next')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/ideas/new')
+
+    fireEvent.click(dialog.getByRole('button', { name: 'View my ideas' }))
+
     expect(
       await screen.findByText(
         'Ideas list: Your idea "A new idea" was created and submitted for review.',
@@ -152,6 +159,46 @@ describe('NewIdeaPage', () => {
     expect(submitMock).toHaveBeenCalledWith('1')
     expect(router.state.location.pathname).toBe('/app/ideas')
     expect(router.state.historyAction).toBe('REPLACE')
+  })
+
+  it('starts a fresh form from the dialog to share another problem', async () => {
+    vi.mocked(categoriesRequest).mockResolvedValue([
+      { id: '10', name: 'Finance', slug: 'finance', description: '' },
+    ])
+    createMock.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      field: null,
+      idea: { ...CREATED, visibility: 'ORGANIZATION' },
+    })
+    submitMock.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      field: null,
+      idea: { ...CREATED, visibility: 'ORGANIZATION', status: 'SUBMITTED' },
+    })
+    const router = renderAt()
+
+    fillProblem()
+    goToStep(CLASSIFY_STEP)
+    await screen.findByRole('option', { name: 'Finance' })
+    fireEvent.change(screen.getByLabelText('Category'), {
+      target: { value: '10' },
+    })
+    fireEvent.click(contextChoice('Organization level'))
+    goToStep(EVIDENCE_STEP)
+    fireEvent.click(screen.getByRole('button', { name: 'Submit for review' }))
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'Your idea is submitted' }))
+    expect(dialog.getByText('“A new idea”')).toBeInTheDocument()
+    expect(dialog.getByText('What happens next')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/ideas/new')
+
+    fireEvent.click(dialog.getByRole('button', { name: 'Share another problem' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Your idea is submitted' })).toBeNull()
+    expect(router.state.location.pathname).toBe('/app/ideas/new')
+    expect(screen.getByText('Step 1 of 8')).toBeInTheDocument()
   })
 
   it('warns, naming the file, when a supporting document could not be attached', async () => {
