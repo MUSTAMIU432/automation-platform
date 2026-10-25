@@ -59,40 +59,42 @@
   --lp-rock-near-bottom: #010806;
 }
 
-/* The website's Midnight theme: black, milk white and blue, chosen with the
-   header's toggle. Only the website's own subtree takes it (LandingPage sets the
-   attribute), so the app, the auth pages and the green default are untouched. */
+/* The website's Midnight theme: black and white, with blue only as the accent
+   (buttons, glows, highlights), chosen with the header's toggle. The dark areas
+   are true black and neutral greys - no navy - and the light ones plain white.
+   Only the website's own subtree takes it (LandingPage sets the attribute), so
+   the app, the auth pages and the green default are untouched. */
 [data-landing-theme='midnight'] {
-  --color-forest: #0a0c12;
-  --color-pine: #16213d;
+  --color-forest: #0a0a0a;
+  --color-pine: #262626;
   --color-jade: #2563eb;
   --color-mint: #6ea8ff;
-  --color-mist: #f5f1e8;
-  --color-ink: #0f172a;
-  --color-sage: #5b6475;
+  --color-mist: #fafafa;
+  --color-ink: #0a0a0a;
+  --color-sage: #6b6b6b;
 
   --lp-mint: 110 168 255;
-  --lp-jade: 37 99 235;
-  --lp-pine: 22 33 61;
-  --lp-deep: 8 12 24;
-  --lp-ink: 15 23 42;
+  --lp-jade: 128 128 136;
+  --lp-pine: 38 38 38;
+  --lp-deep: 10 10 10;
+  --lp-ink: 10 10 10;
   --lp-mint-light: #c7dcff;
   --lp-mint-soft: #9cc3ff;
   --lp-mint-pale: #e3eeff;
-  --lp-bg-top: #0d1324;
-  --lp-bg: #06080e;
-  --lp-bg-deep: #020306;
-  --lp-screen: #f7f4ee;
-  --lp-screen-side: #0b1020;
-  --lp-plinth-1: #18243f;
-  --lp-plinth-2: #0b1222;
-  --lp-plinth-3: #03050b;
-  --lp-plinth-top-1: #1b3570;
-  --lp-plinth-top-2: #0b1733;
-  --lp-rock-far-top: #141c30;
-  --lp-rock-far-bottom: #04060c;
-  --lp-rock-near-top: #0d1426;
-  --lp-rock-near-bottom: #010204;
+  --lp-bg-top: #141414;
+  --lp-bg: #080808;
+  --lp-bg-deep: #000000;
+  --lp-screen: #ffffff;
+  --lp-screen-side: #0a0a0a;
+  --lp-plinth-1: #2a2a2a;
+  --lp-plinth-2: #121212;
+  --lp-plinth-3: #000000;
+  --lp-plinth-top-1: #303030;
+  --lp-plinth-top-2: #141414;
+  --lp-rock-far-top: #1c1c1c;
+  --lp-rock-far-bottom: #050505;
+  --lp-rock-near-top: #121212;
+  --lp-rock-near-bottom: #000000;
 }
 
 @keyframes fade-in {
