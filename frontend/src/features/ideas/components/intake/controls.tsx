@@ -1,10 +1,7 @@
 import { useId, type ReactNode } from 'react'
 
-import {
-  fieldErrorClasses,
-  inputClasses,
-  labelClasses,
-} from '../../../identity/components/fieldStyles'
+import { glassInputClasses } from '../../../../components/glassStyles'
+import { fieldErrorClasses, labelClasses } from '../../../identity/components/fieldStyles'
 
 /**
  * The intake form's question controls. Each renders one question the way the
@@ -99,14 +96,14 @@ export function TextQuestion({
         <textarea
           {...shared}
           rows={rows}
-          className={`${inputClasses(Boolean(error), { multiline: true, large })} w-full resize-y`}
+          className={glassInputClasses(Boolean(error), { multiline: true, large })}
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (
         <input
           {...shared}
           inputMode={inputMode}
-          className={`${inputClasses(Boolean(error), { large })} w-full`}
+          className={glassInputClasses(Boolean(error), { large })}
           onChange={(event) => onChange(event.target.value)}
         />
       )}
@@ -144,7 +141,7 @@ interface ChoiceOption<T extends string> {
  * third design.
  */
 export const choiceClasses =
-  'flex cursor-pointer items-center gap-2.5 rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-800 transition-colors hover:border-brand-200 hover:bg-gray-50 has-checked:border-brand-400 has-checked:bg-brand-50 has-disabled:cursor-not-allowed has-disabled:opacity-60'
+  'flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 bg-white/75 px-3.5 py-3 text-sm text-gray-800 shadow-sm backdrop-blur-sm transition-colors hover:border-brand-300 hover:bg-white has-checked:border-brand-400 has-checked:bg-brand-50/90 has-checked:ring-1 has-checked:ring-brand-200 has-disabled:cursor-not-allowed has-disabled:opacity-60'
 
 /** Pick any number of options: "select all that apply". */
 export function CheckboxQuestion<T extends string>({

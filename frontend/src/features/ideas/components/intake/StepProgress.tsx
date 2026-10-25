@@ -38,9 +38,12 @@ function statusLine(state: StepState, answered: boolean): string | null {
  * The values live in the form, not in the steps, so moving never loses an
  * answer.
  *
- * Wide, it is a frosted sidebar of step cards, each with its status; narrow (the edit panel beside the ideas list), a row of
- * numbered buttons under a progress bar. The same buttons either way, each
- * named in full for assistive technology whichever way it is drawn.
+ * Wide, it is a vertical stepper on frosted glass: a numbered circle per step,
+ * joined by a line that turns green as steps are answered, a tick on each
+ * answered step, and the open step lifted onto a glass highlight. Narrow (the
+ * edit panel beside the ideas list), a row of numbered buttons under a progress
+ * bar. The same buttons either way, each named in full for assistive technology
+ * whichever way it is drawn.
  */
 export function StepProgress({
   steps,
@@ -84,13 +87,24 @@ export function StepProgress({
         aria-label={`Step ${current + 1} of ${steps.length}: ${steps[current].title}`}
         className="mt-2 block h-1.5 w-full appearance-none overflow-hidden rounded-full bg-gray-200 [&::-moz-progress-bar]:bg-brand-600 [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-value]:bg-brand-600 [&::-webkit-progress-value]:motion-safe:transition-[width]"
       />
-      <ol className="mt-4 flex flex-wrap gap-2 @3xl:mt-4 @3xl:flex-1 @3xl:flex-col @3xl:gap-1.5">
+      <ol className="mt-4 flex flex-wrap gap-2 @3xl:mt-5 @3xl:flex-1 @3xl:flex-col @3xl:gap-0">
         {steps.map((step, index) => {
           const state = states[index]
           const status = statusLine(state, answered[index])
           const hasPill = state === 'error' || answered[index]
+          const done = state === 'answered' || (state !== 'error' && answered[index])
+          const last = index === steps.length - 1
           return (
-            <li key={step.title}>
+            <li key={step.title} className="@3xl:relative">
+              {/* The line down to the next step: green once this one is answered. */}
+              {!last && (
+                <span
+                  aria-hidden="true"
+                  className={`hidden @3xl:absolute @3xl:top-[2.7rem] @3xl:-bottom-[0.65rem] @3xl:left-[1.44rem] @3xl:block @3xl:w-0.5 @3xl:rounded-full ${
+                    done ? 'bg-brand-400' : 'bg-slate-200'
+                  }`}
+                />
+              )}
               <button
                 type="button"
                 disabled={disabled}
@@ -103,32 +117,34 @@ export function StepProgress({
                       ? ' (started)'
                       : ''
                 }`}
-                className={`group flex items-center gap-3 rounded-full text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed motion-safe:transition-colors @3xl:w-full @3xl:rounded-xl @3xl:border @3xl:px-3 @3xl:py-2 @3xl:shadow-sm @3xl:backdrop-blur-sm ${
+                className={`group flex items-center gap-3 rounded-full text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 disabled:cursor-not-allowed motion-safe:transition-colors @3xl:relative @3xl:w-full @3xl:items-start @3xl:rounded-2xl @3xl:px-2 @3xl:py-2.5 ${
                   state === 'current'
-                    ? '@3xl:border-brand-300 @3xl:bg-brand-50/85 @3xl:shadow-brand-900/5 @3xl:ring-1 @3xl:ring-brand-200'
-                    : state === 'error'
-                      ? '@3xl:border-red-200 @3xl:bg-white/80'
-                      : '@3xl:border-white/80 @3xl:bg-white/70 @3xl:hover:border-brand-200 @3xl:hover:bg-white/90'
+                    ? '@3xl:bg-white/85 @3xl:shadow-[0_10px_24px_-18px_rgba(8,75,56,0.6)] @3xl:ring-1 @3xl:ring-white'
+                    : '@3xl:hover:bg-white/50'
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ring-1 ${
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ring-1 @3xl:h-8 @3xl:w-8 @3xl:text-sm ${
                     state === 'current'
-                      ? 'bg-brand-600 text-white ring-brand-600'
+                      ? 'bg-brand-600 text-white shadow-[0_0_0_4px_rgba(28,138,99,0.15)] ring-brand-600'
                       : state === 'error'
                         ? 'bg-red-50 text-red-700 ring-red-300'
-                        : state === 'answered'
-                          ? 'bg-brand-50 text-brand-700 ring-brand-200'
-                          : 'bg-white text-gray-500 ring-gray-300'
+                        : done
+                          ? 'bg-brand-500 text-white ring-brand-500'
+                          : 'bg-white text-gray-500 ring-slate-300'
                   }`}
                 >
-                  {state === 'error' ? '!' : index + 1}
+                  {state === 'error' ? '!' : done && state !== 'current' ? '✓' : index + 1}
                 </span>
-                <span aria-hidden="true" className="hidden min-w-0 flex-1 @3xl:block">
+                <span aria-hidden="true" className="hidden min-w-0 flex-1 @3xl:block @3xl:pt-1">
                   <span
                     className={`block leading-5 font-semibold ${
-                      state === 'current' ? 'text-brand-800' : 'text-gray-900'
+                      state === 'current'
+                        ? 'text-brand-800'
+                        : done || state === 'error'
+                          ? 'text-gray-900'
+                          : 'text-gray-500'
                     }`}
                   >
                     {step.title}

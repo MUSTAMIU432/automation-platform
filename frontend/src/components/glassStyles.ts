@@ -18,12 +18,20 @@ export const glassButtonClasses =
  * A frosted field that still reads as a field: mostly-opaque white with a clear
  * slate outline, so it stands apart from the white glass card around it.
  */
-export function glassInputClasses(hasError: boolean, { multiline = false } = {}): string {
+export function glassInputClasses(
+  hasError: boolean,
+  { multiline = false, large = false } = {},
+): string {
+  const size = multiline
+    ? `resize-y ${large ? 'py-3 text-base' : 'py-2.5 text-sm'}`
+    : large
+      ? 'h-12 text-base'
+      : 'h-11 text-sm'
   return [
-    'block w-full rounded-xl border bg-white/85 px-3.5 text-sm text-gray-900 shadow-[inset_0_1px_2px_rgba(15,74,55,0.1)] backdrop-blur-sm',
-    multiline ? 'resize-y py-2.5' : 'h-11',
+    `block w-full rounded-xl border bg-white/85 px-3.5 text-gray-900 shadow-[inset_0_1px_2px_rgba(15,74,55,0.1)] backdrop-blur-sm ${size}`,
     'placeholder:text-gray-500 focus:bg-white focus:outline-none focus:ring-2',
     'motion-safe:transition-[background-color,border-color,box-shadow] motion-safe:duration-150',
+    'disabled:cursor-not-allowed disabled:opacity-60',
     hasError
       ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
       : 'border-slate-300 hover:border-brand-400 focus:border-brand-500 focus:ring-brand-200',
