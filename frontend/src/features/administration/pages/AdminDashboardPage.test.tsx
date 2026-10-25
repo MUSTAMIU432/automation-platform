@@ -10,6 +10,21 @@ vi.mock('../api/administrationApi', async (importOriginal) => ({
   adminOverviewRequest: vi.fn(),
 }))
 
+vi.mock('../../identity/auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: {
+      id: '1',
+      email: 'admin@example.com',
+      firstName: 'Mustafa',
+      lastName: 'Mustamiu',
+      phoneNumber: '',
+      isActive: true,
+      isVerified: true,
+      avatarUrl: null,
+    },
+  }),
+}))
+
 const { adminOverviewRequest } = await import('../api/administrationApi')
 const overviewMock = vi.mocked(adminOverviewRequest)
 
@@ -89,6 +104,17 @@ describe('AdminDashboardPage', () => {
     expect(tile('Changes requested')).toHaveTextContent('1')
     expect(tile('Rejected')).toHaveTextContent('2')
     expect(tile('Organizations')).toHaveTextContent('5')
+  })
+
+  it('shows who is signed in to the console', async () => {
+    overviewMock.mockResolvedValue(OVERVIEW)
+    renderAdminPage(<AdminDashboardPage />)
+
+    const account = within(screen.getByRole('region', { name: 'Signed in as' }))
+    expect(account.getByText('Mustafa Mustamiu')).toBeInTheDocument()
+    expect(account.getByText('admin@example.com')).toBeInTheDocument()
+    expect(account.getByText('Platform administrator')).toBeInTheDocument()
+    await screen.findByRole('region', { name: 'Key figures' })
   })
 
   it('links each status count to the filtered idea list', async () => {

@@ -9,17 +9,20 @@ import type { PageInfo } from '../api/administrationApi'
 /**
  * The band every panel's title sits on.
  *
- * One green, everywhere, and it is the same green as the application's own brand
- * rather than a second accent introduced for the console: a page that reads as
- * "the app, with an admin in it" is the point of the console being *inside* the
- * shell rather than beside it.
- *
- * `brand-600` and not the lighter `brand-400`, because this band carries white
- * text and the lighter green only reaches about 4.3:1 against white - under the
- * 4.5:1 that bold 14px still needs. The decorative bands on `MetricCard` are a
- * step brighter, because nothing is written on those.
+ * The application's own brand green rather than a second accent introduced for
+ * the console: a page that reads as "the app, with an admin in it" is the point
+ * of the console being *inside* the shell rather than beside it. A gradient from
+ * `brand-700` to `brand-600`, so the white title keeps well over 4.5:1 across the
+ * whole band.
  */
-const PANEL_BAND = 'bg-brand-600'
+const PANEL_BAND = 'bg-linear-to-r from-brand-700 to-brand-600'
+
+/**
+ * The console's frosted surface: translucent white over the shell's soft colour,
+ * with a bright top edge. One class, so every panel and figure is the same glass.
+ */
+export const glassSurface =
+  'border border-white/80 bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_45px_-32px_rgba(8,75,56,0.5)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl'
 
 /**
  * The console's small building blocks: one look for headers, states, badges,
@@ -79,10 +82,10 @@ export function AdminCard({
   actions?: ReactNode
 }) {
   return (
-    <section className="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+    <section className={`overflow-hidden rounded-2xl ${glassSurface}`}>
       {(title || actions) && (
         <div
-          className={`flex flex-wrap items-center justify-between gap-2 ${PANEL_BAND} px-4 py-2.5`}
+          className={`flex flex-wrap items-center justify-between gap-2 ${PANEL_BAND} px-5 py-3`}
         >
           {title && (
             <h2 className="text-sm font-bold tracking-wide whitespace-nowrap text-white uppercase">
@@ -268,24 +271,28 @@ export function AdminPagination({
  * keep the rest apart.
  */
 const METRIC_TONES = {
-  brand: { band: 'bg-brand-500', value: 'text-brand-700' },
-  cyan: { band: 'bg-cyan-500', value: 'text-cyan-700' },
-  violet: { band: 'bg-violet-500', value: 'text-violet-700' },
-  amber: { band: 'bg-amber-400', value: 'text-amber-600' },
-  sky: { band: 'bg-sky-500', value: 'text-sky-700' },
-  red: { band: 'bg-red-500', value: 'text-red-600' },
+  brand: { tile: 'from-brand-500 to-teal-500', glow: 'bg-brand-300/40', value: 'text-brand-700' },
+  cyan: { tile: 'from-cyan-500 to-sky-500', glow: 'bg-cyan-300/40', value: 'text-cyan-700' },
+  violet: {
+    tile: 'from-violet-500 to-fuchsia-500',
+    glow: 'bg-violet-300/40',
+    value: 'text-violet-700',
+  },
+  amber: { tile: 'from-amber-400 to-orange-500', glow: 'bg-amber-300/40', value: 'text-amber-600' },
+  sky: { tile: 'from-sky-500 to-blue-500', glow: 'bg-sky-300/40', value: 'text-sky-700' },
+  red: { tile: 'from-red-500 to-rose-500', glow: 'bg-red-300/40', value: 'text-red-600' },
 } as const
 
 export type MetricTone = keyof typeof METRIC_TONES
 
 /**
- * One figure, as a card with a coloured band over it.
+ * One figure, as a glass card with a coloured icon tile.
  *
- * The band carries the icon and nothing else, because the number is the content
- * and a band with writing on it becomes a second place to look. Below it the
- * label is the small uppercase word that names the figure, the value is large
- * and coloured to match its band, and `hint` is the one qualifier that number
- * cannot carry alone ("4 active" beside "4 accounts").
+ * The tile carries the icon and nothing else, because the number is the content.
+ * Beside it the label is the small uppercase word that names the figure, the
+ * value is large and coloured to match its tile, and `hint` is the one qualifier
+ * that number cannot carry alone ("4 active" beside "4 accounts"). A soft glow of
+ * the same colour sits behind the glass, so the row reads at a glance.
  *
  * **`tabular-nums` is not decoration.** These are counts read in a row against
  * each other, and a proportional digit makes two figures of the same length
@@ -312,20 +319,32 @@ export function MetricCard({
   const colors = METRIC_TONES[tone]
   const body = (
     <>
-      <div className={`flex h-16 items-center justify-center ${colors.band}`}>{icon}</div>
-      <div className="px-4 py-3">
-        <p className="text-xs font-bold tracking-wide text-slate-500 uppercase">{label}</p>
-        <p className={`mt-1 text-3xl font-bold tabular-nums ${colors.value}`}>{value}</p>
-        {hint && <p className="mt-0.5 text-xs text-slate-500">{hint}</p>}
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute -top-10 -right-10 h-28 w-28 rounded-full blur-2xl ${colors.glow}`}
+      />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold tracking-wide text-slate-500 uppercase">{label}</p>
+          <p className={`mt-2 text-3xl font-bold tracking-tight tabular-nums ${colors.value}`}>
+            {value}
+          </p>
+          {hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}
+        </div>
+        <span
+          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_10px_22px_-12px_rgba(15,23,42,0.6)] ${colors.tile}`}
+        >
+          {icon}
+        </span>
       </div>
     </>
   )
-  const card = 'flex flex-col overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200'
+  const card = `relative isolate flex flex-col overflow-hidden rounded-2xl p-5 ${glassSurface}`
   if (!to) return <div className={card}>{body}</div>
   return (
     <Link
       to={to}
-      className={`${card} transition hover:-translate-y-0.5 hover:shadow-md hover:ring-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500`}
+      className={`${card} transition hover:-translate-y-0.5 hover:bg-white/85 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-reduce:hover:translate-y-0`}
     >
       {body}
     </Link>

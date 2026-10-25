@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 
+import { useAuth } from '../../identity/auth/AuthContext'
+import { Avatar } from '../../identity/components/Avatar'
 import { adminOverviewRequest, type AdminStatusCount } from '../api/administrationApi'
 import {
   AdminCard,
@@ -9,6 +11,7 @@ import {
   IdeaStatusBadge,
   LoadingState,
   MetricCard,
+  glassSurface,
 } from '../components/AdminUi'
 import {
   ApprovedIcon,
@@ -21,6 +24,61 @@ import {
   UsersIcon,
 } from '../components/AdminIcons'
 import { useAdminQuery } from '../hooks/useAdminQuery'
+
+/** "Good morning" before noon, "Good afternoon" until six, "Good evening" after. */
+function greeting(hour = new Date().getHours()): string {
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+}
+
+/**
+ * Who is signed in to the console, at the top of its first page: the account
+ * every action on these pages is taken as, and audited under. Read from the
+ * session, so it is the account the server knows - not a name typed anywhere.
+ */
+function SignedInAccount() {
+  const { user } = useAuth()
+  if (!user) return null
+  const name = `${user.firstName} ${user.lastName}`.trim() || user.email
+
+  return (
+    <section
+      aria-label="Signed in as"
+      className={`relative isolate mb-6 overflow-hidden rounded-3xl p-6 sm:p-7 ${glassSurface}`}
+    >
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-16 -left-10 h-48 w-48 rounded-full bg-brand-200/60 blur-3xl" />
+        <div className="absolute -right-10 -bottom-20 h-56 w-56 rounded-full bg-teal-200/50 blur-3xl" />
+      </div>
+      <div className="flex flex-wrap items-center gap-5">
+        <Avatar
+          user={user}
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-brand-500 to-teal-500 text-xl font-bold text-white shadow-[0_12px_26px_-12px_rgba(20,99,73,0.8)] ring-4 ring-white/80"
+        />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-slate-500">{greeting()},</p>
+          <p className="truncate text-2xl font-bold tracking-tight text-slate-900">{name}</p>
+          <p className="truncate text-sm text-slate-600">{user.email}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="inline-flex items-center rounded-full bg-brand-600 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+            Platform administrator
+          </span>
+          <span
+            className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ring-1 ${
+              user.isVerified
+                ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                : 'bg-amber-50 text-amber-700 ring-amber-200'
+            }`}
+          >
+            {user.isVerified ? 'Email verified' : 'Email not verified'}
+          </span>
+        </div>
+      </div>
+    </section>
+  )
+}
 
 function countOf(counts: AdminStatusCount[], status: AdminStatusCount['status']): number {
   return counts.find((item) => item.status === status)?.count ?? 0
@@ -46,33 +104,34 @@ export function AdminDashboardPage() {
         title="Overview"
         description="The platform at a glance. Counts are computed from live data on every visit."
       />
+      <SignedInAccount />
       {error && <ErrorState message={error} onRetry={reload} />}
       {loading && !data && <LoadingState />}
       {!loading && !error && data === null && <EmptyState title="No overview available." />}
       {data && (
         <div className="space-y-6">
-          <section aria-label="Key figures" className="space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section aria-label="Key figures" className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Users"
                 to="/app/admin/users"
                 value={data.userCount}
                 hint={`${data.activeUserCount} active`}
-                icon={<UsersIcon size="lg" />}
+                icon={<UsersIcon size="md" />}
                 tone="brand"
               />
               <MetricCard
                 label="Organizations"
                 to="/app/admin/organizations"
                 value={data.organizationCount}
-                icon={<OrganizationIcon size="lg" />}
+                icon={<OrganizationIcon size="md" />}
                 tone="cyan"
               />
               <MetricCard
                 label="Ideas"
                 to="/app/admin/ideas"
                 value={data.ideaCount}
-                icon={<IdeaIcon size="lg" />}
+                icon={<IdeaIcon size="md" />}
                 tone="violet"
               />
               <MetricCard
@@ -80,39 +139,39 @@ export function AdminDashboardPage() {
                 to="/app/admin/reviews"
                 value={data.openReviewCount}
                 hint={`${data.completedReviewCount} completed`}
-                icon={<ReviewIcon size="lg" />}
+                icon={<ReviewIcon size="md" />}
                 tone="amber"
               />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 label="Awaiting review"
                 to="/app/admin/ideas?status=SUBMITTED"
                 value={countOf(data.ideasByStatus, 'SUBMITTED')}
                 hint="Submitted, not yet picked up"
-                icon={<InboxIcon size="lg" />}
+                icon={<InboxIcon size="md" />}
                 tone="sky"
               />
               <MetricCard
                 label="Approved"
                 to="/app/admin/ideas?status=APPROVED"
                 value={countOf(data.ideasByStatus, 'APPROVED')}
-                icon={<ApprovedIcon size="lg" />}
+                icon={<ApprovedIcon size="md" />}
                 tone="brand"
               />
               <MetricCard
                 label="Changes requested"
                 to="/app/admin/ideas?status=CHANGES_REQUESTED"
                 value={countOf(data.ideasByStatus, 'CHANGES_REQUESTED')}
-                icon={<ChangesIcon size="lg" />}
+                icon={<ChangesIcon size="md" />}
                 tone="amber"
               />
               <MetricCard
                 label="Rejected"
                 to="/app/admin/ideas?status=REJECTED"
                 value={countOf(data.ideasByStatus, 'REJECTED')}
-                icon={<RejectedIcon size="lg" />}
+                icon={<RejectedIcon size="md" />}
                 tone="red"
               />
             </div>
@@ -124,7 +183,7 @@ export function AdminDashboardPage() {
                 <li key={item.status}>
                   <Link
                     to={`/app/admin/ideas?status=${item.status}`}
-                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-1.5 text-sm hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-sm shadow-sm ring-1 ring-slate-900/5 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
                   >
                     <IdeaStatusBadge status={item.status} />
                     <span className="font-semibold text-slate-900 tabular-nums">{item.count}</span>

@@ -547,28 +547,28 @@ function Desk({ desk, onChanged }: { desk: DeliveryDesk; onChanged: () => void }
           label="To assign"
           value={desk.toAssign.length}
           hint="waiting for a developer"
-          icon={<InboxIcon size="lg" />}
+          icon={<InboxIcon size="md" />}
           tone="amber"
         />
         <MetricCard
           label="Plans to approve"
           value={desk.plans.length}
           hint="implementation plans"
-          icon={<ProposalIcon size="lg" />}
+          icon={<ProposalIcon size="md" />}
           tone="violet"
         />
         <MetricCard
           label="Stages to approve"
           value={waitingStages.length}
           hint="reported done"
-          icon={<ReviewIcon size="lg" />}
+          icon={<ReviewIcon size="md" />}
           tone="sky"
         />
         <MetricCard
           label="In delivery"
           value={inDelivery}
           hint={`${desk.developers.length} developers`}
-          icon={<AutomationIcon size="lg" />}
+          icon={<AutomationIcon size="md" />}
           tone="brand"
         />
       </div>
