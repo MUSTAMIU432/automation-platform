@@ -13,7 +13,7 @@ import { Services } from './Services'
  * page at /auth, and the contact form to the backend's `sendContactMessage`.
  *
  * The header's switch picks the website's look; the attribute here is what the
- * Midnight colours in index.css hang off, so only this page changes.
+ * White colours in index.css hang off, so only this page changes.
  */
 export function LandingPage() {
   const [theme, setTheme] = useLandingTheme()

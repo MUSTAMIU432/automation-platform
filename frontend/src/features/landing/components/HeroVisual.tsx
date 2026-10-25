@@ -57,7 +57,10 @@ function Dashboard({ stats }: { stats: PlatformStats | null }) {
   ]
 
   return (
-    <div className="grid h-full grid-cols-[23%_1fr] bg-[color:var(--lp-screen)] text-ink">
+    <div
+      data-landing-keep-colors=""
+      className="grid h-full grid-cols-[23%_1fr] bg-[color:var(--lp-screen)] text-ink"
+    >
       <div className="flex flex-col gap-[5%] bg-[color:var(--lp-screen-side)] px-[8%] py-[7%]">
         <div className="mb-[6%] flex items-center gap-1">
           <span className="flex h-3 w-3 items-center justify-center rounded-[3px] bg-mint text-[6px] font-black text-forest">
