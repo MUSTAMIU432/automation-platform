@@ -154,7 +154,7 @@ function enquiry(overrides: Partial<Api.Enquiry> = {}): Api.Enquiry {
 }
 
 describe('the marketplace', () => {
-  it('lists published ideas, without their price, and whether the reader has unlocked them', async () => {
+  it('lists published ideas, with their price, and whether the reader has unlocked them', async () => {
     api.marketIdeasRequest.mockResolvedValue([
       idea(),
       idea({ id: '4', title: 'Leave requests', hasAccess: true, price: 0 }),
@@ -168,11 +168,46 @@ describe('the marketplace', () => {
 
     const list = within(await screen.findByRole('list', { name: 'Ideas for sale' }))
     const [tax, leave, payroll] = list.getAllByRole('listitem')
-    expect(tax).not.toHaveTextContent('TZS 50,000')
+    expect(tax).toHaveTextContent('TZS 50,000')
     expect(tax).toHaveTextContent('Locked')
     expect(within(tax).getByRole('link')).toHaveAttribute('href', '/app/marketplace/3')
     expect(leave).toHaveTextContent('Unlocked')
     expect(payroll).toHaveTextContent('Payment being confirmed')
+  })
+
+  it('searches, filters and sorts the list it already has', async () => {
+    api.marketIdeasRequest.mockResolvedValue([
+      idea({ id: '3', title: 'Automated tax collection', price: 50000 }),
+      idea({ id: '4', title: 'Leave requests', hasAccess: true, price: 10000 }),
+      idea({ id: '5', title: 'Payroll', price: 20000 }),
+    ])
+    render(
+      <MemoryRouter>
+        <MarketplacePage />
+      </MemoryRouter>,
+    )
+    const titles = () =>
+      within(screen.getByRole('list', { name: 'Ideas for sale' }))
+        .getAllByRole('heading')
+        .map((heading) => heading.textContent)
+
+    await screen.findByRole('list', { name: 'Ideas for sale' })
+    fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'price-asc' } })
+    expect(titles()).toEqual(['Leave requests', 'Payroll', 'Automated tax collection'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unlocked' }))
+    expect(titles()).toEqual(['Leave requests'])
+
+    fireEvent.click(screen.getByRole('button', { name: 'All' }))
+    fireEvent.change(screen.getByLabelText('Search the marketplace'), {
+      target: { value: 'payroll' },
+    })
+    expect(titles()).toEqual(['Payroll'])
+
+    fireEvent.change(screen.getByLabelText('Search the marketplace'), {
+      target: { value: 'nothing like it' },
+    })
+    expect(screen.getByText('No ideas match.')).toBeInTheDocument()
   })
 
   it('shows what is included, and takes a payment in the checkout', async () => {
