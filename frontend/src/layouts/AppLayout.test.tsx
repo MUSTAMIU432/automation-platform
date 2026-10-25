@@ -199,13 +199,18 @@ describe('AppLayout', () => {
     ).not.toHaveAttribute('aria-current')
   })
 
-  it('groups the menu by the kind of work, with Implementation leading to projects', () => {
+  it('lays the menu out as the journey, start to market, with Implementation leading to projects', () => {
     renderAt('/app')
 
     const nav = within(screen.getByRole('navigation', { name: 'Main' }))
-    for (const section of ['Workspace', 'Collaboration', 'Review & delivery', 'Market']) {
+    for (const section of ['1 · Start', '2 · Your people', '3 · Idea to solution', '4 · Market']) {
       expect(nav.getByText(section)).toBeInTheDocument()
     }
+    const order = nav.getAllByRole('link').map((link) => link.textContent)
+    expect(order.indexOf('Dashboard')).toBe(0)
+    expect(order.indexOf('Ideas')).toBeLessThan(order.indexOf('Automation'))
+    expect(order.indexOf('Automation')).toBeLessThan(order.indexOf('Implementation'))
+    expect(order.at(-1)).toBe('Marketplace')
     expect(nav.getByRole('link', { name: 'Implementation' })).toHaveAttribute(
       'href',
       '/app/automation/projects',
