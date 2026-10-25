@@ -1,10 +1,13 @@
 import { useId, useState, type FormEvent } from 'react'
 
+import { UsersGlyph } from '../../../components/glyphs'
+import { GlassBackdropBlobs, GlassFormHeader } from '../../../components/GlassForm'
 import {
-  fieldErrorClasses,
-  inputClasses,
-  labelClasses,
-} from '../../identity/components/fieldStyles'
+  glassButtonClasses,
+  glassCardClasses,
+  glassInputClasses,
+} from '../../../components/glassStyles'
+import { fieldErrorClasses, labelClasses } from '../../identity/components/fieldStyles'
 import { createTeamRequest } from '../api/teamsApi'
 import { useTeams } from '../context/useTeams'
 
@@ -74,18 +77,12 @@ export function CreateTeamForm() {
   }
 
   return (
-    <form
-      className="rounded-xl border border-gray-300 border-t-4 border-t-brand-600 bg-white p-6 shadow-md shadow-gray-900/5"
-      onSubmit={handleSubmit}
-      noValidate
-    >
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Create a team</h2>
-        <p className="mt-1 text-sm leading-6 text-gray-600">
-          A team is a group of people who put an idea forward together. You will be its first member
-          and its owner, and it does not need an organization.
-        </p>
-      </div>
+    <form className={glassCardClasses} onSubmit={handleSubmit} noValidate>
+      <GlassBackdropBlobs />
+      <GlassFormHeader Glyph={UsersGlyph} title="Create a team">
+        A team is a group of people who put an idea forward together. You will be its first member
+        and its owner, and it does not need an organization.
+      </GlassFormHeader>
 
       <div className="mt-5 space-y-4">
         <div>
@@ -94,7 +91,7 @@ export function CreateTeamForm() {
           </label>
           <input
             id={nameId}
-            className={`${inputClasses(field === 'name')} w-full`}
+            className={glassInputClasses(field === 'name')}
             maxLength={200}
             placeholder="Registrar"
             value={name}
@@ -110,7 +107,7 @@ export function CreateTeamForm() {
           </label>
           <textarea
             id={descriptionId}
-            className={`${inputClasses(field === 'description', { multiline: true })} w-full resize-y`}
+            className={glassInputClasses(field === 'description', { multiline: true })}
             rows={3}
             maxLength={1000}
             placeholder="The people who allocate rooms to students."
@@ -133,7 +130,7 @@ export function CreateTeamForm() {
 
       <button
         type="submit"
-        className="mt-6 h-11 w-full rounded-lg bg-brand-600 px-4 text-sm font-bold text-white shadow-md shadow-brand-900/20 transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className={glassButtonClasses}
         disabled={isSubmitting}
       >
         {isSubmitting ? 'Creating…' : 'Create team'}

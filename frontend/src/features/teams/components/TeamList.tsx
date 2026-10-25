@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { glassEmptyClasses } from '../../../components/glassStyles'
 import type { Team } from '../api/teamsApi'
 import { useTeams } from '../context/useTeams'
 
@@ -46,7 +47,7 @@ export function TeamList() {
 
   if (teams.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5">
+      <div className={glassEmptyClasses}>
         <p className="text-sm font-semibold text-gray-900">You are not in a team yet</p>
         <p className="mt-1 text-sm leading-6 text-gray-600">
           A team is a group of people who put an idea forward together. Create one, and you will be
