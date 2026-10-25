@@ -19,6 +19,16 @@ describe('env', () => {
     expect(env.graphqlUrl).toBe('https://api.example.test/graphql/')
   })
 
+  it('trims a line break pasted into the host settings around a value', async () => {
+    vi.stubEnv('VITE_GRAPHQL_URL', ' https://api.example.test/graphql/\n')
+    vi.stubEnv('VITE_GOOGLE_OAUTH_CLIENT_ID', '\n123-abc.apps.googleusercontent.com\n')
+
+    const { env } = await loadEnv()
+
+    expect(env.graphqlUrl).toBe('https://api.example.test/graphql/')
+    expect(env.googleClientId).toBe('123-abc.apps.googleusercontent.com')
+  })
+
   it('fails clearly when VITE_GRAPHQL_URL is missing', async () => {
     vi.stubEnv('VITE_GRAPHQL_URL', '')
 

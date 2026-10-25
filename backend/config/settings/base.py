@@ -112,7 +112,9 @@ REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', d
 # Google-signed credential against Google's public keys and never
 # exchanges an authorization code, so the backend has no use for a client
 # secret at all (see identity/google_oauth.py's module docstring).
-GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='')
+# Stripped: a value pasted into a host's settings form easily picks up a line
+# break, and an audience with one in it never matches the token's.
+GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='').strip()
 
 
 # Google Gemini (ai/gemini.py)
