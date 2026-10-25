@@ -140,6 +140,11 @@ export function AdminUsersPage() {
                   >
                     {user.email}
                   </a>
+                  {user.signInMethods.includes('google') && (
+                    <span className="mt-1 block">
+                      <Badge tone="info">Google</Badge>
+                    </span>
+                  )}
                 </td>
                 <td className={rowCell}>
                   <UserStatusBadges user={user} />

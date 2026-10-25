@@ -249,9 +249,20 @@ def _user_queryset() -> QuerySet[User]:
                 .values('created_at')[:1]
             ),
         )
-        .prefetch_related(_membership_prefetch())
+        .prefetch_related(_membership_prefetch(), 'external_identities')
         .order_by('-created_at', '-pk')
     )
+
+
+def sign_in_methods_of(user: User) -> list[str]:
+    """How the account signs in, never with what: the provider's name, not its
+    subject identifier, and "password" only as the fact that one is set.
+
+    Reads `external_identities` through the prefetch `_user_queryset` sets up,
+    so a page of accounts costs one query for this, not one per account.
+    """
+    methods = ['password'] if user.has_usable_password() else []
+    return methods + sorted({identity.provider for identity in user.external_identities.all()})
 
 
 def list_users(
@@ -310,21 +321,15 @@ def get_user(user: User | None, user_id: object) -> UserDetail | None:
             review_count=_count_of(Review, 'reviewer'),
             comment_count=_count_of(Comment, 'author'),
         )
-        .prefetch_related('external_identities')
         .filter(pk=normalized_id)
         .first()
     )
     if target is None:
         return None
 
-    # How the account signs in, never with what: the provider's name, not its
-    # subject identifier, and "password" only as the fact that one is set.
-    methods = ['password'] if target.has_usable_password() else []
-    methods += sorted({identity.provider for identity in target.external_identities.all()})
-
     return UserDetail(
         user=target,
-        sign_in_methods=methods,
+        sign_in_methods=sign_in_methods_of(target),
         idea_count=target.idea_count,
         review_count=target.review_count,
         comment_count=target.comment_count,

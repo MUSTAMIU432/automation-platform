@@ -34,6 +34,7 @@ function user(overrides: Partial<AdminUser> = {}): AdminUser {
     createdAt: '2026-01-01T00:00:00Z',
     lastActiveAt: '2026-09-01T00:00:00Z',
     avatarUrl: null,
+    signInMethods: ['password'],
     memberships: [
       {
         id: '8',

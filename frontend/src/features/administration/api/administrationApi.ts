@@ -228,11 +228,12 @@ export interface AdminUser {
   memberships: AdminUserMembership[]
   /** Where the profile photo is served from (needs the bearer token), or null. */
   avatarUrl: string | null
+  /** How the account signs in: 'password' (one is set) and/or provider names, e.g. 'google'. */
+  signInMethods: string[]
 }
 
 export interface AdminUserDetail extends AdminUser {
   phoneNumber: string
-  signInMethods: string[]
   ideaCount: number
   reviewCount: number
   commentCount: number
@@ -248,7 +249,7 @@ export interface AdminUserFilters {
 
 const USER_FIELDS = `
   id email firstName lastName isActive isVerified isPlatformAdmin isSuperuser
-  createdAt lastActiveAt avatarUrl
+  createdAt lastActiveAt avatarUrl signInMethods
   memberships { id status organization { id name } roles { id name slug isSystem } }
 `
 
@@ -265,7 +266,7 @@ const USER_QUERY = `
   query AdminUser($id: ID!) {
     adminUser(id: $id) {
       ${USER_FIELDS}
-      phoneNumber signInMethods ideaCount reviewCount commentCount
+      phoneNumber ideaCount reviewCount commentCount
       auditEntries { ${AUDIT_ENTRY_FIELDS} }
     }
   }
