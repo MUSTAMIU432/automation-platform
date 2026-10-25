@@ -30,3 +30,4 @@ reportlab==4.5.1
 # The production WSGI server (Render's start command: gunicorn config.wsgi:application).
 # Not used in local development, which runs `manage.py runserver`.
 gunicorn==26.2.0
+gunicorn==26.2.0
