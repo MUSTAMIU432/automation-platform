@@ -137,12 +137,8 @@ export function SignInForm({
         <GoogleAuthButton
           disabled={isSubmitting || !googleSignIn.isConfigured}
           onClick={googleSignIn.trigger}
+          googleButtonContainerId={googleSignIn.hiddenButtonContainerId}
         />
-        {/* Google Identity Services renders its own real button here,
-            visually hidden (not `display: none` - some embedded widgets,
-            this one included, behave unreliably when their container has
-            no layout box) - GoogleAuthButton's onClick forwards to it. */}
-        <div id={googleSignIn.hiddenButtonContainerId} className="sr-only" />
       </div>
 
       <p className="mt-6 text-center text-sm font-semibold text-sage">
