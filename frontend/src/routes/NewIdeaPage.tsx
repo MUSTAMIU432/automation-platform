@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 import type { Idea, SubmissionContext } from '../features/ideas/api/ideasApi'
@@ -7,6 +7,7 @@ import {
   IdeaContextBanner,
   type SubmitOutcome,
 } from '../features/ideas/components/IdeaForm'
+import { SubmittedDialog } from '../features/ideas/components/SubmittedDialog'
 import {
   createdDraftNotice,
   submittedIdeaNotice,
@@ -63,8 +64,17 @@ export function NewIdeaPage() {
     returnToIdeas(createdDraftNotice(idea, failedUploads))
   }
 
+  // A submission the server accepted is confirmed in a dialog before leaving;
+  // one it refused goes straight back to the list, which says why.
+  const [submitted, setSubmitted] = useState<Extract<SubmitOutcome, { submitted: true }> | null>(
+    null,
+  )
+  // Bumped to start a fresh, empty form for "Share another problem".
+  const [formKey, setFormKey] = useState(0)
+
   function handleSubmitted(outcome: SubmitOutcome) {
-    returnToIdeas(submittedIdeaNotice(outcome))
+    if (outcome.submitted) setSubmitted(outcome)
+    else returnToIdeas(submittedIdeaNotice(outcome))
   }
 
   return (
@@ -88,6 +98,7 @@ export function NewIdeaPage() {
 
       <div className="mt-4 flex flex-col lg:min-h-0 lg:flex-1">
         <IdeaForm
+          key={formKey}
           organizationId={locked?.organizationId ?? activeOrganization?.id ?? null}
           lockedContext={locked}
           onSaved={handleSaved}
@@ -95,6 +106,18 @@ export function NewIdeaPage() {
           onCancel={() => navigate(IDEAS_PATH)}
         />
       </div>
+
+      {submitted && (
+        <SubmittedDialog
+          idea={submitted.idea}
+          failedUploads={submitted.failedUploads}
+          onViewIdeas={() => returnToIdeas(submittedIdeaNotice(submitted))}
+          onShareAnother={() => {
+            setSubmitted(null)
+            setFormKey((key) => key + 1)
+          }}
+        />
+      )}
     </div>
   )
 }
