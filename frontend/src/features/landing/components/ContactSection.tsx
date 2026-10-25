@@ -173,7 +173,7 @@ function ContactForm() {
       <button
         type="submit"
         disabled={sending}
-        className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-jade text-sm font-semibold text-white shadow-[0_10px_24px_-12px_rgba(11,143,101,0.9)] hover:bg-pine focus:outline-none focus-visible:ring-2 focus-visible:ring-jade focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-colors sm:w-auto sm:px-8"
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-jade text-sm font-semibold text-white shadow-[0_10px_24px_-12px_rgb(var(--lp-jade)/0.9)] hover:bg-pine focus:outline-none focus-visible:ring-2 focus-visible:ring-jade focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-70 motion-safe:transition-colors sm:w-auto sm:px-8"
       >
         {sending && <SpinnerIcon className="h-4 w-4 motion-safe:animate-spin" />}
         {sending ? 'Sending…' : 'Send message'}
@@ -216,7 +216,7 @@ export function ContactSection() {
         </div>
         <div
           ref={ref}
-          className="rounded-3xl border border-jade/10 bg-white p-6 shadow-[0_24px_60px_-30px_rgba(8,75,56,0.35)] sm:p-8"
+          className="rounded-3xl border border-jade/10 bg-white p-6 shadow-[0_24px_60px_-30px_rgb(var(--lp-pine)/0.35)] sm:p-8"
         >
           <ContactForm />
         </div>

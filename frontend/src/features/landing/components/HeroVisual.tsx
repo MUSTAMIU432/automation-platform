@@ -57,8 +57,8 @@ function Dashboard({ stats }: { stats: PlatformStats | null }) {
   ]
 
   return (
-    <div className="grid h-full grid-cols-[23%_1fr] bg-[#f4faf7] text-ink">
-      <div className="flex flex-col gap-[5%] bg-[#0b221b] px-[8%] py-[7%]">
+    <div className="grid h-full grid-cols-[23%_1fr] bg-[color:var(--lp-screen)] text-ink">
+      <div className="flex flex-col gap-[5%] bg-[color:var(--lp-screen-side)] px-[8%] py-[7%]">
         <div className="mb-[6%] flex items-center gap-1">
           <span className="flex h-3 w-3 items-center justify-center rounded-[3px] bg-mint text-[6px] font-black text-forest">
             M
@@ -117,13 +117,20 @@ function Dashboard({ stats }: { stats: PlatformStats | null }) {
           </div>
           <div className="flex items-center justify-center rounded-md bg-white shadow-sm">
             <svg viewBox="0 0 36 36" className="h-8 sm:h-10">
-              <circle cx="18" cy="18" r="13" fill="none" stroke="#eaf7f1" strokeWidth="5" />
               <circle
                 cx="18"
                 cy="18"
                 r="13"
                 fill="none"
-                stroke="#0b8f65"
+                style={{ stroke: 'var(--color-mist)' }}
+                strokeWidth="5"
+              />
+              <circle
+                cx="18"
+                cy="18"
+                r="13"
+                fill="none"
+                style={{ stroke: 'var(--color-jade)' }}
                 strokeWidth="5"
                 strokeDasharray="50 82"
                 transform="rotate(-90 18 18)"
@@ -133,7 +140,7 @@ function Dashboard({ stats }: { stats: PlatformStats | null }) {
                 cy="18"
                 r="13"
                 fill="none"
-                stroke="#55e6b0"
+                style={{ stroke: 'var(--color-mint)' }}
                 strokeWidth="5"
                 strokeDasharray="20 82"
                 strokeDashoffset="-50"
@@ -186,8 +193,8 @@ function Orbits({ half, moving }: { half: 'back' | 'front'; moving: boolean }) {
         </clipPath>
         <radialGradient id={`orbit-node-${half}`}>
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.35" stopColor="#55e6b0" />
-          <stop offset="1" stopColor="#55e6b0" stopOpacity="0" />
+          <stop offset="0.35" style={{ stopColor: 'var(--color-mint)' }} />
+          <stop offset="1" style={{ stopColor: 'var(--color-mint)', stopOpacity: 0 }} />
         </radialGradient>
       </defs>
       {rings.map((ring, index) => {
@@ -197,21 +204,25 @@ function Orbits({ half, moving }: { half: 'back' | 'front'; moving: boolean }) {
             <g clipPath={`url(#${clipId})`}>
               <path
                 d={path}
-                stroke="rgba(85,230,176,0.8)"
                 strokeWidth={ring.width}
                 strokeDasharray={index === 1 ? '4 8' : undefined}
-                style={{ filter: 'drop-shadow(0 0 6px rgba(85,230,176,0.8))' }}
+                style={{
+                  stroke: 'rgb(var(--lp-mint)/0.8)',
+                  filter: 'drop-shadow(0 0 6px rgb(var(--lp-mint)/0.8))',
+                }}
               />
               {index === 0 && (
                 <path
                   d={path}
                   pathLength={1000}
-                  stroke="#d6fff0"
                   strokeWidth="3"
                   strokeLinecap="round"
                   strokeDasharray="90 910"
                   className="motion-safe:animate-[orbit-trail_7s_linear_infinite]"
-                  style={{ filter: 'drop-shadow(0 0 8px #55e6b0)' }}
+                  style={{
+                    stroke: 'var(--lp-mint-pale)',
+                    filter: 'drop-shadow(0 0 8px var(--color-mint))',
+                  }}
                 />
               )}
               {moving && (
@@ -243,13 +254,13 @@ export function HeroVisual({ stats }: { stats: PlatformStats | null }) {
       className="relative mx-auto aspect-[10/9] w-full max-w-[46rem] select-none"
     >
       {/* Light pooled behind the laptop. */}
-      <div className="absolute inset-[12%] rounded-full bg-[radial-gradient(circle,rgba(85,230,176,0.35),transparent_65%)] blur-2xl" />
+      <div className="absolute inset-[12%] rounded-full bg-[radial-gradient(circle,rgb(var(--lp-mint)/0.35),transparent_65%)] blur-2xl" />
 
       {/* Pedestal: a dark cylinder with glowing rings on its top face. */}
       <div className="absolute inset-x-[10%] bottom-[8%] h-[20%]">
-        <div className="absolute inset-x-0 bottom-0 h-[70%] rounded-b-[50%] bg-gradient-to-b from-[#0d3a2e] via-[#06231b] to-[#020f0b] shadow-[0_40px_60px_-20px_rgba(0,0,0,0.9)]" />
-        <div className="absolute inset-x-0 top-0 h-[62%] rounded-[50%] border-2 border-mint/70 bg-[radial-gradient(ellipse_at_center,#0f4a39,#072a20_70%)] shadow-[0_0_40px_rgba(85,230,176,0.7),inset_0_0_30px_rgba(85,230,176,0.45)]" />
-        <div className="absolute inset-x-[12%] top-[12%] h-[38%] rounded-[50%] border border-mint/50 shadow-[0_0_18px_rgba(85,230,176,0.6)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[70%] rounded-b-[50%] bg-gradient-to-b from-[color:var(--lp-plinth-1)] via-[color:var(--lp-plinth-2)] to-[color:var(--lp-plinth-3)] shadow-[0_40px_60px_-20px_rgba(0,0,0,0.9)]" />
+        <div className="absolute inset-x-0 top-0 h-[62%] rounded-[50%] border-2 border-mint/70 bg-[radial-gradient(ellipse_at_center,var(--lp-plinth-top-1),var(--lp-plinth-top-2)_70%)] shadow-[0_0_40px_rgb(var(--lp-mint)/0.7),inset_0_0_30px_rgb(var(--lp-mint)/0.45)]" />
+        <div className="absolute inset-x-[12%] top-[12%] h-[38%] rounded-[50%] border border-mint/50 shadow-[0_0_18px_rgb(var(--lp-mint)/0.6)]" />
         <div className="absolute inset-x-[26%] top-[20%] h-[22%] rounded-[50%] bg-mint/25 blur-md" />
       </div>
 
@@ -265,7 +276,7 @@ export function HeroVisual({ stats }: { stats: PlatformStats | null }) {
           style={{ transformStyle: 'preserve-3d', transform: 'rotateY(-22deg) rotateX(8deg)' }}
         >
           <div
-            className="rounded-t-[0.8rem] border border-white/25 bg-[#0a0f0d] p-[2.2%] pb-[3%] shadow-[0_0_50px_-6px_rgba(85,230,176,0.55)]"
+            className="rounded-t-[0.8rem] border border-white/25 bg-[#0a0f0d] p-[2.2%] pb-[3%] shadow-[0_0_50px_-6px_rgb(var(--lp-mint)/0.55)]"
             style={{ transformOrigin: '50% 100%', transform: 'rotateX(4deg)' }}
           >
             <div className="aspect-[16/10] overflow-hidden rounded-[0.3rem]">
@@ -311,10 +322,10 @@ export function HeroVisual({ stats }: { stats: PlatformStats | null }) {
           style={{ animationDelay: delay }}
         >
           <div
-            className="flex aspect-square flex-col items-center justify-center gap-[8%] rounded-[1.4rem] border border-white/45 bg-[linear-gradient(145deg,rgba(255,255,255,0.32),rgba(255,255,255,0.08)_45%,rgba(85,230,176,0.18))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),inset_0_-12px_24px_rgba(85,230,176,0.2),0_24px_50px_-14px_rgba(0,0,0,0.7),0_0_34px_rgba(85,230,176,0.35)] backdrop-blur-md"
+            className="flex aspect-square flex-col items-center justify-center gap-[8%] rounded-[1.4rem] border border-white/45 bg-[linear-gradient(145deg,rgba(255,255,255,0.32),rgba(255,255,255,0.08)_45%,rgb(var(--lp-mint)/0.18))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.7),inset_0_-12px_24px_rgb(var(--lp-mint)/0.2),0_24px_50px_-14px_rgba(0,0,0,0.7),0_0_34px_rgb(var(--lp-mint)/0.35)] backdrop-blur-md"
             style={{ transform: `rotate(${tilt}deg)` }}
           >
-            <Glyph className="h-[42%] w-[42%] drop-shadow-[0_0_12px_rgba(85,230,176,0.95)]" />
+            <Glyph className="h-[42%] w-[42%] drop-shadow-[0_0_12px_rgb(var(--lp-mint)/0.95)]" />
             <span className="text-[11px] font-bold [text-shadow:0_1px_6px_rgba(0,0,0,0.6)] lg:text-sm">
               {label}
             </span>

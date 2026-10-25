@@ -23,8 +23,8 @@ function CollaborationPanel() {
 
   return (
     <div ref={ref} aria-hidden="true" className="relative">
-      <div className="absolute -inset-6 rounded-[2rem] bg-[radial-gradient(circle_at_70%_30%,rgba(85,230,176,0.45),transparent_60%),radial-gradient(circle_at_20%_90%,rgba(11,143,101,0.25),transparent_55%)] blur-2xl" />
-      <div className="relative rounded-3xl border border-white/80 bg-white/70 p-6 shadow-[0_24px_60px_-28px_rgba(8,75,56,0.45)] backdrop-blur-xl sm:p-8">
+      <div className="absolute -inset-6 rounded-[2rem] bg-[radial-gradient(circle_at_70%_30%,rgb(var(--lp-mint)/0.45),transparent_60%),radial-gradient(circle_at_20%_90%,rgb(var(--lp-jade)/0.25),transparent_55%)] blur-2xl" />
+      <div className="relative rounded-3xl border border-white/80 bg-white/70 p-6 shadow-[0_24px_60px_-28px_rgb(var(--lp-pine)/0.45)] backdrop-blur-xl sm:p-8">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-jade">
           One idea, three roles
         </p>

@@ -50,7 +50,7 @@ function ServiceCard({ service, index }: { service: Service; index: number }) {
     <li
       ref={ref}
       style={{ '--reveal-delay': `${index * 90}ms` } as CSSProperties}
-      className="group flex flex-col rounded-2xl border border-jade/10 bg-white p-6 shadow-[0_1px_2px_rgba(20,45,37,0.04),0_8px_24px_-12px_rgba(20,45,37,0.12)] hover:-translate-y-1 hover:border-jade/30 hover:shadow-[0_18px_40px_-18px_rgba(11,143,101,0.45)] motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-300"
+      className="group flex flex-col rounded-2xl border border-jade/10 bg-white p-6 shadow-[0_1px_2px_rgb(var(--lp-ink)/0.04),0_8px_24px_-12px_rgb(var(--lp-ink)/0.12)] hover:-translate-y-1 hover:border-jade/30 hover:shadow-[0_18px_40px_-18px_rgb(var(--lp-jade)/0.45)] motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-300"
     >
       <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-mist text-jade ring-1 ring-jade/10 group-hover:bg-jade group-hover:text-white motion-safe:transition-colors">
         <Icon className="h-6 w-6" />

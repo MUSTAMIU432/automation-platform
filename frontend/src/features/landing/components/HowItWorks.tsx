@@ -40,7 +40,7 @@ function Stage({ stage, index }: { stage: (typeof STAGES)[number]; index: number
       style={{ '--reveal-delay': `${index * 140}ms` } as CSSProperties}
       className="relative pl-16 lg:pl-0"
     >
-      <span className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-mint/40 bg-forest text-sm font-bold text-mint shadow-[0_0_24px_-4px_rgba(85,230,176,0.6)] lg:relative">
+      <span className="absolute left-0 top-0 flex h-11 w-11 items-center justify-center rounded-full border border-mint/40 bg-forest text-sm font-bold text-mint shadow-[0_0_24px_-4px_rgb(var(--lp-mint)/0.6)] lg:relative">
         {String(index + 1).padStart(2, '0')}
       </span>
       <div className="rounded-2xl border border-white/15 bg-white/[0.07] p-5 backdrop-blur-md lg:mt-6">
@@ -61,7 +61,7 @@ export function HowItWorks() {
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(11,143,101,0.35),transparent_60%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgb(var(--lp-jade)/0.35),transparent_60%)]"
       />
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <SectionHeading

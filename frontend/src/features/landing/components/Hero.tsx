@@ -46,10 +46,10 @@ function Stat({
   return (
     <li className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
       <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),rgba(85,230,176,0.12))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.5)] motion-safe:animate-[pulse-glow_3.5s_ease-in-out_infinite] sm:h-14 sm:w-14"
+        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),rgb(var(--lp-mint)/0.12))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.5)] motion-safe:animate-[pulse-glow_3.5s_ease-in-out_infinite] sm:h-14 sm:w-14"
         style={{ animationDelay: `${index * 0.7}s` }}
       >
-        <Glyph className="h-6 w-6 drop-shadow-[0_0_8px_rgba(85,230,176,0.9)] sm:h-7 sm:w-7" />
+        <Glyph className="h-6 w-6 drop-shadow-[0_0_8px_rgb(var(--lp-mint)/0.9)] sm:h-7 sm:w-7" />
       </span>
       <span className="min-w-0">
         <span className="block text-xs font-medium text-white/75 sm:text-sm">{label}</span>
@@ -99,7 +99,7 @@ export function Hero() {
       ref={ref}
       id="home"
       aria-labelledby="hero-heading"
-      className="relative -mt-[84px] scroll-mt-24 overflow-hidden bg-[#03140f] px-2 pb-24 pt-2 text-white sm:px-4 sm:pb-36 sm:pt-3 lg:px-6"
+      className="relative -mt-[84px] scroll-mt-24 overflow-hidden bg-[color:var(--lp-bg)] px-2 pb-24 pt-2 text-white sm:px-4 sm:pb-36 sm:pt-3 lg:px-6"
     >
       <GlassBackdrop />
 
@@ -108,7 +108,7 @@ export function Hero() {
         <div className="mx-auto max-w-7xl px-4 pb-6 pt-[104px] sm:px-8 sm:pb-8 lg:px-10">
           <div className="grid items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-4">
             <div className="max-w-2xl py-4 lg:py-10">
-              <p className="inline-flex items-center rounded-full border border-mint/50 bg-mint/[0.07] px-4 py-1.5 text-sm font-medium text-white/90 shadow-[0_0_20px_-6px_rgba(85,230,176,0.6)] motion-safe:animate-[rise_600ms_ease-out_both]">
+              <p className="inline-flex items-center rounded-full border border-mint/50 bg-mint/[0.07] px-4 py-1.5 text-sm font-medium text-white/90 shadow-[0_0_20px_-6px_rgb(var(--lp-mint)/0.6)] motion-safe:animate-[rise_600ms_ease-out_both]">
                 Turning Ideas into Real Solutions
               </p>
               <h1
@@ -117,7 +117,7 @@ export function Hero() {
               >
                 From Real Problems <br className="hidden sm:block" />
                 to Real{' '}
-                <span className="bg-gradient-to-r from-mint to-[#8ff5cf] bg-clip-text text-transparent [text-shadow:0_0_40px_rgba(85,230,176,0.35)]">
+                <span className="bg-gradient-to-r from-mint to-[color:var(--lp-mint-light)] bg-clip-text text-transparent [text-shadow:0_0_40px_rgb(var(--lp-mint)/0.35)]">
                   Solutions
                 </span>
               </h1>
@@ -129,7 +129,7 @@ export function Hero() {
               <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
                 <Link
                   to={getStartedPath}
-                  className="group inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-white/40 bg-gradient-to-b from-[#7af0c3] to-mint px-8 text-base font-semibold text-forest shadow-[0_0_0_4px_rgba(85,230,176,0.18),0_0_40px_-4px_rgba(85,230,176,0.9)] hover:-translate-y-0.5 hover:shadow-[0_0_0_6px_rgba(85,230,176,0.25),0_0_56px_0_rgba(85,230,176,1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-forest motion-safe:animate-[rise_600ms_ease-out_300ms_both] motion-safe:transition-[transform,box-shadow]"
+                  className="group inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-white/40 bg-gradient-to-b from-[color:var(--lp-mint-soft)] to-mint px-8 text-base font-semibold text-forest shadow-[0_0_0_4px_rgb(var(--lp-mint)/0.18),0_0_40px_-4px_rgb(var(--lp-mint)/0.9)] hover:-translate-y-0.5 hover:shadow-[0_0_0_6px_rgb(var(--lp-mint)/0.25),0_0_56px_0_rgb(var(--lp-mint)/1)] focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-forest motion-safe:animate-[rise_600ms_ease-out_300ms_both] motion-safe:transition-[transform,box-shadow]"
                 >
                   Get Started
                   <ArrowRightIcon className="h-5 w-5 group-hover:translate-x-0.5 motion-safe:transition-transform" />
