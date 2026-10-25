@@ -286,7 +286,7 @@ interface SidebarSection {
 
 function sidebarLinkClass(active: boolean, collapsed: boolean): string {
   return `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
-    collapsed ? 'lg:justify-center lg:px-0' : ''
+    collapsed ? 'lg:justify-center lg:px-0 lg:py-3' : ''
   } ${
     active
       ? 'bg-gradient-to-r from-mint/45 to-mint/15 font-semibold text-forest shadow-[inset_0_0_0_1px_rgba(11,143,101,0.15)]'
@@ -299,7 +299,7 @@ function sidebarLinkClass(active: boolean, collapsed: boolean): string {
  * work. Reviews is offered only to someone who can review (the server still
  * authorizes the queue); everything else needs nothing but a session.
  *
- * On a wide screen it collapses to a rail of icons - the button at its foot -
+ * On a wide screen it collapses to a rail of icons - the button at its top -
  * and the page takes the room. In the rail each link keeps its name for
  * assistive technology and shows it on hover, a count becomes a dot on its
  * icon, and the section titles become dividers. The choice is remembered on
@@ -333,6 +333,33 @@ function Sidebar({
         collapsed ? 'lg:w-[4.75rem]' : 'lg:w-64'
       }`}
     >
+      <div
+        className={`mb-3 hidden items-center justify-between gap-2 border-b border-jade/10 pb-3 lg:flex ${whenCollapsed(
+          'lg:justify-center',
+        )}`}
+      >
+        <span
+          className={`px-3 text-xs font-semibold whitespace-nowrap text-ink/70 ${whenCollapsed('lg:hidden')}`}
+        >
+          Menu
+        </span>
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          aria-expanded={expanded}
+          aria-controls="app-sidebar"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-jade/15 bg-white/80 text-forest shadow-sm transition-colors hover:border-jade/30 hover:bg-mint/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50"
+        >
+          {collapsed ? (
+            <PanelExpandIcon className="h-6 w-6" />
+          ) : (
+            <PanelCollapseIcon className="h-5 w-5" />
+          )}
+        </button>
+      </div>
+
       <nav aria-label="Main" className="flex-1">
         {sections.map((section, index) => (
           <div key={section.title} className={index > 0 ? 'mt-4 border-t border-jade/10 pt-4' : ''}>
@@ -356,7 +383,7 @@ function Sidebar({
                       sidebarLinkClass(isActive ? isActive(pathname) : routeActive, collapsed)
                     }
                   >
-                    <Icon className="h-5 w-5 shrink-0" />
+                    <Icon className={`h-5 w-5 shrink-0 ${whenCollapsed('lg:h-6 lg:w-6')}`} />
                     <span className={`flex-1 whitespace-nowrap ${whenCollapsed('lg:sr-only')}`}>
                       {label}
                     </span>
@@ -403,27 +430,6 @@ function Sidebar({
         </p>
         <span aria-hidden="true" className="relative mt-3 block h-0.5 w-8 rounded-full bg-mint" />
       </div>
-
-      <button
-        type="button"
-        onClick={toggleExpanded}
-        aria-expanded={expanded}
-        aria-controls="app-sidebar"
-        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className={`mt-3 hidden items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap text-ink/60 transition-colors hover:bg-white/80 hover:text-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 lg:flex ${whenCollapsed(
-          'lg:justify-center lg:px-0',
-        )}`}
-      >
-        {collapsed ? (
-          <PanelExpandIcon className="h-5 w-5 shrink-0" />
-        ) : (
-          <PanelCollapseIcon className="h-5 w-5 shrink-0" />
-        )}
-        <span aria-hidden="true" className={whenCollapsed('lg:hidden')}>
-          Collapse
-        </span>
-      </button>
     </aside>
   )
 }
