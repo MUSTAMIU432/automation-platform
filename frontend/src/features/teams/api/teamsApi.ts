@@ -47,6 +47,8 @@ export function teamRoleLabel(slug: string): string {
 export interface CreateTeamInput {
   name: string
   description?: string
+  /** The team's URL name; the server makes one from the name when this is blank. */
+  slug?: string
 }
 
 export interface TeamMutationResult {
@@ -185,7 +187,11 @@ export async function teamMembersRequest(teamId: string): Promise<TeamMember[]> 
  */
 export async function createTeamRequest(input: CreateTeamInput): Promise<CreateTeamResult> {
   const data = await graphqlClient.request<{ createTeam: CreateTeamResult }>(CREATE_TEAM_MUTATION, {
-    input: { name: input.name, description: input.description ?? '' },
+    input: {
+      name: input.name,
+      description: input.description ?? '',
+      ...(input.slug ? { slug: input.slug } : {}),
+    },
   })
   return data.createTeam
 }

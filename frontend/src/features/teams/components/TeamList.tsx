@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 
-import { ArrowRightIcon, BulbIcon, ChatIcon, UsersIcon } from '../../../components/AppIcons'
+import { ArrowRightIcon, BulbIcon, ShieldCheckIcon, UsersIcon } from '../../../components/AppIcons'
 import { collectionCardClasses } from '../../../components/glassStyles'
 import { EmptyCollection } from '../../../components/WorkspaceCollection'
 import type { Team } from '../api/teamsApi'
@@ -52,17 +52,17 @@ export function TeamList({ onCreate }: { onCreate: () => void }) {
     return (
       <EmptyCollection
         Icon={UsersIcon}
-        title="You are not in a team yet"
+        title="No teams yet"
         actionLabel="Create your first team"
         onAction={onCreate}
         benefits={[
-          [UsersIcon, 'Write ideas together'],
-          [ChatIcon, 'Talk in one place'],
-          [BulbIcon, 'Put ideas forward as one'],
+          [UsersIcon, 'Work together', 'Invite members and collaborate'],
+          [ShieldCheckIcon, 'Manage access', 'Control roles and permissions'],
+          [BulbIcon, 'Stay organized', 'Keep your team ideas in one place'],
         ]}
       >
-        A team is a group of people who put an idea forward together. Create one, and you will be
-        its first member.
+        Create a team to give your work a shared home. Invite members, write ideas together and put
+        them forward as one.
       </EmptyCollection>
     )
   }

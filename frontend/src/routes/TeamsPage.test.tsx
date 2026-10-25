@@ -62,7 +62,7 @@ describe('TeamsPage', () => {
     vi.mocked(teamsMock).mockResolvedValue([])
     renderAt()
 
-    expect(await screen.findByText('You are not in a team yet')).toBeInTheDocument()
+    expect(await screen.findByText('No teams yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create team' })).toBeInTheDocument()
 
     // The empty state's button takes the reader straight to the form's first field.

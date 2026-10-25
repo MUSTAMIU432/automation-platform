@@ -57,7 +57,8 @@ export function EmptyCollection({
   children: ReactNode
   actionLabel: string
   onAction: () => void
-  benefits: Array<[IconType, string]>
+  /** What it gives the reader: an icon, a short title and one line under it. */
+  benefits: Array<[IconType, string, string]>
 }) {
   return (
     <div className={`${collectionCardClasses} text-center`}>
@@ -99,11 +100,16 @@ export function EmptyCollection({
         {actionLabel}
       </button>
 
-      <ul className="mt-7 grid grid-cols-3 divide-x divide-brand-100 rounded-2xl bg-brand-50/60 px-2 py-4 ring-1 ring-brand-100">
-        {benefits.map(([BenefitIcon, label]) => (
-          <li key={label} className="flex flex-col items-center gap-1.5 px-2">
-            <BenefitIcon className="h-5 w-5 text-brand-700" />
-            <span className="text-xs leading-5 text-gray-700">{label}</span>
+      <ul className="mt-7 grid gap-4 border-t border-brand-100 pt-5 text-left sm:grid-cols-3 sm:gap-3">
+        {benefits.map(([BenefitIcon, benefit, detail]) => (
+          <li key={benefit} className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-700 ring-1 ring-brand-100">
+              <BenefitIcon className="h-5 w-5" />
+            </span>
+            <span>
+              <span className="block text-sm font-semibold text-gray-900">{benefit}</span>
+              <span className="block text-xs leading-5 text-gray-500">{detail}</span>
+            </span>
           </li>
         ))}
       </ul>
@@ -124,11 +130,26 @@ export function OwnerNote({ title, children }: { title: string; children: ReactN
   )
 }
 
-/** A form field with an icon inside it, on the left. */
-export function IconField({ Icon, children }: { Icon: IconType; children: ReactNode }) {
+/**
+ * A form field with an icon inside it, on the left: centred for a one-line
+ * input, at the first line for a text area (`top`).
+ */
+export function IconField({
+  Icon,
+  top = false,
+  children,
+}: {
+  Icon: IconType
+  top?: boolean
+  children: ReactNode
+}) {
   return (
     <div className="relative">
-      <Icon className="pointer-events-none absolute top-1/2 left-3.5 z-10 h-4 w-4 -translate-y-1/2 text-gray-500" />
+      <Icon
+        className={`pointer-events-none absolute left-3.5 z-10 h-4 w-4 text-gray-500 ${
+          top ? 'top-3.5' : 'top-1/2 -translate-y-1/2'
+        }`}
+      />
       {children}
     </div>
   )

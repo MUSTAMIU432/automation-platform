@@ -66,9 +66,9 @@ export function OrganizationsPage() {
                 actionLabel="Create your first organization"
                 onAction={focusCreateForm}
                 benefits={[
-                  [UsersIcon, 'Collaborate with your team'],
-                  [LockIcon, 'Control access and permissions'],
-                  [ChartIcon, 'Keep your work organized'],
+                  [UsersIcon, 'Work together', 'Invite members and collaborate'],
+                  [LockIcon, 'Manage access', 'Control roles and permissions'],
+                  [ChartIcon, 'Stay organized', 'Ideas and reviews in one place'],
                 ]}
               >
                 Create one to give your work a shared home. You can invite members, review ideas and

@@ -109,6 +109,22 @@ class TestCreateTeam:
         assert first.slug != second.slug
         assert first.name == second.name == 'University Team'
 
+    def test_a_chosen_url_is_used_as_written(self, owner):
+        team = services.create_team(
+            owner, services.TeamInput(name='Research', slug='Research and Development')
+        )
+
+        assert team.slug == 'research-and-development'
+
+    def test_a_taken_or_unusable_url_is_refused_against_the_url(self, owner, member):
+        services.create_team(owner, services.TeamInput(name='One', slug='research'))
+
+        for slug in ('research', '!!!'):
+            with pytest.raises(services.TeamError) as exc_info:
+                services.create_team(member, services.TeamInput(name='Two', slug=slug))
+            assert exc_info.value.field == 'slug'
+        assert Team.objects.count() == 1
+
     @pytest.mark.parametrize('name', ['', '   ', 'x' * 201])
     def test_an_unusable_name_is_refused(self, owner, name):
         with pytest.raises(services.TeamError) as exc_info:

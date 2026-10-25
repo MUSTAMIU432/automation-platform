@@ -1,8 +1,8 @@
 import { useId, useState, type FormEvent } from 'react'
 
-import { ArrowRightIcon, UsersIcon } from '../../../components/AppIcons'
+import { ArrowRightIcon, DocumentIcon, LinkIcon, UsersIcon } from '../../../components/AppIcons'
 import { UsersGlyph } from '../../../components/glyphs'
-import { IconField, OwnerNote } from '../../../components/WorkspaceCollection'
+import { IconField } from '../../../components/WorkspaceCollection'
 import { GlassBackdropBlobs, GlassFormHeader } from '../../../components/GlassForm'
 import {
   glassButtonClasses,
@@ -33,6 +33,7 @@ import { useTeams } from '../context/useTeams'
 export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
   const { reload } = useTeams()
   const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
   const [description, setDescription] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [field, setField] = useState<string | null>(null)
@@ -40,6 +41,7 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const generatedNameId = useId()
   const nameId = nameInputId ?? generatedNameId
+  const slugId = useId()
   const descriptionId = useId()
   const messageId = useId()
 
@@ -60,6 +62,7 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
       const result = await createTeamRequest({
         name: name.trim(),
         description: description.trim(),
+        slug: slug.trim() || undefined,
       })
       if (!result.success) {
         setMessage(result.message)
@@ -67,6 +70,7 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
         return
       }
       setName('')
+      setSlug('')
       setDescription('')
       setCreated(result.message)
       // The list beside this form is the caller's own teams, and a team just
@@ -84,8 +88,8 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
     <form className={glassCardClasses} onSubmit={handleSubmit} noValidate>
       <GlassBackdropBlobs />
       <GlassFormHeader Glyph={UsersGlyph} title="Create a team">
-        A team is a group of people who put an idea forward together. You will be its first member
-        and its owner, and it does not need an organization.
+        Set up a team workspace for your collaborators. You will be the first member and owner, and
+        it needs no organization.
       </GlassFormHeader>
 
       <div className="mt-6 space-y-5">
@@ -98,7 +102,7 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
               id={nameId}
               className={`${glassInputClasses(field === 'name')} pl-10`}
               maxLength={200}
-              placeholder="e.g. Registrar"
+              placeholder="e.g. Research and Development Team"
               value={name}
               onChange={(event) => setName(event.target.value)}
               aria-required="true"
@@ -107,24 +111,49 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
             />
           </IconField>
           <p className="mt-1.5 text-xs text-gray-500">
-            Use a name the people in the team will recognize.
+            Use a clear and recognizable name for your team.
+          </p>
+        </div>
+
+        <div>
+          <label className={labelClasses} htmlFor={slugId}>
+            Team URL <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <IconField Icon={LinkIcon}>
+            <input
+              id={slugId}
+              className={`${glassInputClasses(field === 'slug')} pl-10`}
+              maxLength={100}
+              placeholder="research-and-development"
+              value={slug}
+              onChange={(event) => setSlug(event.target.value)}
+              aria-invalid={field === 'slug'}
+            />
+          </IconField>
+          <p className="mt-1.5 text-xs text-gray-500">
+            A URL-friendly name, made from the team name if left blank.
           </p>
         </div>
 
         <div>
           <label className={labelClasses} htmlFor={descriptionId}>
-            What is this team for? <span className="font-normal text-gray-500">(optional)</span>
+            Description <span className="font-normal text-gray-500">(optional)</span>
           </label>
-          <textarea
-            id={descriptionId}
-            className={glassInputClasses(field === 'description', { multiline: true })}
-            rows={3}
-            maxLength={1000}
-            placeholder="The people who allocate rooms to students."
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            aria-invalid={field === 'description'}
-          />
+          <IconField Icon={DocumentIcon} top>
+            <textarea
+              id={descriptionId}
+              className={`${glassInputClasses(field === 'description', { multiline: true })} pl-10`}
+              rows={3}
+              maxLength={1000}
+              placeholder="Briefly describe the purpose of this team…"
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              aria-invalid={field === 'description'}
+            />
+          </IconField>
+          <p className="mt-1.5 text-xs text-gray-500">
+            This helps other members understand the team's goals.
+          </p>
         </div>
       </div>
 
@@ -139,13 +168,10 @@ export function CreateTeamForm({ nameInputId }: { nameInputId?: string } = {}) {
       ) : null}
 
       <button type="submit" className={glassButtonClasses} disabled={isSubmitting}>
+        {!isSubmitting && <UsersIcon className="h-4 w-4" />}
         {isSubmitting ? 'Creating…' : 'Create team'}
         {!isSubmitting && <ArrowRightIcon className="h-4 w-4" />}
       </button>
-
-      <OwnerNote title="You will become the owner">
-        As the owner, you can invite people, manage the team, and put ideas forward together.
-      </OwnerNote>
 
       {created ? <output className="sr-only">{created}</output> : null}
     </form>

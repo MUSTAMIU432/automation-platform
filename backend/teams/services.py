@@ -74,6 +74,8 @@ class TeamError(authorization.TeamAuthorizationError):
 class TeamInput:
     name: str
     description: str = ''
+    #: The team's URL name. Optional: made from the name when left blank.
+    slug: str | None = None
 
 
 def assert_known_permissions(codes) -> None:
@@ -129,6 +131,22 @@ def _unique_slug(name: str) -> str:
         candidate = f'{base}-{suffix}'
         suffix += 1
     return candidate
+
+
+def _chosen_slug(value: str) -> str:
+    """
+    The URL name the creator asked for, normalized - refused rather than altered
+    when it is unusable or taken, because a URL somebody chose and then did not
+    get is a URL they will share wrongly.
+    """
+    slug = slugify(value)
+    if not slug:
+        raise TeamError('Use letters or numbers in the team URL.', field='slug')
+    if len(slug) > Team._meta.get_field('slug').max_length:
+        raise TeamError('The team URL is too long.', field='slug')
+    if Team.objects.filter(slug=slug).exists():
+        raise TeamError('A team with this URL already exists.', field='slug')
+    return slug
 
 
 def _ensure_permissions() -> dict[str, Permission]:
@@ -205,10 +223,11 @@ def create_team(user: User | None, data: TeamInput) -> Team:
 
     name = _validate_name(data.name)
     description = _validate_description(data.description)
+    slug = _chosen_slug(data.slug) if data.slug and data.slug.strip() else _unique_slug(name)
 
     team = Team.objects.create(
         name=name,
-        slug=_unique_slug(name),
+        slug=slug,
         description=description,
         owner=active_user,
     )

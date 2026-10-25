@@ -86,6 +86,9 @@ class TeamMembershipPayload:
 class CreateTeamInput:
     name: str
     description: str = ''
+    slug: str | None = strawberry.field(
+        default=None, description="The team's URL name; made from the name when left blank."
+    )
 
 
 @strawberry.input(description='Add somebody who already has an account to a team.')
@@ -140,7 +143,7 @@ class Mutation:
         try:
             team = services.create_team(
                 info.context.user,
-                services.TeamInput(name=input.name, description=input.description),
+                services.TeamInput(name=input.name, description=input.description, slug=input.slug),
             )
         except services.TeamError as exc:
             return CreateTeamPayload(success=False, message=exc.message, field=exc.field)

@@ -29,7 +29,7 @@ export function TeamsPage() {
     <>
       <CollectionHero
         title="Your teams"
-        description="A team is a group of people who put an idea forward together. It is not an organization: an organization is shared work with its own reviewers, while a team is simply who writes the idea with you."
+        description="Create a team to collaborate on ideas, projects and reviews."
         art={<PeopleArt className="h-auto w-full" />}
       />
 
