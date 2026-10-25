@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 
+import { glassEmptyClasses } from '../components/glassStyles'
 import { CreateOrganizationForm } from '../features/organizations/components/CreateOrganizationForm'
 import { useOrganization } from '../features/organizations/context/useOrganization'
 
@@ -45,7 +46,7 @@ export function OrganizationsPage() {
                 </button>
               </div>
             ) : memberships.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-5">
+              <div className={glassEmptyClasses}>
                 <p className="text-sm font-semibold text-gray-900">No organizations yet</p>
                 <p className="mt-1 text-sm leading-6 text-gray-600">
                   Create one to give your work a shared home.

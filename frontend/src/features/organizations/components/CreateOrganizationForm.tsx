@@ -1,10 +1,13 @@
 import { useId, useState, type FormEvent } from 'react'
 
+import { BuildingGlyph } from '../../../components/glyphs'
+import { GlassBackdropBlobs, GlassFormHeader } from '../../../components/GlassForm'
 import {
-  inputClasses,
-  labelClasses,
-  fieldErrorClasses,
-} from '../../identity/components/fieldStyles'
+  glassButtonClasses,
+  glassCardClasses,
+  glassInputClasses,
+} from '../../../components/glassStyles'
+import { labelClasses, fieldErrorClasses } from '../../identity/components/fieldStyles'
 import { useOrganization } from '../context/useOrganization'
 
 export function CreateOrganizationForm() {
@@ -45,16 +48,11 @@ export function CreateOrganizationForm() {
   }
 
   return (
-    <form
-      className="rounded-xl border border-gray-300 border-t-4 border-t-brand-600 bg-white p-6 shadow-md shadow-gray-900/5"
-      onSubmit={handleSubmit}
-    >
-      <div>
-        <h2 className="text-lg font-bold text-gray-900">Create an organization</h2>
-        <p className="mt-1 text-sm leading-6 text-gray-600">
-          Start a shared workspace for your team. You will be its first member and owner.
-        </p>
-      </div>
+    <form className={glassCardClasses} onSubmit={handleSubmit}>
+      <GlassBackdropBlobs />
+      <GlassFormHeader Glyph={BuildingGlyph} title="Create an organization">
+        Start a shared workspace for your team. You will be its first member and owner.
+      </GlassFormHeader>
 
       <div className="mt-5 space-y-4">
         <div>
@@ -63,7 +61,7 @@ export function CreateOrganizationForm() {
           </label>
           <input
             id={nameId}
-            className={`${inputClasses(field === 'name')} w-full`}
+            className={glassInputClasses(field === 'name')}
             maxLength={200}
             placeholder="Organization name"
             value={name}
@@ -79,7 +77,7 @@ export function CreateOrganizationForm() {
           </label>
           <input
             id={slugId}
-            className={`${inputClasses(field === 'slug')} w-full`}
+            className={glassInputClasses(field === 'slug')}
             maxLength={100}
             placeholder="organization-name"
             value={slug}
@@ -104,7 +102,7 @@ export function CreateOrganizationForm() {
 
       <button
         type="submit"
-        className="mt-6 h-11 w-full rounded-lg bg-brand-600 px-4 text-sm font-bold text-white shadow-md shadow-brand-900/20 transition-colors hover:bg-brand-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        className={glassButtonClasses}
         disabled={isSubmitting}
       >
         {isSubmitting ? 'Creating…' : 'Create organization'}
