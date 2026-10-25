@@ -135,6 +135,7 @@ function renderDashboard(path: string | { pathname: string; state?: unknown } = 
             <Route path="ideas/:ideaId" element={<p>Idea page</p>} />
             <Route path="ideas/:ideaId/proposal" element={<p>Proposal page</p>} />
             <Route path="automation/workspace/:projectId" element={<p>Workspace page</p>} />
+            <Route path="teams/:teamId" element={<p>Team page</p>} />
           </Route>
         </Routes>
       </AuthProvider>
@@ -300,34 +301,27 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('0')).not.toBeInTheDocument()
   })
 
-  it('offers a breadcrumb back to the workspace from app sub-pages only', async () => {
+  it('offers a back arrow from app sub-pages only, with no breadcrumb trail', async () => {
     renderDashboard()
     await screen.findByText('Welcome back, Ada')
-    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /^Back to / })).not.toBeInTheDocument()
 
     fireEvent.click(
       within(screen.getByRole('navigation', { name: 'Main' })).getByRole('link', { name: 'Ideas' }),
     )
-    const breadcrumb = await screen.findByRole('navigation', {
-      name: 'Breadcrumb',
-    })
-    expect(within(breadcrumb).getByText('Ideas')).toHaveAttribute('aria-current', 'page')
+    const back = await screen.findByRole('link', { name: 'Back to home' })
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
 
-    fireEvent.click(within(breadcrumb).getByRole('link', { name: 'Home' }))
+    fireEvent.click(back)
     expect(await screen.findByText('Welcome back, Ada')).toBeInTheDocument()
   })
 
-  it('leads from the new-idea page back to the ideas list through the breadcrumb', async () => {
+  it('leads from the new-idea page back to the ideas list', async () => {
     renderDashboard('/app/ideas/new')
 
-    const breadcrumb = await screen.findByRole('navigation', {
-      name: 'Breadcrumb',
-    })
-    expect(within(breadcrumb).getByText('New idea')).toHaveAttribute('aria-current', 'page')
-    // One step up, not home - and the Ideas crumb is the back control, not a second link.
-    const back = within(breadcrumb).getByRole('link', { name: 'Back to ideas' })
+    // One step up, not home.
+    const back = await screen.findByRole('link', { name: 'Back to ideas' })
     expect(back).toHaveAttribute('href', '/app/ideas')
-    expect(within(breadcrumb).queryByRole('link', { name: 'Ideas' })).not.toBeInTheDocument()
 
     fireEvent.click(back)
     expect(await screen.findByText(/^Ideas page/)).toBeInTheDocument()
@@ -344,10 +338,8 @@ describe('DashboardPage', () => {
       },
     })
 
-    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
-    const back = within(breadcrumb).getByRole('link', { name: 'Back to your workspace' })
+    const back = await screen.findByRole('link', { name: 'Back to your workspace' })
     expect(back).toHaveAttribute('href', '/app/automation/workspace/9?tab=overview')
-    expect(within(breadcrumb).queryByRole('link', { name: 'Home' })).not.toBeInTheDocument()
 
     fireEvent.click(back)
     expect(await screen.findByText('Workspace page')).toBeInTheDocument()
@@ -359,34 +351,36 @@ describe('DashboardPage', () => {
       state: { returnTo: { path: 'https://evil.example/phish', label: 'Back to your workspace' } },
     })
 
-    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
-    expect(within(breadcrumb).getByRole('link', { name: 'Back to ideas' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Back to ideas' })).toHaveAttribute(
       'href',
       '/app/ideas',
     )
-    expect(within(breadcrumb).queryByRole('link', { name: /evil|workspace/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /evil|Back to your workspace/i })).toBeNull()
   })
 
   it("leads from an idea's proposal back to that idea", async () => {
     renderDashboard('/app/ideas/4/proposal')
 
-    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
-    expect(within(breadcrumb).getByRole('link', { name: 'Back to idea' })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Back to idea' })).toHaveAttribute(
       'href',
       '/app/ideas/4',
-    )
-    expect(within(breadcrumb).getByRole('link', { name: 'Ideas' })).toHaveAttribute(
-      'href',
-      '/app/ideas',
     )
   })
 
   it('leads from an idea back to Ideas, however the idea was opened', async () => {
     renderDashboard('/app/ideas/4')
 
-    const breadcrumb = await screen.findByRole('navigation', { name: 'Breadcrumb' })
-    fireEvent.click(within(breadcrumb).getByRole('link', { name: 'Back to ideas' }))
+    fireEvent.click(await screen.findByRole('link', { name: 'Back to ideas' }))
     expect(await screen.findByText(/^Ideas page/)).toBeInTheDocument()
+  })
+
+  it('leads from a team back to Teams', async () => {
+    renderDashboard('/app/teams/3')
+
+    expect(await screen.findByRole('link', { name: 'Back to teams' })).toHaveAttribute(
+      'href',
+      '/app/teams',
+    )
   })
 
   it('shows the account menu from the avatar, and closes it on Escape', async () => {
