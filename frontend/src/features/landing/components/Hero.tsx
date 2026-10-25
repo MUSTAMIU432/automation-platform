@@ -103,8 +103,8 @@ export function Hero() {
     >
       <GlassBackdrop />
 
-      {/* The glass frame the header and the hero sit in. */}
-      <div className="relative mx-auto max-w-[92rem] rounded-[2rem] border border-white/15 bg-[linear-gradient(180deg,rgba(6,47,37,0.55),rgba(4,32,25,0.45)_45%,rgba(6,47,37,0.55))] shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_40px_80px_-40px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+      {/* The frame the header and the hero sit in: transparent, so it draws no edge. */}
+      <div className="relative mx-auto max-w-[92rem]">
         <div className="mx-auto max-w-7xl px-4 pb-6 pt-[104px] sm:px-8 sm:pb-8 lg:px-10">
           <div className="grid items-center gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:gap-4">
             <div className="max-w-2xl py-4 lg:py-10">
