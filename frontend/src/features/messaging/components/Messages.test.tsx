@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -31,7 +31,8 @@ const {
   markThreadReadRequest: markReadMock,
 } = await import('../api/messagingApi')
 
-const RAE = { id: '8', email: 'rae@example.com', firstName: 'Rae', lastName: 'B' }
+const RAE = { id: '8', email: 'rae@example.com', firstName: 'Rae', lastName: 'B', avatarUrl: null }
+const ADA = { id: '7', email: 'ada@example.com', firstName: 'Ada', lastName: 'A', avatarUrl: null }
 
 function summary(overrides: Partial<MessageThreadSummary> = {}): MessageThreadSummary {
   return {
@@ -41,7 +42,7 @@ function summary(overrides: Partial<MessageThreadSummary> = {}): MessageThreadSu
       ideaId: '1',
       ideaTitle: 'Automate the invoice run',
       startedById: '7',
-      participants: [{ id: '7', email: 'ada@example.com', firstName: 'Ada', lastName: 'A' }, RAE],
+      participants: [ADA, RAE],
       latestMessageAt: '2026-02-01T00:00:00.000Z',
     },
     otherParticipants: [RAE],
@@ -86,7 +87,7 @@ describe('MessagesPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useAuth).mockReturnValue({
-      user: { id: '7', email: 'ada@example.com' },
+      user: { id: '7', email: 'ada@example.com', firstName: 'Ada', lastName: 'A' },
     } as unknown as ReturnType<typeof useAuth>)
     vi.mocked(threadsMock).mockResolvedValue({ threads: [summary()], unreadThreadCount: 1 })
   })
@@ -126,11 +127,19 @@ describe('MessagesPage', () => {
   })
 })
 
+/**
+ * A message in the open conversation. The list beside it previews the latest
+ * message too, so a bare text query would find both.
+ */
+async function findMessage(text: string) {
+  return within(await screen.findByRole('list', { name: 'Messages' })).findByText(text)
+}
+
 describe('MessageThreadPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(useAuth).mockReturnValue({
-      user: { id: '7', email: 'ada@example.com' },
+      user: { id: '7', email: 'ada@example.com', firstName: 'Ada', lastName: 'A' },
     } as unknown as ReturnType<typeof useAuth>)
     vi.mocked(threadsMock).mockResolvedValue({ threads: [summary()], unreadThreadCount: 0 })
     vi.mocked(messagesMock).mockResolvedValue({
@@ -151,14 +160,14 @@ describe('MessageThreadPage', () => {
   it('shows the messages and who else is in the conversation', async () => {
     renderThread()
 
-    expect(await screen.findByText('Can you send the monthly volume?')).toBeInTheDocument()
-    expect(await screen.findByText(/^With$/)).toBeInTheDocument()
-    expect(screen.getByText('Rae')).toBeInTheDocument()
+    expect(await findMessage('Can you send the monthly volume?')).toBeInTheDocument()
+    // The open conversation's header names who it is with.
+    expect(await screen.findByRole('heading', { name: 'Rae' })).toBeInTheDocument()
   })
 
   it('marks the thread read on arrival, once', async () => {
     renderThread()
-    await screen.findByText('Can you send the monthly volume?')
+    await findMessage('Can you send the monthly volume?')
 
     // Opening a conversation is what "read" means here, so the position moves
     // without anybody pressing anything.
@@ -182,12 +191,12 @@ describe('MessageThreadPage', () => {
       },
     })
     renderThread()
-    await screen.findByText('Can you send the monthly volume?')
+    await findMessage('Can you send the monthly volume?')
 
     fireEvent.change(screen.getByLabelText('Write a message'), { target: { value: 'Here it is.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    expect(await screen.findByText('Here it is.')).toBeInTheDocument()
+    expect(await findMessage('Here it is.')).toBeInTheDocument()
     expect(postMock).toHaveBeenCalledWith('t1', 'Here it is.')
     // Spliced, not re-read: the reader keeps their place in the conversation.
     expect(messagesMock).toHaveBeenCalledOnce()
@@ -202,7 +211,7 @@ describe('MessageThreadPage', () => {
       sentMessage: null,
     })
     renderThread()
-    await screen.findByText('Can you send the monthly volume?')
+    await findMessage('Can you send the monthly volume?')
 
     fireEvent.change(screen.getByLabelText('Write a message'), { target: { value: 'Here it is.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -214,7 +223,7 @@ describe('MessageThreadPage', () => {
   it('reports a transport failure without claiming the message was sent', async () => {
     vi.mocked(postMock).mockRejectedValue(new Error('Failed to fetch'))
     renderThread()
-    await screen.findByText('Can you send the monthly volume?')
+    await findMessage('Can you send the monthly volume?')
 
     fireEvent.change(screen.getByLabelText('Write a message'), { target: { value: 'Here it is.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
@@ -237,7 +246,7 @@ describe('MessageThreadPage', () => {
 
   it('never sends an empty message', async () => {
     renderThread()
-    await screen.findByText('Can you send the monthly volume?')
+    await findMessage('Can you send the monthly volume?')
 
     expect(screen.getByRole('button', { name: 'Send' })).toBeDisabled()
     expect(postMock).not.toHaveBeenCalled()

@@ -19,6 +19,8 @@ export interface MessageAuthor {
   email: string
   firstName: string
   lastName: string
+  /** The profile photo's URL, or null when the person has none. */
+  avatarUrl: string | null
 }
 
 export interface Message {
@@ -74,6 +76,7 @@ const USER_FIELDS = `
   email
   firstName
   lastName
+  avatarUrl
 `
 
 const MESSAGE_FIELDS = `
