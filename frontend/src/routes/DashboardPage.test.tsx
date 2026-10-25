@@ -383,6 +383,24 @@ describe('DashboardPage', () => {
     )
   })
 
+  it('collapses the sidebar to a rail of icons, keeps its links named, and remembers it', async () => {
+    window.localStorage.removeItem('collapse:app.sidebar')
+    renderDashboard()
+    await screen.findByText('Welcome back, Ada')
+    const sidebar = document.getElementById('app-sidebar') as HTMLElement
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+
+    expect(sidebar).toHaveAttribute('data-collapsed', 'true')
+    const main = within(screen.getByRole('navigation', { name: 'Main' }))
+    expect(main.getByRole('link', { name: 'Ideas' })).toHaveAttribute('title', 'Ideas')
+    expect(window.localStorage.getItem('collapse:app.sidebar')).toBe('closed')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+    expect(sidebar).toHaveAttribute('data-collapsed', 'false')
+    window.localStorage.removeItem('collapse:app.sidebar')
+  })
+
   it('shows the account menu from the avatar, and closes it on Escape', async () => {
     renderDashboard()
     await screen.findByText('Welcome back, Ada')

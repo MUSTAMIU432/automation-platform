@@ -20,11 +20,14 @@ import {
   FlowIcon,
   GridIcon,
   MenuIcon,
+  PanelCollapseIcon,
+  PanelExpandIcon,
   SearchIcon,
   StoreIcon,
   UsersIcon,
 } from '../components/AppIcons'
 import { Logo } from '../components/Logo'
+import { useCollapsed } from '../components/useCollapsed'
 import { AdminCapabilitiesProvider } from '../features/administration/context/AdminCapabilitiesProvider'
 import { useAdminCapabilities } from '../features/administration/context/useAdminCapabilities'
 import { useAuth } from '../features/identity/auth/AuthContext'
@@ -281,8 +284,10 @@ interface SidebarSection {
   items: SidebarItem[]
 }
 
-function sidebarLinkClass(active: boolean): string {
-  return `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
+function sidebarLinkClass(active: boolean, collapsed: boolean): string {
+  return `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
+    collapsed ? 'lg:justify-center lg:px-0' : ''
+  } ${
     active
       ? 'bg-gradient-to-r from-mint/45 to-mint/15 font-semibold text-forest shadow-[inset_0_0_0_1px_rgba(11,143,101,0.15)]'
       : 'text-ink/75 hover:bg-white/80 hover:text-forest'
@@ -293,6 +298,12 @@ function sidebarLinkClass(active: boolean): string {
  * The signed-in app's navigation: what there is to do, grouped by the kind of
  * work. Reviews is offered only to someone who can review (the server still
  * authorizes the queue); everything else needs nothing but a session.
+ *
+ * On a wide screen it collapses to a rail of icons - the button at its foot -
+ * and the page takes the room. In the rail each link keeps its name for
+ * assistive technology and shows it on hover, a count becomes a dot on its
+ * icon, and the section titles become dividers. The choice is remembered on
+ * this device. The phone's slide-out menu is always full width.
  */
 function Sidebar({
   sections,
@@ -305,19 +316,31 @@ function Sidebar({
   open: boolean
   onNavigate: () => void
 }) {
+  const [expanded, toggleExpanded] = useCollapsed('app.sidebar', true)
+  const collapsed = !expanded
+  // Only the wide layout collapses; the phone's drawer ignores it.
+  const whenCollapsed = (classes: string) => (collapsed ? classes : '')
+
   return (
     <aside
       id="app-sidebar"
+      data-collapsed={collapsed}
       className={`${
         open
           ? 'fixed inset-y-0 left-0 z-50 flex w-72 overflow-y-auto bg-white p-4 shadow-2xl'
           : 'hidden'
-      } flex-col lg:sticky lg:top-[calc(var(--app-chrome-height)+1rem)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--app-chrome-height)-2rem)] lg:w-64 lg:shrink-0 lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-white lg:bg-white/70 lg:p-3 lg:shadow-[0_20px_50px_-30px_rgba(8,75,56,0.45)] lg:backdrop-blur-xl`}
+      } flex-col lg:sticky lg:top-[calc(var(--app-chrome-height)+1rem)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--app-chrome-height)-2rem)] lg:shrink-0 lg:overflow-x-hidden lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-white lg:bg-white/70 lg:p-3 lg:shadow-[0_20px_50px_-30px_rgba(8,75,56,0.45)] lg:backdrop-blur-xl motion-safe:lg:transition-[width] motion-safe:lg:duration-300 ${
+        collapsed ? 'lg:w-[4.75rem]' : 'lg:w-64'
+      }`}
     >
       <nav aria-label="Main" className="flex-1">
         {sections.map((section, index) => (
           <div key={section.title} className={index > 0 ? 'mt-4 border-t border-jade/10 pt-4' : ''}>
-            <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-sage">
+            <p
+              className={`px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-sage ${whenCollapsed(
+                'lg:sr-only',
+              )}`}
+            >
               {section.title}
             </p>
             <ul className="space-y-1">
@@ -328,16 +351,21 @@ function Sidebar({
                     end={end}
                     onClick={onNavigate}
                     aria-label={ariaLabel}
+                    title={collapsed ? label : undefined}
                     className={({ isActive: routeActive }) =>
-                      sidebarLinkClass(isActive ? isActive(pathname) : routeActive)
+                      sidebarLinkClass(isActive ? isActive(pathname) : routeActive, collapsed)
                     }
                   >
                     <Icon className="h-5 w-5 shrink-0" />
-                    <span className="flex-1">{label}</span>
+                    <span className={`flex-1 whitespace-nowrap ${whenCollapsed('lg:sr-only')}`}>
+                      {label}
+                    </span>
                     {badge !== undefined && badge > 0 && (
                       <span
                         aria-hidden="true"
-                        className="min-w-[1.25rem] rounded-full bg-amber-400 px-1.5 text-center text-[11px] font-bold text-amber-950 tabular-nums"
+                        className={`min-w-[1.25rem] rounded-full bg-amber-400 px-1.5 text-center text-[11px] font-bold text-amber-950 tabular-nums ${whenCollapsed(
+                          'lg:absolute lg:top-1.5 lg:right-3 lg:h-2.5 lg:w-2.5 lg:min-w-0 lg:p-0 lg:text-[0px] lg:ring-2 lg:ring-white',
+                        )}`}
                       >
                         {badge > 99 ? '99+' : badge}
                       </span>
@@ -351,7 +379,11 @@ function Sidebar({
       </nav>
 
       {/* The platform's promise, as a quiet card at the foot of the menu. */}
-      <div className="relative mt-4 hidden overflow-hidden rounded-2xl bg-gradient-to-br from-jade via-pine to-forest p-4 text-white lg:block">
+      <div
+        className={`relative mt-4 hidden overflow-hidden rounded-2xl bg-gradient-to-br from-jade via-pine to-forest p-4 text-white ${
+          collapsed ? '' : 'lg:block'
+        }`}
+      >
         <span
           aria-hidden="true"
           className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.8),rgba(85,230,176,0.45)_35%,rgba(11,143,101,0.2)_70%)]"
@@ -371,6 +403,27 @@ function Sidebar({
         </p>
         <span aria-hidden="true" className="relative mt-3 block h-0.5 w-8 rounded-full bg-mint" />
       </div>
+
+      <button
+        type="button"
+        onClick={toggleExpanded}
+        aria-expanded={expanded}
+        aria-controls="app-sidebar"
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className={`mt-3 hidden items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium whitespace-nowrap text-ink/60 transition-colors hover:bg-white/80 hover:text-forest focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 lg:flex ${whenCollapsed(
+          'lg:justify-center lg:px-0',
+        )}`}
+      >
+        {collapsed ? (
+          <PanelExpandIcon className="h-5 w-5 shrink-0" />
+        ) : (
+          <PanelCollapseIcon className="h-5 w-5 shrink-0" />
+        )}
+        <span aria-hidden="true" className={whenCollapsed('lg:hidden')}>
+          Collapse
+        </span>
+      </button>
     </aside>
   )
 }
