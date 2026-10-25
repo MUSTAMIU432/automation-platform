@@ -19,7 +19,7 @@ import { EnquirySection } from './EnquirySection'
 function FileIcon({ format }: { format: 'PDF' | 'Word' }) {
   const pdf = format === 'PDF'
   return (
-    <span aria-hidden="true" className="relative block h-14 w-11 shrink-0">
+    <span aria-hidden="true" className="relative block h-12 w-10 shrink-0">
       <span className="absolute inset-0 rounded-md border border-gray-200 bg-white shadow-sm [clip-path:polygon(0_0,70%_0,100%_22%,100%_100%,0_100%)]" />
       <span className="absolute top-0 right-0 h-3 w-3 rounded-bl-sm bg-gray-200" />
       <span
@@ -62,7 +62,7 @@ function Tile({
   )
   if (!locked) {
     return (
-      <li className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+      <li className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 shadow-sm ring-1 ring-slate-900/5">
         {body}
         <span className="flex gap-2">{children}</span>
       </li>
@@ -75,7 +75,7 @@ function Tile({
         disabled={waiting}
         onClick={onUnlock}
         aria-label={`${title}, locked`}
-        className="group flex w-full items-center gap-4 rounded-xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:border-brand-300 hover:shadow-md disabled:cursor-default disabled:hover:border-gray-200 disabled:hover:shadow-sm"
+        className="group flex w-full items-center gap-3 rounded-2xl border border-white/80 bg-white/80 px-4 py-3 text-left shadow-sm ring-1 ring-slate-900/5 transition hover:border-brand-300 hover:shadow-md disabled:cursor-default disabled:hover:border-white/80 disabled:hover:shadow-sm"
       >
         {body}
         {/* A lock, not a button: one payment unlocks every item, from the button above. */}
@@ -145,14 +145,14 @@ function WhatsIncluded({
   return (
     <section
       aria-labelledby="included-heading"
-      className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8"
+      className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_50px_-36px_rgba(8,75,56,0.5)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl sm:px-6 sm:py-5"
     >
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 id="included-heading" className="text-xl font-bold text-gray-900">
+          <h2 id="included-heading" className="text-lg font-bold text-gray-900">
             What’s included
           </h2>
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-600">
+          <p className="mt-0.5 max-w-2xl text-sm leading-6 text-gray-600">
             {!open
               ? includedSummary(idea)
               : locked
@@ -213,7 +213,7 @@ function WhatsIncluded({
       {open && (
         <div id={bodyId}>
           {onPhone && purchase && (
-            <output className="mt-5 block rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <output className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-semibold">Approve the payment on your phone</p>
               <p className="mt-1">
                 A request for {formatPrice(purchase.amount, purchase.currency)} was sent to{' '}
@@ -223,7 +223,7 @@ function WhatsIncluded({
             </output>
           )}
           {waiting && !onPhone && purchase && (
-            <output className="mt-5 block rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <output className="mt-4 block rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
               <p className="font-semibold">We are confirming your payment</p>
               <p className="mt-1">
                 {formatPrice(purchase.amount, purchase.currency)} by {purchase.method.provider},
@@ -236,7 +236,7 @@ function WhatsIncluded({
           {locked && purchase?.status === 'failed' && (
             <div
               role="note"
-              className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">Your last payment did not go through</p>
@@ -250,7 +250,7 @@ function WhatsIncluded({
           {locked && purchase?.status === 'rejected' && (
             <div
               role="note"
-              className="mt-5 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+              className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-semibold">Your last payment could not be confirmed</p>
@@ -262,7 +262,7 @@ function WhatsIncluded({
             </div>
           )}
 
-          <ul aria-label="Included" className="mt-6 grid gap-3 lg:grid-cols-2">
+          <ul aria-label="Included" className="mt-4 grid gap-3 lg:grid-cols-2">
             {info && (
               <Tile
                 icon={<FileIcon format={info.format} />}
@@ -401,8 +401,8 @@ export function MarketIdeaPage() {
   }
 
   return (
-    <article className="mt-6 space-y-6">
-      <header className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8">
+    <article className="mt-4 space-y-4">
+      <header className="rounded-3xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_50px_-36px_rgba(8,75,56,0.5)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl sm:px-6 sm:py-5">
         <p className="text-xs font-bold tracking-[0.18em] text-brand-700 uppercase">Marketplace</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900">{idea.title}</h1>
         <div className="mt-4">
