@@ -69,6 +69,23 @@ describe('LandingPage', () => {
     setAccessToken(null)
   })
 
+  it('opens green, and switches to the Midnight look and remembers it', () => {
+    window.localStorage.removeItem('mustanet:landing-theme')
+    const { container } = renderWithProviders(<LandingPage />)
+    const page = container.querySelector('[data-landing-theme]')
+    const toggle = screen.getByRole('switch', { name: 'Midnight theme' })
+
+    expect(page).toHaveAttribute('data-landing-theme', 'green')
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+
+    fireEvent.click(toggle)
+
+    expect(page).toHaveAttribute('data-landing-theme', 'midnight')
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    expect(window.localStorage.getItem('mustanet:landing-theme')).toBe('midnight')
+    window.localStorage.removeItem('mustanet:landing-theme')
+  })
+
   it('says what the platform is in the first screen', () => {
     renderWithProviders(<LandingPage />)
 

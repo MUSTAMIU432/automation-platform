@@ -30,6 +30,71 @@
   --color-neu: #e6f1ec;
 }
 
+/* The website's colour roles beyond the named palette: glows, the hero's night
+   sky, the laptop's screen, its plinth and the rocks. Each green value is the one
+   the components used to hard-code, so the default website looks exactly as it
+   did. Channel triples (`85 230 176`) are for `rgb(var(--lp-mint)/0.4)`. */
+:root {
+  --lp-mint: 85 230 176;
+  --lp-jade: 11 143 101;
+  --lp-pine: 8 75 56;
+  --lp-deep: 4 40 30;
+  --lp-ink: 20 45 37;
+  --lp-mint-light: #8ff5cf;
+  --lp-mint-soft: #7af0c3;
+  --lp-mint-pale: #d6fff0;
+  --lp-bg-top: #05261d;
+  --lp-bg: #03140f;
+  --lp-bg-deep: #020c09;
+  --lp-screen: #f4faf7;
+  --lp-screen-side: #0b221b;
+  --lp-plinth-1: #0d3a2e;
+  --lp-plinth-2: #06231b;
+  --lp-plinth-3: #020f0b;
+  --lp-plinth-top-1: #0f4a39;
+  --lp-plinth-top-2: #072a20;
+  --lp-rock-far-top: #0d3a2d;
+  --lp-rock-far-bottom: #03130e;
+  --lp-rock-near-top: #0a2c22;
+  --lp-rock-near-bottom: #010806;
+}
+
+/* The website's Midnight theme: black, milk white and blue, chosen with the
+   header's toggle. Only the website's own subtree takes it (LandingPage sets the
+   attribute), so the app, the auth pages and the green default are untouched. */
+[data-landing-theme='midnight'] {
+  --color-forest: #0a0c12;
+  --color-pine: #16213d;
+  --color-jade: #2563eb;
+  --color-mint: #6ea8ff;
+  --color-mist: #f5f1e8;
+  --color-ink: #0f172a;
+  --color-sage: #5b6475;
+
+  --lp-mint: 110 168 255;
+  --lp-jade: 37 99 235;
+  --lp-pine: 22 33 61;
+  --lp-deep: 8 12 24;
+  --lp-ink: 15 23 42;
+  --lp-mint-light: #c7dcff;
+  --lp-mint-soft: #9cc3ff;
+  --lp-mint-pale: #e3eeff;
+  --lp-bg-top: #0d1324;
+  --lp-bg: #06080e;
+  --lp-bg-deep: #020306;
+  --lp-screen: #f7f4ee;
+  --lp-screen-side: #0b1020;
+  --lp-plinth-1: #18243f;
+  --lp-plinth-2: #0b1222;
+  --lp-plinth-3: #03050b;
+  --lp-plinth-top-1: #1b3570;
+  --lp-plinth-top-2: #0b1733;
+  --lp-rock-far-top: #141c30;
+  --lp-rock-far-bottom: #04060c;
+  --lp-rock-near-top: #0d1426;
+  --lp-rock-near-bottom: #010204;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

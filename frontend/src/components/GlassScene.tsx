@@ -30,15 +30,15 @@ const BACKDROP_SPHERES: Array<[string, number, boolean]> = [
 export function GlassBackdrop() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_68%_40%,rgba(11,143,101,0.55),transparent_50%),radial-gradient(ellipse_at_15%_20%,rgba(8,75,56,0.8),transparent_45%),linear-gradient(180deg,#05261d,#03140f_70%,#020c09)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_68%_40%,rgb(var(--lp-jade)/0.55),transparent_50%),radial-gradient(ellipse_at_15%_20%,rgb(var(--lp-pine)/0.8),transparent_45%),linear-gradient(180deg,var(--lp-bg-top),var(--lp-bg)_70%,var(--lp-bg-deep))]" />
 
       {/* Glass petals: two large curved translucent forms behind everything. */}
       <div
-        className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-[45%] border border-white/5 bg-[linear-gradient(135deg,rgba(85,230,176,0.18),rgba(11,143,101,0.04)_60%)] blur-[3px]"
+        className="absolute -left-40 -top-40 h-[34rem] w-[34rem] rounded-[45%] border border-white/5 bg-[linear-gradient(135deg,rgb(var(--lp-mint)/0.18),rgb(var(--lp-jade)/0.04)_60%)] blur-[3px]"
         style={{ ...parallax(0.1), rotate: '-24deg' }}
       />
       <div
-        className="absolute -right-48 top-1/4 h-[40rem] w-[30rem] rounded-[48%] border border-white/5 bg-[linear-gradient(200deg,rgba(85,230,176,0.16),rgba(11,143,101,0.03)_60%)] blur-[3px]"
+        className="absolute -right-48 top-1/4 h-[40rem] w-[30rem] rounded-[48%] border border-white/5 bg-[linear-gradient(200deg,rgb(var(--lp-mint)/0.16),rgb(var(--lp-jade)/0.03)_60%)] blur-[3px]"
         style={{ ...parallax(0.18), rotate: '18deg' }}
       />
 
@@ -60,9 +60,9 @@ export function GlassBackdrop() {
       >
         <defs>
           <linearGradient id="hero-streak" x1="0" x2="1">
-            <stop offset="0" stopColor="#55e6b0" stopOpacity="0" />
-            <stop offset="0.35" stopColor="#55e6b0" stopOpacity="0.7" />
-            <stop offset="1" stopColor="#55e6b0" stopOpacity="0" />
+            <stop offset="0" style={{ stopColor: 'var(--color-mint)', stopOpacity: 0 }} />
+            <stop offset="0.35" style={{ stopColor: 'var(--color-mint)', stopOpacity: 0.7 }} />
+            <stop offset="1" style={{ stopColor: 'var(--color-mint)', stopOpacity: 0 }} />
           </linearGradient>
         </defs>
         {[0, 18, 36].map((offset) => (
@@ -84,12 +84,12 @@ export function GlassBackdrop() {
       >
         <defs>
           <linearGradient id="rock-far" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#0d3a2d" />
-            <stop offset="1" stopColor="#03130e" />
+            <stop offset="0" style={{ stopColor: 'var(--lp-rock-far-top)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--lp-rock-far-bottom)' }} />
           </linearGradient>
           <linearGradient id="rock-near" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#0a2c22" />
-            <stop offset="1" stopColor="#010806" />
+            <stop offset="0" style={{ stopColor: 'var(--lp-rock-near-top)' }} />
+            <stop offset="1" style={{ stopColor: 'var(--lp-rock-near-bottom)' }} />
           </linearGradient>
         </defs>
         <path
@@ -102,12 +102,12 @@ export function GlassBackdrop() {
         />
         <path
           d="M60 110 L120 140 L190 100 M1120 120 L1200 150 L1270 105 L1350 135"
-          stroke="rgba(85,230,176,0.35)"
+          style={{ stroke: 'rgb(var(--lp-mint)/0.35)' }}
           strokeWidth="1.5"
           fill="none"
         />
       </svg>
-      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-[#020c09]" />
+      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-b from-transparent to-[color:var(--lp-bg-deep)]" />
     </div>
   )
 }

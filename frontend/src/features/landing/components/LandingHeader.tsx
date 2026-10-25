@@ -4,8 +4,10 @@ import { Link } from 'react-router-dom'
 import { Logo } from '../../../components/Logo'
 import { useAuth } from '../../identity/auth/AuthContext'
 import { useActiveSection } from '../hooks/useActiveSection'
+import type { LandingTheme } from '../hooks/useLandingTheme'
 import { SECTION_IDS, SECTIONS, SIGN_IN_PATH, SIGN_UP_PATH } from '../sections'
 import { CloseIcon, MenuIcon } from './icons'
+import { ThemeToggle } from './ThemeToggle'
 
 const focusRing =
   'focus:outline-none focus-visible:ring-2 focus-visible:ring-mint focus-visible:ring-offset-2 focus-visible:ring-offset-forest'
@@ -15,7 +17,13 @@ const focusRing =
  * (the page scrolls; nothing navigates), and the account actions are links
  * into the real auth page - or into the app, for someone already signed in.
  */
-export function LandingHeader() {
+export function LandingHeader({
+  theme,
+  onThemeChange,
+}: {
+  theme: LandingTheme
+  onThemeChange: (theme: LandingTheme) => void
+}) {
   const { status } = useAuth()
   const active = useActiveSection(SECTION_IDS)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -61,7 +69,7 @@ export function LandingHeader() {
         </Link>
         <Link
           to={SIGN_UP_PATH}
-          className={`inline-flex ${size} items-center justify-center rounded-xl bg-mint text-sm font-semibold text-forest shadow-[0_0_28px_-4px_rgba(85,230,176,0.8)] hover:bg-white motion-safe:transition-colors ${focusRing}`}
+          className={`inline-flex ${size} items-center justify-center rounded-xl bg-mint text-sm font-semibold text-forest shadow-[0_0_28px_-4px_rgb(var(--lp-mint)/0.8)] hover:bg-white motion-safe:transition-colors ${focusRing}`}
         >
           Sign Up
         </Link>
@@ -114,18 +122,21 @@ export function LandingHeader() {
             </ul>
           </nav>
 
-          <div className="hidden items-center gap-3 lg:flex">{accountActions('row')}</div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle theme={theme} onChange={onThemeChange} />
+            <div className="hidden items-center gap-3 lg:flex">{accountActions('row')}</div>
 
-          <button
-            type="button"
-            className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-white lg:hidden ${focusRing}`}
-            aria-expanded={menuOpen}
-            aria-controls="mobile-menu"
-            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            {menuOpen ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
-          </button>
+            <button
+              type="button"
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 text-white lg:hidden ${focusRing}`}
+              aria-expanded={menuOpen}
+              aria-controls="mobile-menu"
+              aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              {menuOpen ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+            </button>
+          </div>
         </div>
 
         {menuOpen && (
