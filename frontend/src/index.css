@@ -59,57 +59,58 @@
   --lp-rock-near-bottom: #010806;
 }
 
-/* The website's White theme, chosen with the header's toggle: a white page,
-   near-black text, neutral glass and blue accents. Only the website's own
+/* The website's Midnight theme, chosen with the header's toggle: black and
+   blue. A pure black page, dark grey cards, white headings, soft grey body text
+   and one vivid blue for every action and highlight. Only the website's own
    subtree takes it (LandingPage sets the attribute), so the app, the auth pages
    and the green default are untouched. */
-[data-landing-theme='white'] {
-  --color-jade: #2563eb;
-  --color-mint: #2563eb;
-  --color-mist: #f6f7f9;
-  --color-ink: #0a0a0a;
-  --color-sage: #5f6368;
+[data-landing-theme='midnight'] {
+  background-color: #000000;
 
-  --lp-mint: 37 99 235;
-  --lp-jade: 148 163 184;
-  --lp-pine: 226 232 240;
-  --lp-deep: 203 213 225;
-  --lp-ink: 15 23 42;
-  --lp-mint-light: #1e40af;
-  --lp-mint-soft: #60a5fa;
-  --lp-mint-pale: #93c5fd;
-  --lp-bg-top: #ffffff;
-  --lp-bg: #f4f6f9;
-  --lp-bg-deep: #e9edf2;
+  --color-forest: #000000;
+  --color-pine: #18181b;
+  --color-jade: #3b82f6;
+  --color-mint: #4f8dff;
+  --color-mist: #0b0b0d;
+  --color-ink: #f4f4f5;
+  --color-sage: #a1a1aa;
+
+  --lp-mint: 79 141 255;
+  --lp-jade: 30 64 175;
+  --lp-pine: 24 24 27;
+  --lp-deep: 9 9 11;
+  --lp-ink: 0 0 0;
+  --lp-mint-light: #9cc2ff;
+  --lp-mint-soft: #7aa9ff;
+  --lp-mint-pale: #cfe0ff;
+  --lp-bg-top: #050507;
+  --lp-bg: #000000;
+  --lp-bg-deep: #000000;
   --lp-screen: #ffffff;
-  --lp-screen-side: #0a0a0a;
-  --lp-plinth-1: #ffffff;
-  --lp-plinth-2: #e2e8f0;
-  --lp-plinth-3: #cbd5e1;
-  --lp-plinth-top-1: #ffffff;
-  --lp-plinth-top-2: #e2e8f0;
-  --lp-rock-far-top: #e2e8f0;
-  --lp-rock-far-bottom: #f1f5f9;
-  --lp-rock-near-top: #d5dde8;
-  --lp-rock-near-bottom: #eef2f6;
+  --lp-screen-side: #09090b;
+  --lp-plinth-1: #1c1c22;
+  --lp-plinth-2: #0c0c10;
+  --lp-plinth-3: #000000;
+  --lp-plinth-top-1: #16264d;
+  --lp-plinth-top-2: #0a0f1f;
+  --lp-rock-far-top: #121216;
+  --lp-rock-far-bottom: #030304;
+  --lp-rock-near-top: #0b0b0e;
+  --lp-rock-near-bottom: #000000;
 }
 
-/* The areas that are dark by design - header, hero, how it works, footer -
-   turn light: their dark ground (forest) becomes white, and the white they write
-   and draw glass with becomes near-black. */
-[data-landing-theme='white'] :is(header, #home, #how-it-works, footer) {
-  --color-forest: #ffffff;
-  --color-white: #0a0a0a;
+/* The sections that are light by design - services, about, contact - go dark
+   too: their white cards become dark grey panels, the mist they sit on black,
+   and their ink text light. */
+[data-landing-theme='midnight'] :is(#services, #about, #contact) {
+  --color-white: #111114;
 }
 
-/* Except what keeps its own colours whatever the look: the laptop's mini
-   dashboard, and the logo's white tile. */
-[data-landing-theme='white'] [data-landing-keep-colors] {
+/* What keeps its own colours whatever the look: the laptop's mini dashboard. */
+[data-landing-theme='midnight'] [data-landing-keep-colors] {
   --color-white: #ffffff;
+  --color-ink: #142d25;
   --color-forest: #062f25;
-}
-[data-landing-theme='white'] svg .fill-white {
-  fill: #ffffff;
 }
 
 @keyframes fade-in {
