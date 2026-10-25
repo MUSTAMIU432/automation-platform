@@ -4,7 +4,6 @@ import { useAuth } from '../../identity/auth/AuthContext'
 import { Avatar } from '../../identity/components/Avatar'
 import { adminOverviewRequest, type AdminStatusCount } from '../api/administrationApi'
 import {
-  AdminCard,
   AdminPageHeader,
   EmptyState,
   ErrorState,
@@ -76,6 +75,69 @@ function SignedInAccount() {
           </span>
         </div>
       </div>
+    </section>
+  )
+}
+
+/**
+ * Every lifecycle status as a glass tile: its badge, how many ideas are in it,
+ * and that count's share of all ideas as a thin bar - so where the work is piling
+ * up shows without reading a single number. Each tile opens the idea list
+ * filtered to its status.
+ */
+function IdeasByStatus({ counts, total }: { counts: AdminStatusCount[]; total: number }) {
+  return (
+    <section
+      aria-labelledby="ideas-by-status-heading"
+      className={`rounded-3xl p-5 sm:p-6 ${glassSurface}`}
+    >
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 id="ideas-by-status-heading" className="text-lg font-bold text-slate-900">
+          Ideas by status
+        </h2>
+        <p className="text-sm text-slate-500">
+          {total === 1 ? '1 idea in total' : `${total} ideas in total`}
+        </p>
+      </div>
+      <ul
+        aria-label="Ideas by status"
+        className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+      >
+        {counts.map((item) => {
+          const share = total > 0 ? Math.round((item.count / total) * 100) : 0
+          return (
+            <li key={item.status}>
+              <Link
+                to={`/app/admin/ideas?status=${item.status}`}
+                className={`flex h-full flex-col rounded-2xl border border-white/80 p-4 ring-1 ring-slate-900/5 transition hover:-translate-y-0.5 hover:bg-white/95 hover:shadow-[0_16px_32px_-24px_rgba(8,75,56,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-reduce:hover:translate-y-0 ${
+                  item.count > 0 ? 'bg-white/75' : 'bg-white/45'
+                }`}
+              >
+                <span className="flex items-start justify-between gap-3">
+                  <IdeaStatusBadge status={item.status} />
+                  <span
+                    className={`text-2xl leading-none font-bold tabular-nums ${
+                      item.count > 0 ? 'text-slate-900' : 'text-slate-400'
+                    }`}
+                  >
+                    {item.count}
+                  </span>
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="mt-4 block h-1.5 overflow-hidden rounded-full bg-slate-900/[0.06]"
+                >
+                  <span
+                    className="block h-full rounded-full bg-linear-to-r from-brand-500 to-teal-400"
+                    style={{ width: `${share}%` }}
+                  />
+                </span>
+                <span className="mt-2 text-xs text-slate-500">{share}% of ideas</span>
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }
@@ -177,21 +239,7 @@ export function AdminDashboardPage() {
             </div>
           </section>
 
-          <AdminCard title="Ideas by status">
-            <ul aria-label="Ideas by status" className="flex flex-wrap gap-2">
-              {data.ideasByStatus.map((item) => (
-                <li key={item.status}>
-                  <Link
-                    to={`/app/admin/ideas?status=${item.status}`}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3 py-1.5 text-sm shadow-sm ring-1 ring-slate-900/5 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
-                  >
-                    <IdeaStatusBadge status={item.status} />
-                    <span className="font-semibold text-slate-900 tabular-nums">{item.count}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </AdminCard>
+          <IdeasByStatus counts={data.ideasByStatus} total={data.ideaCount} />
         </div>
       )}
     </>
