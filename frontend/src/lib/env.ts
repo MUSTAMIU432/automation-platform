@@ -3,8 +3,17 @@
  * Import from here instead of reading `import.meta.env` in components.
  */
 
+/**
+ * Trimmed, because a value pasted into a host's settings form easily picks up a
+ * line break or a space, and it is baked into the build as is: a client id with
+ * a newline in it is one Google has never heard of.
+ */
+function readEnv(key: keyof ImportMetaEnv): string {
+  return (import.meta.env[key] ?? '').trim()
+}
+
 function requireEnv(key: keyof ImportMetaEnv): string {
-  const value = import.meta.env[key]
+  const value = readEnv(key)
   if (!value) {
     throw new Error(`Missing required environment variable: ${key}`)
   }
@@ -26,5 +35,5 @@ export const env = {
   // "Continue with Google" button does nothing) rather than the app
   // failing to start, when it isn't configured - see
   // src/features/identity/auth/googleIdentityServices.ts.
-  googleClientId: import.meta.env.VITE_GOOGLE_OAUTH_CLIENT_ID || '',
+  googleClientId: readEnv('VITE_GOOGLE_OAUTH_CLIENT_ID'),
 }
