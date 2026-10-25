@@ -9,6 +9,7 @@ import { RequireAuth } from '../features/identity/components/RequireAuth'
 import { ResetPasswordPage } from '../features/identity/components/ResetPasswordPage'
 import { AcceptInvitationPage } from '../features/invitations/components/AcceptInvitationPage'
 import { LandingPage } from '../features/landing/components/LandingPage'
+import { HelpPage } from '../routes/HelpPage'
 import { MessageThreadPage } from '../features/messaging/components/MessageThreadPage'
 import { MessagesPage } from '../features/messaging/components/MessagesPage'
 import { MarketIdeaPage } from '../features/marketplace/components/MarketIdeaPage'
@@ -198,6 +199,7 @@ export const router = createBrowserRouter([
                 element: <Navigate to="/app/settings/profile" replace />,
               },
               { path: 'settings/:section', element: <AccountSettingsPage /> },
+              { path: 'help', element: <HelpPage /> },
               {
                 path: 'admin',
                 lazy: async () => ({

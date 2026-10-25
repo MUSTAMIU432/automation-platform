@@ -54,7 +54,7 @@ describe('TeamsPage', () => {
     expect(within(list).getByText('/registrar')).toBeInTheDocument()
     // A team needs no organization, so this page is reachable by somebody in
     // none - and says what a team is rather than assuming a tenant.
-    expect(screen.getByRole('heading', { level: 1, name: 'Your teams.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Your teams' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Registrar/ })).toHaveAttribute('href', '/app/teams/9')
   })
 
@@ -62,8 +62,12 @@ describe('TeamsPage', () => {
     vi.mocked(teamsMock).mockResolvedValue([])
     renderAt()
 
-    expect(await screen.findByText('You are not in a team yet')).toBeInTheDocument()
+    expect(await screen.findByText('No teams yet')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create team' })).toBeInTheDocument()
+
+    // The empty state's button takes the reader straight to the form's first field.
+    fireEvent.click(screen.getByRole('button', { name: 'Create your first team' }))
+    expect(screen.getByLabelText('Team name')).toHaveFocus()
   })
 
   it('reports a failed load as itself, with a way to try again', async () => {

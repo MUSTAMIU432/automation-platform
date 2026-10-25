@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom'
 
-import { glassEmptyClasses } from '../../../components/glassStyles'
+import { ArrowRightIcon, BulbIcon, ShieldCheckIcon, UsersIcon } from '../../../components/AppIcons'
+import { collectionCardClasses } from '../../../components/glassStyles'
+import { EmptyCollection } from '../../../components/WorkspaceCollection'
 import type { Team } from '../api/teamsApi'
 import { useTeams } from '../context/useTeams'
 
@@ -14,9 +16,10 @@ import { useTeams } from '../context/useTeams'
  * state and no second picker in the header.
  *
  * The teams come from the page's `TeamsProvider`, so this list and the form
- * beside it share one request rather than making one each.
+ * beside it share one request rather than making one each. `onCreate` is the
+ * empty state's way to the create form beside it.
  */
-export function TeamList() {
+export function TeamList({ onCreate }: { onCreate: () => void }) {
   const { teams, loading, error, reload } = useTeams()
 
   if (loading && teams.length === 0) {
@@ -47,22 +50,32 @@ export function TeamList() {
 
   if (teams.length === 0) {
     return (
-      <div className={glassEmptyClasses}>
-        <p className="text-sm font-semibold text-gray-900">You are not in a team yet</p>
-        <p className="mt-1 text-sm leading-6 text-gray-600">
-          A team is a group of people who put an idea forward together. Create one, and you will be
-          its first member.
-        </p>
-      </div>
+      <EmptyCollection
+        Icon={UsersIcon}
+        title="No teams yet"
+        actionLabel="Create your first team"
+        onAction={onCreate}
+        benefits={[
+          [UsersIcon, 'Work together', 'Invite members and collaborate'],
+          [ShieldCheckIcon, 'Manage access', 'Control roles and permissions'],
+          [BulbIcon, 'Stay organized', 'Keep your team ideas in one place'],
+        ]}
+      >
+        Create a team to give your work a shared home. Invite members, write ideas together and put
+        them forward as one.
+      </EmptyCollection>
     )
   }
 
   return (
-    <ul className="space-y-3" aria-label="Your teams">
-      {teams.map((team) => (
-        <TeamRow key={team.id} team={team} />
-      ))}
-    </ul>
+    <div className={collectionCardClasses}>
+      <p className="text-lg font-bold text-gray-900">Teams you are in</p>
+      <ul className="mt-4 space-y-3" aria-label="Your teams">
+        {teams.map((team) => (
+          <TeamRow key={team.id} team={team} />
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -71,20 +84,26 @@ function TeamRow({ team }: { team: Team }) {
     <li>
       <Link
         to={`/app/teams/${team.id}`}
-        className="block rounded-xl border border-gray-300 bg-white p-4 shadow-sm transition-colors hover:border-brand-300 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+        className="flex items-center gap-4 rounded-2xl border border-white/80 bg-white/80 p-4 shadow-sm ring-1 ring-slate-900/5 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-reduce:hover:translate-y-0"
       >
-        <span className="flex items-start justify-between gap-4">
-          <span className="min-w-0">
-            <span className="block text-base font-bold text-gray-900">{team.name}</span>
-            <span className="mt-1 block text-sm text-gray-500">/{team.slug}</span>
-          </span>
-          <span className="shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">
-            {team.memberCount === 1 ? '1 member' : `${team.memberCount} members`}
-          </span>
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100">
+          <UsersIcon className="h-5 w-5" />
         </span>
-        {team.description ? (
-          <span className="mt-2 block text-sm leading-6 text-gray-600">{team.description}</span>
-        ) : null}
+        <span className="min-w-0 flex-1">
+          <span className="flex items-start justify-between gap-3">
+            <span className="min-w-0">
+              <span className="block truncate text-base font-bold text-gray-900">{team.name}</span>
+              <span className="mt-0.5 block text-sm text-gray-500">/{team.slug}</span>
+            </span>
+            <span className="shrink-0 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-bold text-brand-800">
+              {team.memberCount === 1 ? '1 member' : `${team.memberCount} members`}
+            </span>
+          </span>
+          {team.description ? (
+            <span className="mt-2 block text-sm leading-6 text-gray-600">{team.description}</span>
+          ) : null}
+        </span>
+        <ArrowRightIcon className="h-4 w-4 shrink-0 text-brand-600" />
       </Link>
     </li>
   )
