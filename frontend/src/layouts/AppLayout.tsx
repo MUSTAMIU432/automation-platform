@@ -13,6 +13,7 @@ import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from 'react
 import {
   BuildingIcon,
   BulbIcon,
+  CapIcon,
   ChatIcon,
   ChecklistIcon,
   CloseIcon,
@@ -144,6 +145,24 @@ const SECTION_TRAILS: Array<[RegExp, Crumb[]]> = [
     [{ label: 'Marketplace', to: '/app/marketplace' }, { label: 'Idea' }],
   ],
   [/^\/app\/marketplace$/, [{ label: 'Marketplace' }]],
+  [
+    /^\/app\/learn\/courses\/([^/]+)\/(lessons|exercises|quizzes)\/[^/]+$/,
+    [
+      { label: 'Learning', to: '/app/learn' },
+      { label: 'Course', to: (match) => `/app/learn/courses/${match[1]}` },
+      { label: 'Lesson' },
+    ],
+  ],
+  [
+    /^\/app\/learn\/courses\/[^/]+$/,
+    [
+      { label: 'Learning', to: '/app/learn' },
+      { label: 'Courses', to: '/app/learn/courses' },
+      { label: 'Course' },
+    ],
+  ],
+  [/^\/app\/learn\/courses$/, [{ label: 'Learning', to: '/app/learn' }, { label: 'Courses' }]],
+  [/^\/app\/learn$/, [{ label: 'Learning' }]],
 ]
 
 /**
@@ -607,6 +626,11 @@ function AppShell() {
       // publishes is not part of the reader's own workspace.
       title: '4 · Market',
       items: [{ to: '/app/marketplace', label: 'Marketplace', Icon: StoreIcon }],
+    },
+    {
+      // Beside the journey rather than a step in it: building the skills to take part.
+      title: '5 · Learn',
+      items: [{ to: '/app/learn', label: 'Learning', Icon: CapIcon }],
     },
   ]
 

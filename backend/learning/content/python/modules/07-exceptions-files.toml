@@ -1,0 +1,342 @@
+position = 7
+slug = "exceptions-and-files"
+title = "Exceptions and File Handling"
+summary = "Handling errors deliberately, defining your own exceptions, and reading and writing text, JSON and CSV files safely."
+objectives = [
+  "Handle exceptions with try, except, else and finally",
+  "Raise exceptions and define custom exception classes",
+  "Read and write text files with context managers",
+  "Work with JSON and CSV data",
+  "Build file paths and work with directories using pathlib",
+  "Manage resources safely so they are always released",
+]
+project = "File-based expense tracker with import and export: load expenses from CSV, validate every row, save them as JSON, and report the rows that could not be imported."
+
+[[lessons]]
+slug = "handling-exceptions"
+title = "Handling and raising exceptions"
+summary = "Catching the errors you expect, letting the ones you do not surface, and defining your own."
+minutes = 35
+objectives = [
+  "Catch specific exceptions with try and except",
+  "Use else and finally correctly",
+  "Raise exceptions with helpful messages",
+  "Create a custom exception hierarchy",
+]
+body = '''
+## try and except
+
+When an operation might fail, wrap it in `try` and handle the failure in `except`.
+Catch the **specific** exception you expect:
+
+```python
+text = "12a"
+try:
+    quantity = int(text)
+except ValueError:
+    quantity = 0
+    print(f"{text!r} is not a whole number; using 0.")
+print(quantity)
+```
+
+Never write a bare `except:` or `except Exception:` just to make an error go away -
+it also hides real bugs, such as a typo that raises `NameError`. Handle only what
+you know how to handle, and let everything else surface.
+
+## Several exceptions, else and finally
+
+```python
+def safe_divide(a, b):
+    try:
+        result = a / b
+    except ZeroDivisionError:
+        return None
+    except TypeError as error:
+        raise ValueError(f"Numbers only: {error}") from error
+    else:
+        # Runs only when the try block raised nothing.
+        return round(result, 2)
+    finally:
+        # Always runs - success, failure, or return.
+        print("division attempted")
+
+print(safe_divide(10, 4))
+print(safe_divide(1, 0))
+```
+
+`as error` gives you the exception object. `raise ... from error` keeps the
+original cause attached, so the traceback shows both.
+
+## Raising exceptions
+
+Raise an exception when your code is asked to do something it cannot do correctly.
+A clear message saves the caller from guessing:
+
+```python
+def set_age(age):
+    if not isinstance(age, int) or age < 0:
+        raise ValueError(f"Age must be a non-negative whole number, got {age!r}.")
+    return age
+```
+
+## Custom exceptions
+
+Define your own exceptions by subclassing `Exception`. A small hierarchy lets
+callers catch one specific problem or all of your module's errors at once:
+
+```python
+class ExpenseError(Exception):
+    """Base class for every error in the expense tracker."""
+
+class InvalidAmountError(ExpenseError):
+    def __init__(self, amount):
+        super().__init__(f"Invalid amount: {amount!r}")
+        self.amount = amount
+
+try:
+    raise InvalidAmountError("-5")
+except ExpenseError as error:
+    print(type(error).__name__, error)
+```
+
+Some common built-in exceptions: `ValueError` (right type, wrong value),
+`TypeError` (wrong type), `KeyError` (missing dictionary key), `IndexError`
+(position out of range), `FileNotFoundError` and `PermissionError`.
+'''
+
+[[lessons]]
+slug = "files-json-csv"
+title = "Files, paths, JSON, CSV and context managers"
+summary = "Reading and writing files safely, the standard formats for structured data, and pathlib."
+minutes = 40
+objectives = [
+  "Read and write text files using with",
+  "Build portable paths and list directories with pathlib",
+  "Convert between Python data and JSON",
+  "Read and write CSV files",
+  "Explain what a context manager guarantees",
+]
+body = '''
+## Opening files with with
+
+`open()` returns a file object. Always use it in a `with` block - a **context
+manager** - which closes the file when the block ends, even if an exception is
+raised inside it:
+
+```python
+with open("notes.txt", "w", encoding="utf-8") as file:
+    file.write("First line\n")
+    file.write("Second line\n")
+
+with open("notes.txt", encoding="utf-8") as file:
+    for line in file:
+        print(line.rstrip("\n"))
+```
+
+The mode is `"r"` to read (the default), `"w"` to write (replacing the file),
+`"a"` to append and `"x"` to create a new file only. Always pass
+`encoding="utf-8"` so your program behaves the same on every operating system.
+
+## Paths with pathlib
+
+`pathlib.Path` builds paths that work on Windows, macOS and Linux, and has
+convenient methods for common jobs:
+
+```python
+from pathlib import Path
+
+data_dir = Path("data")
+data_dir.mkdir(exist_ok=True)
+
+report = data_dir / "report.txt"          # / joins path parts
+report.write_text("Total: 42\n", encoding="utf-8")
+print(report.exists(), report.name, report.suffix)
+print(report.read_text(encoding="utf-8"))
+
+for path in sorted(data_dir.glob("*.txt")):
+    print(path)
+```
+
+## JSON
+
+**JSON** is the standard text format for structured data on the web. The `json`
+module converts between JSON text and Python dictionaries, lists, strings,
+numbers, booleans and `None`:
+
+```python
+import json
+
+expense = {"category": "transport", "amount": 3500, "paid": True}
+text = json.dumps(expense, indent=2)
+print(text)
+print(json.loads(text)["amount"])
+
+with open("expenses.json", "w", encoding="utf-8") as file:
+    json.dump([expense], file, indent=2)
+with open("expenses.json", encoding="utf-8") as file:
+    print(json.load(file))
+```
+
+## CSV
+
+**CSV** files hold tables, one row per line. `csv.DictReader` reads each row as a
+dictionary keyed by the header; `csv.DictWriter` writes them. Always open CSV
+files with `newline=""`:
+
+```python
+import csv
+
+rows = [{"date": "2025-01-03", "amount": "1200"}, {"date": "2025-01-04", "amount": "350"}]
+with open("expenses.csv", "w", newline="", encoding="utf-8") as file:
+    writer = csv.DictWriter(file, fieldnames=["date", "amount"])
+    writer.writeheader()
+    writer.writerows(rows)
+
+with open("expenses.csv", newline="", encoding="utf-8") as file:
+    total = sum(float(row["amount"]) for row in csv.DictReader(file))
+print(total)   # 1550.0
+```
+
+> CSV values always come back as strings. Convert and validate each field before
+> trusting it - a file someone else made can contain anything.
+
+## Context managers beyond files
+
+A context manager is any object that sets something up on entering a `with` block
+and cleans it up on leaving, however the block ends. Database connections, locks
+and temporary directories all use the same pattern - you will write your own in
+the advanced module.
+'''
+
+[[exercises]]
+slug = "csv-expense-import"
+title = "Validating a CSV import"
+lesson = "files-json-csv"
+difficulty = "hard"
+instructions = '''
+Write `import_expenses(csv_text)`. `csv_text` is the **contents** of a CSV file
+with the header `date,category,amount`. Return a dictionary:
+
+```python
+{"imported": [...], "errors": [...]}
+```
+
+- `imported` is a list of `{"date": str, "category": str, "amount": float}` for
+  every valid row, in file order.
+- A row is invalid when its `amount` is not a number or is not greater than zero,
+  or when `category` is empty after stripping spaces. For each invalid row add a
+  message `"line N: invalid amount"` or `"line N: missing category"` to `errors`,
+  where N is the line number in the file (the header is line 1). Check the
+  category first.
+
+Use `csv.DictReader` with `io.StringIO(csv_text)` to read the text as a file.
+'''
+starter = '''
+import csv
+import io
+
+
+def import_expenses(csv_text):
+    result = {"imported": [], "errors": []}
+    return result
+'''
+solution = '''
+import csv
+import io
+
+
+def import_expenses(csv_text):
+    result = {"imported": [], "errors": []}
+    reader = csv.DictReader(io.StringIO(csv_text))
+    for line_number, row in enumerate(reader, start=2):
+        category = (row.get("category") or "").strip()
+        if not category:
+            result["errors"].append(f"line {line_number}: missing category")
+            continue
+        try:
+            amount = float(row.get("amount") or "")
+        except ValueError:
+            amount = 0
+        if amount <= 0:
+            result["errors"].append(f"line {line_number}: invalid amount")
+            continue
+        result["imported"].append(
+            {"date": row["date"].strip(), "category": category, "amount": amount}
+        )
+    return result
+'''
+hints = [
+  "enumerate(reader, start=2) numbers the data rows from 2, because the header is line 1.",
+  "Wrap float() in try/except ValueError - a value such as \"abc\" cannot be converted.",
+  "Use continue after recording an error so the row is not imported as well.",
+]
+
+[[exercises.tests]]
+name = "Two good rows"
+call = '''
+text = "date,category,amount\n2025-01-03,transport,3500\n2025-01-04,food,1200.5\n"
+print(import_expenses(text))
+'''
+expected = "{'imported': [{'date': '2025-01-03', 'category': 'transport', 'amount': 3500.0}, {'date': '2025-01-04', 'category': 'food', 'amount': 1200.5}], 'errors': []}"
+
+[[exercises.tests]]
+name = "Every kind of bad row"
+call = '''
+text = "date,category,amount\n2025-01-03,,10\n2025-01-04,food,abc\n2025-01-05,rent,-5\n2025-01-06,rent,0\n2025-01-07, data ,99\n"
+result = import_expenses(text)
+print(result["errors"])
+print(result["imported"])
+'''
+expected = "['line 2: missing category', 'line 3: invalid amount', 'line 4: invalid amount', 'line 5: invalid amount']\n[{'date': '2025-01-07', 'category': 'data', 'amount': 99.0}]"
+hidden = true
+
+[[exercises.tests]]
+name = "Header only"
+call = "print(import_expenses('date,category,amount\\n'))"
+expected = "{'imported': [], 'errors': []}"
+hidden = true
+
+[quiz]
+title = "Exceptions and File Handling"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "When does the else block of a try statement run?"
+options = ["Always", "Only when an exception was raised", "Only when the try block raised no exception", "Only when finally is missing"]
+correct = [2]
+explanation = "else runs when the try block completed without an exception; finally runs every time."
+
+[[quiz.questions]]
+prompt = "Why should you open files in a with block?"
+options = [
+  "It reads the file faster",
+  "The file is closed automatically, even if an error occurs",
+  "It is required to write files",
+  "It converts the file to UTF-8",
+]
+correct = [1]
+explanation = "with is a context manager: it guarantees the file is closed when the block ends, however it ends."
+
+[[quiz.questions]]
+prompt = "What does json.loads('{\"a\": [1, 2]}') return?"
+options = ["The string unchanged", "A dictionary {'a': [1, 2]}", "A list", "A JSON object that must be converted again"]
+correct = [1]
+explanation = "json.loads parses JSON text into Python values: an object becomes a dict and an array a list."
+
+[[quiz.questions]]
+prompt = "Which are good exception-handling practices? Choose every one."
+kind = "multiple"
+options = [
+  "Catch the specific exceptions you expect",
+  "Use a bare except: to keep the program running no matter what",
+  "Raise exceptions with clear messages",
+  "Chain a new exception to its cause with raise ... from ...",
+]
+correct = [0, 2, 3]
+explanation = "A bare except hides real bugs. Catch what you can handle, explain failures clearly, and keep the original cause."
+
+[[quiz.questions]]
+prompt = "What type are the values csv.DictReader gives you?"
+options = ["They are converted to the right types automatically", "Always strings", "Floats for numbers", "Bytes"]
+correct = [1]
+explanation = "CSV has no types: every field comes back as a string, so convert and validate it yourself."

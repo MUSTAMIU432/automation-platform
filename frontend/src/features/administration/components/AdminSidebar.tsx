@@ -5,6 +5,7 @@ import {
   AutomationIcon,
   BellIcon,
   CloseIcon,
+  CourseIcon,
   DashboardIcon,
   IdeaIcon,
   InvitationIcon,
@@ -88,6 +89,10 @@ const GROUPS: Array<{ label: string; sections: Section[] }> = [
       { to: '/app/admin/marketplace/enquiries', label: 'Enquiries', icon: MessageIcon },
       { to: '/app/admin/marketplace/methods', label: 'Payment methods', icon: PaymentIcon },
     ],
+  },
+  {
+    label: 'Learning',
+    sections: [{ to: '/app/admin/courses', label: 'Courses', icon: CourseIcon }],
   },
   {
     label: 'Communication',

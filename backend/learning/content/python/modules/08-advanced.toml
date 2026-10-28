@@ -1,0 +1,504 @@
+position = 8
+slug = "advanced-python"
+title = "Advanced Python"
+summary = "The features that make Python expressive: iterators and generators, closures and decorators, functional tools, typing, and how objects live in memory."
+objectives = [
+  "Explain the iterator protocol and write generators",
+  "Write closures and decorators, including decorators with arguments",
+  "Use higher-order functions and functional tools from functools and itertools",
+  "Write your own context managers",
+  "Use generics, Protocols and dataclasses in type annotations",
+  "Explain references, mutability, garbage collection and basic performance trade-offs",
+]
+project = "Reusable data-processing library: a small package of generator-based pipeline steps (read, filter, transform, batch), with decorators for timing and retries, fully type-annotated."
+
+[[lessons]]
+slug = "iterators-generators-closures"
+title = "Iterators, generators, closures and decorators"
+summary = "Producing values lazily, functions that remember, and wrapping functions to add behaviour."
+minutes = 45
+objectives = [
+  "Explain iterables, iterators and the iterator protocol",
+  "Write generator functions and generator expressions",
+  "Explain what a closure captures",
+  "Write decorators with functools.wraps, with and without arguments",
+]
+body = '''
+## Iterables and iterators
+
+An **iterable** is anything a `for` loop can walk over: lists, strings, files,
+dictionaries. Calling `iter()` on it gives an **iterator**, which hands out one
+value per `next()` call and raises `StopIteration` when it runs out. A `for` loop
+does exactly this behind the scenes:
+
+```python
+numbers = iter([10, 20])
+print(next(numbers))   # 10
+print(next(numbers))   # 20
+# next(numbers) would now raise StopIteration
+```
+
+## Generators
+
+A **generator function** uses `yield` instead of `return`. Each `yield` hands out
+one value and pauses the function until the next value is requested, so values are
+produced **lazily**, one at a time:
+
+```python
+def countdown(n):
+    while n > 0:
+        yield n
+        n -= 1
+
+for value in countdown(3):
+    print(value)        # 3, 2, 1
+
+def read_large_log(lines):
+    for line in lines:
+        if "ERROR" in line:
+            yield line.strip()
+
+log = ["ok\n", "ERROR disk full\n", "ok\n"]
+print(list(read_large_log(log)))
+```
+
+Because a generator never builds the whole sequence, it can process a file larger
+than memory - or an infinite stream. A **generator expression** is the lazy version
+of a list comprehension: `sum(x * x for x in range(1_000_000))` never creates a
+million-item list.
+
+## Closures
+
+A function defined inside another function can use the outer function's
+variables, and keeps them after the outer function has returned. That function
+is a **closure**:
+
+```python
+def make_multiplier(factor):
+    def multiply(value):
+        return value * factor     # factor is captured
+    return multiply
+
+double = make_multiplier(2)
+triple = make_multiplier(3)
+print(double(5), triple(5))      # 10 15
+```
+
+## Decorators
+
+A **decorator** takes a function and returns a new function that adds behaviour
+around it. `@decorator` above a `def` is shorthand for `f = decorator(f)`:
+
+```python
+import functools
+import time
+
+def timed(func):
+    @functools.wraps(func)        # keep the original name and docstring
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.4f}s")
+        return result
+    return wrapper
+
+@timed
+def slow_sum(n):
+    return sum(range(n))
+
+slow_sum(100_000)
+```
+
+A decorator **with arguments** is a function that returns a decorator - one more
+level of nesting:
+
+```python
+import functools
+
+def repeat(times):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            return [func(*args, **kwargs) for _ in range(times)]
+        return wrapper
+    return decorator
+
+@repeat(3)
+def roll():
+    return "rolled"
+
+print(roll())   # ['rolled', 'rolled', 'rolled']
+```
+'''
+
+[[lessons]]
+slug = "functional-typing-internals"
+title = "Functional tools, context managers, typing and Python internals"
+summary = "Higher-order functions, writing your own context managers, generics and protocols, and how memory and performance work."
+minutes = 45
+objectives = [
+  "Use map, filter, functools and itertools",
+  "Write a context manager with contextlib",
+  "Annotate generic functions and structural interfaces with Protocol",
+  "Explain references, mutability, reference counting and timing code",
+]
+body = '''
+## Higher-order functions
+
+A **higher-order function** takes or returns a function. `sorted(key=...)`,
+`map()` and `filter()` are built-in examples, and `functools` adds more:
+
+```python
+from functools import reduce, lru_cache, partial
+
+prices = [1200, 450, 3000]
+with_vat = list(map(lambda p: p * 1.18, prices))
+expensive = list(filter(lambda p: p > 1000, prices))
+total = reduce(lambda a, b: a + b, prices)
+print(expensive, total)
+
+@lru_cache(maxsize=None)        # remember results: memoisation
+def fibonacci(n):
+    return n if n < 2 else fibonacci(n - 1) + fibonacci(n - 2)
+
+print(fibonacci(80))
+
+square_root = partial(pow, exp=0.5)
+print(square_root(81))   # 9.0
+```
+
+Comprehensions are usually clearer than `map` and `filter` with a lambda; reach
+for `map` when you already have a named function. `itertools` provides lazy
+building blocks such as `chain`, `islice`, `groupby` and `batched` (Python 3.12+).
+
+## Writing context managers
+
+`contextlib.contextmanager` turns a generator into a context manager: code before
+the `yield` runs on entry, code after it runs on exit - put it in `finally` so it
+runs even when the block raises:
+
+```python
+from contextlib import contextmanager
+import time
+
+@contextmanager
+def stopwatch(label):
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        print(f"{label}: {time.perf_counter() - start:.4f}s")
+
+with stopwatch("sorting"):
+    sorted(range(100_000), reverse=True)
+```
+
+## Generics and protocols
+
+Type hints can describe functions that work for **any** type while keeping the
+relationship between input and output. Python 3.12 has a direct syntax for
+**generic** functions:
+
+```python
+def first[T](items: list[T]) -> T | None:
+    return items[0] if items else None
+
+name = first(["Amina", "Juma"])   # a type checker knows this is str | None
+```
+
+A **Protocol** describes the methods an object must have - not which class it
+inherits from. Any class with those methods matches, which is "duck typing" that a
+type checker can verify:
+
+```python
+from typing import Protocol
+
+class SupportsArea(Protocol):
+    def area(self) -> float: ...
+
+class Square:
+    def __init__(self, side: float):
+        self.side = side
+
+    def area(self) -> float:
+        return self.side ** 2
+
+def total_area(shapes: list[SupportsArea]) -> float:
+    return sum(shape.area() for shape in shapes)
+
+print(total_area([Square(2), Square(3)]))   # 13
+```
+
+## Objects, references and memory
+
+Every Python value is an **object**, and a variable is a **reference** to one.
+`is` checks whether two names refer to the *same* object; `==` checks whether
+values are *equal*:
+
+```python
+a = [1, 2]
+b = a
+c = [1, 2]
+print(a == c, a is c, a is b)   # True False True
+```
+
+**Mutable** objects (lists, dicts, sets) can change in place, so every reference
+sees the change. **Immutable** objects (ints, strings, tuples) never change -
+"changing" one makes a new object. CPython frees an object when its **reference
+count** drops to zero, and a cycle collector cleans up objects that only refer to
+each other.
+
+## Performance fundamentals
+
+Measure before you optimise. `timeit` times small snippets reliably:
+
+```python
+import timeit
+
+setup = "items = list(range(10_000)); lookup = set(items)"
+print(timeit.timeit("9_999 in items", setup=setup, number=1_000))
+print(timeit.timeit("9_999 in lookup", setup=setup, number=1_000))
+```
+
+The set lookup is dramatically faster because `in` on a set is a hash lookup, while
+on a list it checks every item. Choosing the right data structure usually matters
+far more than micro-optimising a loop.
+'''
+
+[[exercises]]
+slug = "pipeline-generators"
+title = "A generator pipeline"
+lesson = "iterators-generators-closures"
+difficulty = "medium"
+instructions = '''
+Write three generator functions that can be chained into a data pipeline:
+
+- `parse(lines)` yields each non-blank line as an `int`, skipping lines that are
+  blank after stripping.
+- `only_positive(numbers)` yields only the numbers greater than zero.
+- `batched(items, size)` yields lists of up to `size` items; the last list may be
+  shorter.
+
+All three must be **generators** (use `yield`) so they work on endless input.
+'''
+starter = '''
+def parse(lines):
+    ...
+
+
+def only_positive(numbers):
+    ...
+
+
+def batched(items, size):
+    ...
+'''
+solution = '''
+def parse(lines):
+    for line in lines:
+        text = line.strip()
+        if text:
+            yield int(text)
+
+
+def only_positive(numbers):
+    for number in numbers:
+        if number > 0:
+            yield number
+
+
+def batched(items, size):
+    batch = []
+    for item in items:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+'''
+hints = [
+  "Each function loops over its input and yields - none of them builds a full list.",
+  "In batched, collect items into a list, yield it when it reaches size, then start a new one.",
+  "Do not forget to yield the final, shorter batch if it is not empty.",
+]
+
+[[exercises.tests]]
+name = "A short pipeline"
+call = '''
+lines = ["5", "-2", "", " 8 ", "0", "3"]
+print(list(batched(only_positive(parse(lines)), 2)))
+'''
+expected = "[[5, 8], [3]]"
+
+[[exercises.tests]]
+name = "They are generators"
+call = '''
+import inspect
+print(all(inspect.isgeneratorfunction(f) for f in (parse, only_positive, batched)))
+'''
+expected = "True"
+hidden = true
+
+[[exercises.tests]]
+name = "Works on endless input"
+call = '''
+import itertools
+endless = (str(n) for n in itertools.count(1))
+print(next(batched(only_positive(parse(endless)), 3)))
+'''
+expected = "[1, 2, 3]"
+hidden = true
+
+[[exercises]]
+slug = "retry-decorator"
+title = "A retry decorator"
+lesson = "iterators-generators-closures"
+difficulty = "hard"
+instructions = '''
+Write a decorator factory `retry(times, exceptions)`. The decorated function is
+called; if it raises one of `exceptions` (a tuple of exception classes), it is
+called again, up to `times` attempts **in total**. If the last attempt also fails,
+that exception is raised. Any other exception is raised immediately, without
+retrying. Use `functools.wraps` so the function keeps its name.
+'''
+starter = '''
+import functools
+
+
+def retry(times, exceptions):
+    ...
+'''
+solution = '''
+import functools
+
+
+def retry(times, exceptions):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, times + 1):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions:
+                    if attempt == times:
+                        raise
+        return wrapper
+    return decorator
+'''
+hints = [
+  "retry(times, exceptions) returns a decorator; the decorator returns a wrapper.",
+  "Loop over the attempts, and return as soon as the call succeeds.",
+  "In except exceptions:, re-raise with a bare raise on the final attempt.",
+]
+
+[[exercises.tests]]
+name = "Succeeds on the third try"
+call = '''
+calls = []
+
+@retry(3, (ConnectionError,))
+def flaky():
+    calls.append(1)
+    if len(calls) < 3:
+        raise ConnectionError("down")
+    return "ok"
+
+print(flaky(), len(calls), flaky.__name__)
+'''
+expected = "ok 3 flaky"
+
+[[exercises.tests]]
+name = "Gives up after the limit"
+call = '''
+attempts = []
+
+@retry(2, (TimeoutError,))
+def always_fails():
+    attempts.append(1)
+    raise TimeoutError("slow")
+
+try:
+    always_fails()
+except TimeoutError as error:
+    print("raised", error, len(attempts))
+'''
+expected = "raised slow 2"
+hidden = true
+
+[[exercises.tests]]
+name = "Other errors are not retried"
+call = '''
+attempts = []
+
+@retry(5, (ConnectionError,))
+def broken():
+    attempts.append(1)
+    raise KeyError("x")
+
+try:
+    broken()
+except KeyError:
+    print(len(attempts))
+'''
+expected = "1"
+hidden = true
+
+[quiz]
+title = "Advanced Python"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does calling a generator function return?"
+options = ["The first yielded value", "A list of every value", "A generator object that produces values on demand", "None"]
+correct = [2]
+explanation = "Calling a generator function runs none of its body; it returns a generator that runs up to each yield when asked for the next value."
+
+[[quiz.questions]]
+prompt = "What does this print?"
+code = '''
+def make_counter():
+    count = 0
+    def increment():
+        nonlocal count
+        count += 1
+        return count
+    return increment
+
+counter = make_counter()
+counter()
+print(counter())
+'''
+options = ["0", "1", "2", "An error"]
+correct = [2]
+explanation = "The closure keeps count between calls; nonlocal lets it update the enclosing variable. The second call returns 2."
+
+[[quiz.questions]]
+prompt = "Why use functools.wraps in a decorator?"
+options = [
+  "It makes the wrapper faster",
+  "It copies the wrapped function's name, docstring and other metadata onto the wrapper",
+  "It is required for decorators to work",
+  "It caches results",
+]
+correct = [1]
+explanation = "Without wraps, the decorated function would report the wrapper's name and docstring."
+
+[[quiz.questions]]
+prompt = "a = [1]; b = [1]. Which is true?"
+options = ["a is b and a == b", "a == b but not a is b", "a is b but not a == b", "Neither"]
+correct = [1]
+explanation = "They are equal in value but are two different list objects."
+
+[[quiz.questions]]
+prompt = "Which are good reasons to use a generator? Choose every one."
+kind = "multiple"
+options = [
+  "Processing a file too large to fit in memory",
+  "Working with a potentially infinite stream",
+  "Needing random access to items by index",
+  "Building a pipeline of processing steps",
+]
+correct = [0, 1, 3]
+explanation = "Generators are lazy and sequential; they do not support indexing."

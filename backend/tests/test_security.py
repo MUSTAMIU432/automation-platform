@@ -243,7 +243,8 @@ def test_production_cors_is_restricted_to_the_configured_origins():
         # is a buyer's download of an idea they paid for, served the same way.
         'CORS_URLS_REGEX': (
             r'^(?:/graphql/|/ideas/\d+/attachments/|/administration/attachments/'
-            r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/)'
+            r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/'
+            r'|/learning/lessons/\d+/materials/|/learning/materials/\d+/download/)'
         ),
         'CSRF_TRUSTED_ORIGINS': ['https://app.example.test'],
     }

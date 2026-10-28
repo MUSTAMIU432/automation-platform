@@ -1,0 +1,341 @@
+position = 9
+slug = "testing-and-quality"
+title = "Testing and Software Quality"
+summary = "Proving your code works with pytest, isolating it from the outside world, and keeping it readable with logging, formatting, linting, refactoring and Git."
+objectives = [
+  "Write unit tests with pytest and read their results",
+  "Use fixtures, parametrization and test isolation",
+  "Replace external dependencies with mocks",
+  "Debug with pdb and add useful logging",
+  "Format and lint code automatically, and refactor safely",
+  "Work in a Git-based workflow with branches and reviews",
+]
+project = "Add comprehensive tests to an existing Python application: cover the expense tracker from module 7 with unit tests, parametrized edge cases and a mocked file system, and fix the bugs the tests uncover."
+
+[[lessons]]
+slug = "pytest-basics"
+title = "Unit testing with pytest: fixtures, parametrization and mocks"
+summary = "Writing tests that pin down behaviour, sharing setup, testing many cases at once and faking what you cannot control."
+minutes = 45
+objectives = [
+  "Write and run pytest tests with plain assert",
+  "Test that code raises the right exception",
+  "Share setup with fixtures and keep tests isolated",
+  "Parametrize a test over many inputs",
+  "Mock an external dependency",
+]
+body = '''
+## Why test
+
+A **unit test** is code that calls your code and checks the result. Tests catch
+mistakes before users do, document how code is meant to behave, and let you change
+code with confidence - if the tests still pass, you have not broken anything they
+cover.
+
+## pytest
+
+Install pytest with `pip install pytest`. A test is a function whose name starts
+with `test_`, in a file whose name starts with `test_`, using plain `assert`:
+
+```python
+# discounts.py
+def apply_discount(price, percent):
+    if not 0 <= percent <= 100:
+        raise ValueError("percent must be between 0 and 100")
+    return round(price * (1 - percent / 100), 2)
+```
+
+```python
+# test_discounts.py
+import pytest
+from discounts import apply_discount
+
+def test_ten_percent_off():
+    assert apply_discount(200, 10) == 180
+
+def test_rejects_an_impossible_percentage():
+    with pytest.raises(ValueError, match="between 0 and 100"):
+        apply_discount(100, 150)
+```
+
+Run `pytest` in the project folder. It finds the tests, runs them, and shows a
+detailed explanation of any failed `assert`.
+
+A good test has three parts - **arrange** the inputs, **act** by calling the code,
+**assert** on the result - and checks one behaviour, named so a failure explains
+itself.
+
+## Parametrization
+
+Test many cases with one test function:
+
+```python
+import pytest
+from discounts import apply_discount
+
+@pytest.mark.parametrize(
+    ("price", "percent", "expected"),
+    [(100, 0, 100), (100, 100, 0), (59.99, 15, 50.99)],
+)
+def test_apply_discount(price, percent, expected):
+    assert apply_discount(price, percent) == expected
+```
+
+## Fixtures and isolation
+
+A **fixture** provides setup that tests ask for by name. Every test gets a fresh
+one, so tests cannot affect each other - **test isolation**. pytest's built-in
+`tmp_path` fixture gives each test its own empty temporary directory:
+
+```python
+import pytest
+
+@pytest.fixture
+def cart():
+    return {"items": [], "total": 0}
+
+def test_new_cart_is_empty(cart):
+    assert cart["items"] == []
+
+def test_writes_report(tmp_path):
+    report = tmp_path / "report.txt"
+    report.write_text("ok", encoding="utf-8")
+    assert report.read_text(encoding="utf-8") == "ok"
+```
+
+## Mocking
+
+Code that calls a web API, sends email or reads the clock is slow and
+unpredictable to test. A **mock** replaces that dependency with a stand-in you
+control. `unittest.mock` is in the standard library:
+
+```python
+from unittest.mock import Mock
+
+def convert(amount, rates_client):
+    rate = rates_client.get_rate("USD", "TZS")
+    return round(amount * rate, 2)
+
+def test_convert_uses_the_current_rate():
+    client = Mock()
+    client.get_rate.return_value = 2600
+    assert convert(10, client) == 26000
+    client.get_rate.assert_called_once_with("USD", "TZS")
+```
+
+Passing dependencies in as arguments, as `convert` does, makes mocking easy - the
+same dependency-inversion idea from the object-oriented module.
+'''
+
+[[lessons]]
+slug = "quality-workflow"
+title = "Debugging, logging, formatting, linting, refactoring and Git"
+summary = "The everyday tools and habits that keep a codebase healthy as it grows."
+minutes = 35
+objectives = [
+  "Debug with breakpoint() and pdb",
+  "Log with levels instead of print",
+  "Format and lint code with Ruff",
+  "Refactor safely behind tests",
+  "Follow a branch, commit and review workflow in Git",
+]
+body = '''
+## Debugging with pdb
+
+Put `breakpoint()` in your code and run it: execution pauses there in **pdb**, the
+Python debugger. Useful commands: `p name` prints a value, `n` runs the next line,
+`s` steps into a function call, `c` continues, `q` quits. It shows you the real
+state of the program, rather than what you assume it is.
+
+## Logging instead of print
+
+`print` is fine while you investigate; the `logging` module is what you keep. Each
+message has a **level** - DEBUG, INFO, WARNING, ERROR, CRITICAL - and the
+configuration decides which levels are shown and where they go, without changing
+your code:
+
+```python
+import logging
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger("expenses")
+
+logger.debug("Hidden at INFO level")
+logger.info("Imported %d rows", 42)
+try:
+    1 / 0
+except ZeroDivisionError:
+    logger.exception("Could not compute the average")   # logs the traceback too
+```
+
+Pass values as arguments (`"%d rows", 42`) rather than formatting the string
+yourself - logging only formats messages it actually emits. Never log passwords,
+tokens or other secrets.
+
+## Formatting and linting
+
+A **formatter** rewrites code into one consistent style so nobody argues about
+spaces; a **linter** finds likely bugs and bad patterns - unused imports, undefined
+names, bare excepts. **Ruff** does both, very fast:
+
+```text
+$ pip install ruff
+$ ruff format .          # format every file
+$ ruff check .           # report problems
+$ ruff check --fix .     # fix the ones it safely can
+```
+
+Run them in your editor on save and in continuous integration, so every change is
+checked the same way.
+
+## Refactoring
+
+**Refactoring** changes how code is structured without changing what it does:
+renaming, extracting a function, removing duplication. Do it in small steps, with
+tests passing before and after each one - the tests are what tell you behaviour has
+not changed.
+
+## A Git workflow
+
+Git records the history of your code. A typical team workflow:
+
+```text
+$ git switch -c feature/csv-import     # a branch for one change
+$ git add expenses.py test_expenses.py
+$ git commit -m "Validate amounts when importing CSV"
+$ git push -u origin feature/csv-import
+```
+
+Then open a pull request: teammates review it, continuous integration runs the
+tests and linters, and only then is it merged into the main branch. Commit small,
+focused changes with messages that explain *why*.
+'''
+
+[[exercises]]
+slug = "testable-validator"
+title = "Code that is easy to test"
+lesson = "pytest-basics"
+difficulty = "medium"
+instructions = '''
+Write `validate_password(password)`, which returns a **list of problems** - empty
+when the password is acceptable - so every rule can be tested on its own:
+
+- `"too short"` if it has fewer than 10 characters
+- `"no digit"` if it contains no digit
+- `"no uppercase letter"` if it contains no uppercase letter
+- `"no lowercase letter"` if it contains no lowercase letter
+- `"contains spaces"` if it contains a space
+
+Report the problems in exactly that order. The hidden tests are parametrized over
+many passwords - write your own test cases first, then make them pass.
+'''
+starter = '''
+def validate_password(password: str) -> list[str]:
+    problems = []
+    return problems
+
+
+# Try your own cases:
+# assert validate_password("Abcdefghi1") == []
+# assert validate_password("short") == ["too short", "no digit", "no uppercase letter"]
+'''
+solution = '''
+def validate_password(password: str) -> list[str]:
+    problems = []
+    if len(password) < 10:
+        problems.append("too short")
+    if not any(character.isdigit() for character in password):
+        problems.append("no digit")
+    if not any(character.isupper() for character in password):
+        problems.append("no uppercase letter")
+    if not any(character.islower() for character in password):
+        problems.append("no lowercase letter")
+    if " " in password:
+        problems.append("contains spaces")
+    return problems
+'''
+hints = [
+  "any(character.isdigit() for character in password) is True if at least one character is a digit.",
+  "Check every rule independently with its own if - do not use elif.",
+]
+
+[[exercises.tests]]
+name = "A good password"
+call = "print(validate_password('Abcdefghi1'))"
+expected = "[]"
+
+[[exercises.tests]]
+name = "A short one"
+call = "print(validate_password('short'))"
+expected = "['too short', 'no digit', 'no uppercase letter']"
+
+[[exercises.tests]]
+name = "Many cases"
+call = '''
+cases = ["", "ALLUPPERCASE123", "all lower case 1", "NoDigitsHereAtAll", "Valid Pass 99"]
+for case in cases:
+    print(validate_password(case))
+'''
+expected = '''
+['too short', 'no digit', 'no uppercase letter', 'no lowercase letter']
+['no lowercase letter']
+['no uppercase letter', 'contains spaces']
+['no digit']
+['contains spaces']
+'''
+hidden = true
+
+[quiz]
+title = "Testing and Software Quality"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "How do you check that a function raises ValueError in pytest?"
+options = ["try/except in the test", "with pytest.raises(ValueError):", "assert raises(ValueError)", "@pytest.mark.raises"]
+correct = [1]
+explanation = "pytest.raises is a context manager that fails the test unless the block raises that exception."
+
+[[quiz.questions]]
+prompt = "What is a fixture for?"
+options = [
+  "Fixing failing tests automatically",
+  "Providing fresh setup that tests request by name",
+  "Running tests in parallel",
+  "Formatting test code",
+]
+correct = [1]
+explanation = "A fixture builds setup (data, temporary directories, clients) for each test that asks for it, keeping tests isolated."
+
+[[quiz.questions]]
+prompt = "Why mock an external API in a unit test?"
+options = [
+  "To make the test fast, predictable and independent of the network",
+  "Because real APIs cannot be called from Python",
+  "To test the API itself",
+  "To skip the test",
+]
+correct = [0]
+explanation = "A mock gives the test full control over the dependency's answers, without network calls."
+
+[[quiz.questions]]
+prompt = "Which statements about logging are true? Choose every one."
+kind = "multiple"
+options = [
+  "Levels let configuration decide what is shown without changing code",
+  "logger.exception records the traceback",
+  "It is fine to log passwords at DEBUG level",
+  "Logging can send messages to files and other destinations",
+]
+correct = [0, 1, 3]
+explanation = "Never log secrets at any level - logs are read and stored far more widely than code."
+
+[[quiz.questions]]
+prompt = "What makes a change a refactoring?"
+options = [
+  "It adds a feature",
+  "It changes structure without changing behaviour",
+  "It fixes a bug",
+  "It makes the code shorter",
+]
+correct = [1]
+explanation = "Refactoring improves structure while behaviour stays the same - which tests confirm."

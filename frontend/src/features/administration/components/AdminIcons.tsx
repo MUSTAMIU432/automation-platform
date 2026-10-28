@@ -208,6 +208,16 @@ export function RoleIcon({ size }: { size?: AdminIconSize }) {
   )
 }
 
+/** Courses: an open book. */
+export function CourseIcon({ size }: { size?: AdminIconSize }) {
+  return (
+    <Icon size={size}>
+      <path d="M2 5.5A1.5 1.5 0 0 1 3.5 4H9a3 3 0 0 1 3 3v13a2.5 2.5 0 0 0-2.5-2.5h-6A1.5 1.5 0 0 1 2 16Z" />
+      <path d="M22 5.5A1.5 1.5 0 0 0 20.5 4H15a3 3 0 0 0-3 3v13a2.5 2.5 0 0 1 2.5-2.5h6A1.5 1.5 0 0 0 22 16Z" />
+    </Icon>
+  )
+}
+
 /** Proposals: a written document. */
 export function ProposalIcon({ size }: { size?: AdminIconSize }) {
   return (

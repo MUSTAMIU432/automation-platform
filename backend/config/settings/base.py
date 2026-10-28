@@ -71,6 +71,8 @@ INSTALLED_APPS = [
     'ai',
     # Ideas the platform publishes for sale, and the payments that unlock them.
     'marketplace',
+    # Courses, lessons and coding exercises; learner code runs only in an external sandbox.
+    'learning',
     # The public website's own endpoints: its contact form and platform figures.
     'website',
     # Platform administration (the internal console): reads and changes the
@@ -501,6 +503,21 @@ ATTACHMENT_MAX_UPLOAD_BYTES = env.int('ATTACHMENT_MAX_UPLOAD_BYTES', default=200
 # Profile photos and other pictures: 100 MB. Enforced in `identity.avatars`.
 AVATAR_MAX_UPLOAD_BYTES = env.int('AVATAR_MAX_UPLOAD_BYTES', default=100 * 1024 * 1024)
 
+# Learning: the sandbox that runs learner code (learning/execution.py). Off when
+# unset - Run and Submit then say code execution is unavailable, and nothing runs
+# anywhere else. Learner code never runs in this process. See docs/learning.md.
+CODE_EXECUTION_URL = env('CODE_EXECUTION_URL', default='').strip()
+# SECRET, optional: sent as a bearer token, for a sandbox behind an authenticating proxy.
+CODE_EXECUTION_TOKEN = env('CODE_EXECUTION_TOKEN', default='')
+CODE_EXECUTION_PYTHON_VERSION = env('CODE_EXECUTION_PYTHON_VERSION', default='3.12.0')
+CODE_EXECUTION_TIMEOUT_MS = env.int('CODE_EXECUTION_TIMEOUT_MS', default=3000)
+CODE_EXECUTION_MEMORY_LIMIT_BYTES = env.int(
+    'CODE_EXECUTION_MEMORY_LIMIT_BYTES', default=128 * 1024 * 1024
+)
+
+if CODE_EXECUTION_URL and urlsplit(CODE_EXECUTION_URL).scheme not in ('http', 'https'):
+    raise ImproperlyConfigured('CODE_EXECUTION_URL must be an http:// or https:// URL.')
+
 # Marketplace push payments: the gateway that prompts a buyer's phone to pay
 # (`marketplace.gateways`). `sandbox`, or the dotted path to an adapter class; empty
 # turns push payments off, leaving the manual methods. The sandbox works only with DEBUG.
@@ -533,7 +550,8 @@ MARKETPLACE_SANDBOX_APPROVE_SECONDS = env.int('MARKETPLACE_SANDBOX_APPROVE_SECON
 
 CORS_URLS_REGEX = (
     r'^(?:/graphql/|/ideas/\d+/attachments/|/administration/attachments/'
-    r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/)'
+    r'|/account/avatar/|/users/\d+/avatar/|/marketplace/ideas/\d+/document/'
+    r'|/learning/lessons/\d+/materials/|/learning/materials/\d+/download/)'
 )
 # Explicit so a stray setting elsewhere can never open the API to every origin.
 CORS_ALLOW_ALL_ORIGINS = False

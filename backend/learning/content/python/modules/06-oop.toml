@@ -1,0 +1,430 @@
+position = 6
+slug = "object-oriented-programming"
+title = "Object-Oriented Programming"
+summary = "Modelling a problem with classes and objects: state and behaviour together, inheritance and composition, and designs that stay easy to change."
+objectives = [
+  "Define classes with constructors, attributes and methods",
+  "Apply encapsulation and abstraction with properties",
+  "Use inheritance and polymorphism, and prefer composition where it fits",
+  "Write class methods, static methods and dataclasses",
+  "Implement special methods such as __str__, __repr__, __eq__ and __len__",
+  "Explain the SOLID principles and apply them to small designs",
+]
+project = "Library management system: books, members and loans as classes, with borrowing rules, overdue checks and a report of who has what."
+
+[[lessons]]
+slug = "classes-and-objects"
+title = "Classes, objects, encapsulation and properties"
+summary = "Bundling data and behaviour into classes, protecting an object's state, and computed attributes."
+minutes = 40
+objectives = [
+  "Define a class with __init__, attributes and methods",
+  "Explain the difference between a class and an instance",
+  "Protect invariants with encapsulation and properties",
+  "Use class methods, static methods and special methods",
+]
+body = '''
+## Classes and objects
+
+A **class** is a blueprint; an **object** (an *instance*) is one thing built from
+it. The class defines what data each object holds - its **attributes** - and what
+it can do - its **methods**.
+
+```python
+class BankAccount:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self.balance = balance
+
+    def deposit(self, amount):
+        self.balance += amount
+
+account = BankAccount("Amina", 100)
+account.deposit(50)
+print(account.owner, account.balance)   # Amina 150
+```
+
+`__init__` is the **constructor**: Python calls it when you create an object.
+`self` is the object the method is working on - Python passes it automatically,
+so `account.deposit(50)` runs `deposit(account, 50)`.
+
+## Encapsulation
+
+**Encapsulation** means an object protects its own state, so it can never be put
+into an invalid condition from outside. A leading underscore marks an attribute as
+internal by convention, and methods enforce the rules:
+
+```python
+class BankAccount:
+    def __init__(self, owner, balance=0):
+        self.owner = owner
+        self._balance = balance
+
+    def withdraw(self, amount):
+        if amount <= 0:
+            raise ValueError("Withdraw a positive amount.")
+        if amount > self._balance:
+            raise ValueError("Insufficient funds.")
+        self._balance -= amount
+
+    @property
+    def balance(self):
+        return self._balance
+```
+
+A **property** looks like an attribute (`account.balance`) but runs a method.
+With only a getter it is read-only, so the only way to change the balance is
+through `deposit` and `withdraw`, which check the rules. That is **abstraction**:
+callers use a simple interface without knowing - or being able to break - the
+details behind it.
+
+## Class methods and static methods
+
+A `@classmethod` receives the class instead of an instance, and is commonly used
+as an alternative constructor. A `@staticmethod` receives neither; it is a plain
+function that belongs with the class for organisation:
+
+```python
+class Temperature:
+    def __init__(self, celsius):
+        self.celsius = celsius
+
+    @classmethod
+    def from_fahrenheit(cls, fahrenheit):
+        return cls((fahrenheit - 32) * 5 / 9)
+
+    @staticmethod
+    def is_freezing(celsius):
+        return celsius <= 0
+
+t = Temperature.from_fahrenheit(212)
+print(t.celsius, Temperature.is_freezing(t.celsius))   # 100.0 False
+```
+
+## Special methods
+
+Methods with double underscores - "dunder" methods - let your objects work with
+Python's built-in operations:
+
+```python
+class Playlist:
+    def __init__(self, name, songs):
+        self.name = name
+        self.songs = list(songs)
+
+    def __len__(self):
+        return len(self.songs)
+
+    def __str__(self):
+        return f"{self.name} ({len(self)} songs)"
+
+    def __repr__(self):
+        return f"Playlist({self.name!r}, {self.songs!r})"
+
+    def __eq__(self, other):
+        return isinstance(other, Playlist) and self.songs == other.songs
+
+mix = Playlist("Road trip", ["Malaika", "Jambo"])
+print(len(mix), str(mix))
+print(repr(mix))
+```
+
+`__str__` is for people; `__repr__` is for developers and should ideally look like
+the code that recreates the object.
+'''
+
+[[lessons]]
+slug = "inheritance-composition-design"
+title = "Inheritance, polymorphism, composition, dataclasses and SOLID"
+summary = "Reusing and extending classes, choosing between inheritance and composition, and principles for designs that last."
+minutes = 45
+objectives = [
+  "Extend a class with inheritance and call the parent with super()",
+  "Use polymorphism to treat different objects the same way",
+  "Choose composition over inheritance where it fits",
+  "Write dataclasses",
+  "Explain each SOLID principle with an example",
+]
+body = '''
+## Inheritance
+
+A **subclass** inherits everything from its **base class** and can add to it or
+**override** it. `super()` calls the base class's version:
+
+```python
+class Employee:
+    def __init__(self, name, salary):
+        self.name = name
+        self.salary = salary
+
+    def annual_pay(self):
+        return self.salary * 12
+
+class Manager(Employee):
+    def __init__(self, name, salary, bonus):
+        super().__init__(name, salary)
+        self.bonus = bonus
+
+    def annual_pay(self):
+        return super().annual_pay() + self.bonus
+
+print(Manager("Neema", 2000, 5000).annual_pay())   # 29000
+```
+
+## Polymorphism
+
+**Polymorphism** means different classes respond to the same method call in their
+own way, so code can work with any of them without checking which it has:
+
+```python
+class Shape:
+    def area(self):
+        raise NotImplementedError
+
+class Square(Shape):
+    def __init__(self, side):
+        self.side = side
+
+    def area(self):
+        return self.side ** 2
+
+class Circle(Shape):
+    def __init__(self, radius):
+        self.radius = radius
+
+    def area(self):
+        return 3.14159 * self.radius ** 2
+
+shapes = [Square(2), Circle(1)]
+print([round(shape.area(), 2) for shape in shapes])   # [4, 3.14]
+```
+
+## Composition
+
+Inheritance models **is-a** relationships (a manager *is an* employee).
+**Composition** models **has-a** relationships: an object holds other objects and
+delegates work to them. Composition is usually more flexible, because parts can be
+swapped without a class hierarchy:
+
+```python
+class Engine:
+    def start(self):
+        return "Engine running"
+
+class Car:
+    def __init__(self, engine):
+        self.engine = engine          # a Car has an Engine
+
+    def drive(self):
+        return f"{self.engine.start()} - driving"
+
+print(Car(Engine()).drive())
+```
+
+Prefer composition unless the subclass truly is a specialised kind of its base.
+
+## Dataclasses
+
+For classes that mostly hold data, `@dataclass` writes `__init__`, `__repr__` and
+`__eq__` for you:
+
+```python
+from dataclasses import dataclass, field
+
+@dataclass
+class Book:
+    title: str
+    author: str
+    copies: int = 1
+    tags: list[str] = field(default_factory=list)
+
+book = Book("Things Fall Apart", "Chinua Achebe")
+print(book)
+print(book == Book("Things Fall Apart", "Chinua Achebe"))   # True
+```
+
+Use `@dataclass(frozen=True)` for objects that should never change after creation.
+
+## SOLID
+
+Five principles for object-oriented designs that stay easy to change:
+
+- **Single responsibility** - a class has one reason to change. A `ReportGenerator` should not also send emails.
+- **Open/closed** - extend behaviour by adding code (a new `Shape` subclass), not by editing working code.
+- **Liskov substitution** - a subclass must work anywhere its base class does, without surprises.
+- **Interface segregation** - depend on small, focused interfaces rather than one large one.
+- **Dependency inversion** - depend on abstractions: pass a `Car` its engine rather than having it build a specific one.
+
+They are guidelines, not laws. Apply them when a design starts to resist change.
+'''
+
+[[exercises]]
+slug = "library-system"
+title = "Library loans"
+lesson = "inheritance-composition-design"
+difficulty = "medium"
+instructions = '''
+Build the core of a library system.
+
+`Book` holds a `title` and a number of `copies` (default 1).
+
+`Library` keeps books by title and tracks loans:
+
+- `add_book(book)` adds a book, or adds its copies to a book with the same title.
+- `borrow(member, title)` lends one copy to `member` (a string). Raise
+  `ValueError("No such book")` for an unknown title and
+  `ValueError("No copies available")` when every copy is out. A member may not
+  borrow two copies of the same title: raise `ValueError("Already borrowed")`.
+- `return_book(member, title)` returns that member's copy, or raises
+  `ValueError("Not borrowed")`.
+- `available(title)` returns how many copies are on the shelf.
+- `loans_for(member)` returns the sorted list of titles that member has borrowed.
+'''
+starter = '''
+class Book:
+    def __init__(self, title, copies=1):
+        self.title = title
+        self.copies = copies
+
+
+class Library:
+    def __init__(self):
+        self.books = {}
+        self.loans = []  # (member, title) pairs
+
+    def add_book(self, book):
+        ...
+
+    def borrow(self, member, title):
+        ...
+
+    def return_book(self, member, title):
+        ...
+
+    def available(self, title):
+        ...
+
+    def loans_for(self, member):
+        ...
+'''
+solution = '''
+class Book:
+    def __init__(self, title, copies=1):
+        self.title = title
+        self.copies = copies
+
+
+class Library:
+    def __init__(self):
+        self.books = {}
+        self.loans = []
+
+    def add_book(self, book):
+        if book.title in self.books:
+            self.books[book.title].copies += book.copies
+        else:
+            self.books[book.title] = book
+
+    def borrow(self, member, title):
+        if title not in self.books:
+            raise ValueError("No such book")
+        if (member, title) in self.loans:
+            raise ValueError("Already borrowed")
+        if self.available(title) == 0:
+            raise ValueError("No copies available")
+        self.loans.append((member, title))
+
+    def return_book(self, member, title):
+        if (member, title) not in self.loans:
+            raise ValueError("Not borrowed")
+        self.loans.remove((member, title))
+
+    def available(self, title):
+        out = sum(1 for _, borrowed in self.loans if borrowed == title)
+        return self.books[title].copies - out
+
+    def loans_for(self, member):
+        return sorted(title for who, title in self.loans if who == member)
+'''
+hints = [
+  "Store loans as (member, title) tuples; `in` then answers \"has this member borrowed this title?\".",
+  "available() is the book's copies minus the loans of that title.",
+  "Check the error conditions in the order the instructions list them.",
+]
+
+[[exercises.tests]]
+name = "Borrow and return"
+call = '''
+library = Library()
+library.add_book(Book("Kifo Kisimani", 2))
+library.borrow("amina", "Kifo Kisimani")
+print(library.available("Kifo Kisimani"))
+library.return_book("amina", "Kifo Kisimani")
+print(library.available("Kifo Kisimani"))
+'''
+expected = "1\n2"
+
+[[exercises.tests]]
+name = "Errors"
+call = '''
+library = Library()
+library.add_book(Book("A"))
+library.borrow("x", "A")
+for action in (lambda: library.borrow("y", "A"), lambda: library.borrow("x", "A"),
+               lambda: library.borrow("x", "B"), lambda: library.return_book("y", "A")):
+    try:
+        action()
+    except ValueError as error:
+        print(error)
+'''
+expected = "No copies available\nAlready borrowed\nNo such book\nNot borrowed"
+hidden = true
+
+[[exercises.tests]]
+name = "Copies add up, loans are sorted"
+call = '''
+library = Library()
+library.add_book(Book("B", 1))
+library.add_book(Book("B", 2))
+library.add_book(Book("A"))
+library.borrow("m", "B")
+library.borrow("m", "A")
+print(library.available("B"), library.loans_for("m"), library.loans_for("z"))
+'''
+expected = "2 ['A', 'B'] []"
+hidden = true
+
+[quiz]
+title = "Object-Oriented Programming"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What is self in a method?"
+options = ["The class itself", "The object the method was called on", "A keyword that must be the last parameter", "A global variable"]
+correct = [1]
+explanation = "self is the instance; account.deposit(50) runs deposit(account, 50)."
+
+[[quiz.questions]]
+prompt = "Which relationship is best modelled with composition rather than inheritance?"
+options = ["A Manager and an Employee", "A Car and its Engine", "A Square and a Shape", "A SavingsAccount and an Account"]
+correct = [1]
+explanation = "A car has an engine (has-a) - composition. The others are is-a relationships."
+
+[[quiz.questions]]
+prompt = "What does @dataclass generate for you? Choose every one."
+kind = "multiple"
+options = ["__init__", "__repr__", "__eq__", "A database table"]
+correct = [0, 1, 2]
+explanation = "A dataclass writes __init__, __repr__ and __eq__ from the annotated fields. It has nothing to do with databases."
+
+[[quiz.questions]]
+prompt = "A property with only a getter is…"
+options = ["Read-only from outside the class", "Private and invisible", "Recomputed only once", "A class method"]
+correct = [0]
+explanation = "Without a setter, assigning to the property raises an AttributeError, so callers can read it but not change it."
+
+[[quiz.questions]]
+prompt = "Which SOLID principle says a class should have only one reason to change?"
+options = ["Open/closed", "Single responsibility", "Liskov substitution", "Dependency inversion"]
+correct = [1]
+explanation = "The single responsibility principle: one class, one job, one reason to change."

@@ -1,0 +1,343 @@
+position = 4
+slug = "data-structures"
+title = "Data Structures"
+summary = "Lists, tuples, sets and dictionaries: storing many values, finding them again, and choosing the right structure for the job."
+objectives = [
+  "Create, index, slice and iterate lists and tuples",
+  "Use sets for membership and uniqueness, and dictionaries for lookup by key",
+  "Write list, set and dictionary comprehensions",
+  "Work with nested collections",
+  "Sort and search collections, and choose a suitable structure",
+]
+project = "Student records and inventory manager: keep records in a list of dictionaries, look them up by id, and report on them sorted and filtered."
+
+[[lessons]]
+slug = "lists-and-tuples"
+title = "Lists and tuples"
+summary = "Ordered collections: changeable lists and fixed tuples, with indexing, slicing, sorting and searching."
+minutes = 30
+objectives = [
+  "Create and change lists, and know which operations change them in place",
+  "Use tuples for fixed groups of values and unpack them",
+  "Sort and search lists",
+]
+body = '''
+## Lists
+
+A **list** is an ordered, changeable sequence, written in square brackets. It can
+hold any values, even mixed types, and grows and shrinks as you need:
+
+```python
+scores = [72, 88, 95]
+scores.append(64)        # add to the end
+scores.insert(0, 100)    # add at a position
+scores.remove(88)        # remove the first 88
+last = scores.pop()      # remove and return the last item
+print(scores, last)      # [100, 72, 95] 64
+print(len(scores), scores[0], scores[-1])
+```
+
+Indexing and slicing work exactly as they do for strings, and a slice of a list is
+a new list: `scores[1:]` is everything but the first.
+
+## Lists are references
+
+Assigning a list to a second name does **not** copy it - both names refer to the
+same list:
+
+```python
+a = [1, 2, 3]
+b = a
+b.append(4)
+print(a)          # [1, 2, 3, 4] - a changed too
+c = a.copy()      # or list(a), or a[:]
+c.append(5)
+print(a, c)       # [1, 2, 3, 4] [1, 2, 3, 4, 5]
+```
+
+## Tuples
+
+A **tuple** is like a list that cannot change after it is created. Use one for a
+fixed group of related values, such as coordinates or a database row. Tuples can be
+**unpacked** into separate names:
+
+```python
+point = (3, 4)
+x, y = point
+print(x, y)
+
+name, mark = ("Amina", 91)
+print(f"{name}: {mark}")
+
+a, b = 1, 2
+a, b = b, a       # swap, without a temporary variable
+print(a, b)       # 2 1
+```
+
+## Sorting and searching
+
+`sorted()` returns a new sorted list; `list.sort()` sorts in place and returns
+`None`. Both take a `key` function and `reverse=True`:
+
+```python
+words = ["banana", "Cherry", "apple"]
+print(sorted(words))                  # ['Cherry', 'apple', 'banana'] - capitals first
+print(sorted(words, key=str.lower))   # ['apple', 'banana', 'Cherry']
+print(sorted(words, key=len, reverse=True))
+
+numbers = [5, 3, 9, 3]
+print(3 in numbers, numbers.index(9), numbers.count(3))   # True 2 2
+print(min(numbers), max(numbers), sum(numbers))
+```
+
+`in` on a list checks every item in turn, which is slow for very large lists -
+a set or dictionary, below, finds a value in a single step.
+'''
+
+[[lessons]]
+slug = "sets-dicts-comprehensions"
+title = "Sets, dictionaries and comprehensions"
+summary = "Unique values, lookup by key, nested data, and building collections in one expression."
+minutes = 40
+objectives = [
+  "Use sets for uniqueness and fast membership tests",
+  "Store and look up data by key in dictionaries",
+  "Build collections with comprehensions",
+  "Choose between list, tuple, set and dictionary",
+]
+body = '''
+## Sets
+
+A **set** is an unordered collection of **unique** values. Adding a value that is
+already there does nothing, and `in` on a set is fast however large it is:
+
+```python
+tags = {"python", "web", "python"}
+print(tags)                    # {'python', 'web'} - the duplicate is gone
+tags.add("api")
+
+a = {"amina", "juma", "neema"}
+b = {"juma", "baraka"}
+print(a & b)    # {'juma'}  - in both (intersection)
+print(a | b)    # all four  - in either (union)
+print(a - b)    # {'amina', 'neema'} - in a but not b
+```
+
+`set(some_list)` is the quickest way to remove duplicates (it does not keep the order).
+
+## Dictionaries
+
+A **dictionary** maps **keys** to **values**. Look values up by key rather than by position:
+
+```python
+stock = {"pen": 120, "notebook": 45}
+stock["eraser"] = 30           # add or replace
+stock["pen"] -= 20
+print(stock["notebook"])       # 45
+print(stock.get("ruler", 0))   # 0 - a default instead of a KeyError
+print("pen" in stock)          # True - checks keys
+
+for item, count in stock.items():
+    print(f"{item}: {count}")
+```
+
+Keys must be immutable (strings, numbers, tuples); values can be anything.
+
+## Nested collections
+
+Real data is usually nested - for example a list of dictionaries, one per record:
+
+```python
+students = [
+    {"id": 1, "name": "Amina", "marks": [88, 92]},
+    {"id": 2, "name": "Juma", "marks": [75, 68]},
+]
+for student in students:
+    average = sum(student["marks"]) / len(student["marks"])
+    print(f"{student['name']}: {average:.1f}")
+
+by_id = {student["id"]: student for student in students}
+print(by_id[2]["name"])   # Juma - found by key, without a loop
+```
+
+## Comprehensions
+
+A **comprehension** builds a collection from another in a single expression,
+optionally filtering as it goes:
+
+```python
+numbers = [1, 2, 3, 4, 5, 6]
+squares = [n * n for n in numbers]
+evens = [n for n in numbers if n % 2 == 0]
+lengths = {word: len(word) for word in ["map", "filter"]}
+initials = {name[0] for name in ["Amina", "Abdul", "Neema"]}
+print(squares, evens, lengths, initials)
+```
+
+Keep comprehensions short. When one needs several conditions or nested loops,
+an ordinary `for` loop is easier to read.
+
+## Choosing a structure
+
+- **list** - an ordered sequence you will change: a queue of tasks, search results.
+- **tuple** - a fixed record of a few values: a coordinate, a function's two results.
+- **set** - unique values and fast "is it there?" checks: tags, seen ids.
+- **dict** - values you look up by a key: settings, a record by id, counts.
+'''
+
+[[exercises]]
+slug = "word-counter"
+title = "Word frequencies"
+lesson = "sets-dicts-comprehensions"
+difficulty = "medium"
+instructions = '''
+Write `word_counts(text)`, which returns a **dictionary** mapping each word in
+`text` to the number of times it appears.
+
+- Words are separated by whitespace.
+- Counting ignores case: `"The"` and `"the"` are the same word, stored in lowercase.
+- Strip these punctuation characters from the ends of each word: `.,!?;:`
+- Ignore anything left empty after stripping.
+
+`word_counts("The cat. The hat!")` returns `{"the": 2, "cat": 1, "hat": 1}`.
+'''
+starter = '''
+def word_counts(text):
+    counts = {}
+    return counts
+'''
+solution = '''
+def word_counts(text):
+    counts = {}
+    for raw in text.split():
+        word = raw.strip(".,!?;:").lower()
+        if word:
+            counts[word] = counts.get(word, 0) + 1
+    return counts
+'''
+hints = [
+  "text.split() splits on any whitespace, including newlines.",
+  "str.strip(\".,!?;:\") removes those characters from both ends of a word.",
+  "counts.get(word, 0) + 1 counts a word whether or not it has been seen before.",
+]
+
+[[exercises.tests]]
+name = "Two sentences"
+call = "print(sorted(word_counts('The cat. The hat!').items()))"
+expected = "[('cat', 1), ('hat', 1), ('the', 2)]"
+
+[[exercises.tests]]
+name = "Empty text"
+call = "print(word_counts(''))"
+expected = "{}"
+hidden = true
+
+[[exercises.tests]]
+name = "Punctuation only"
+call = "print(sorted(word_counts('Wait ... what?! WAIT; what').items()))"
+expected = "[('wait', 2), ('what', 2)]"
+hidden = true
+
+[[exercises]]
+slug = "inventory-report"
+title = "Inventory report"
+lesson = "sets-dicts-comprehensions"
+difficulty = "medium"
+instructions = '''
+An inventory is a list of dictionaries, each with `name`, `quantity` and
+`reorder_level`. Write `low_stock(items)`, which returns the **names** of the
+items whose `quantity` is **at or below** their `reorder_level`, sorted by
+quantity (lowest first) and then by name.
+
+```python
+items = [
+    {"name": "pens", "quantity": 4, "reorder_level": 10},
+    {"name": "paper", "quantity": 50, "reorder_level": 20},
+    {"name": "ink", "quantity": 4, "reorder_level": 5},
+]
+low_stock(items)   # ["ink", "pens"]
+```
+'''
+starter = '''
+def low_stock(items):
+    return []
+'''
+solution = '''
+def low_stock(items):
+    low = [item for item in items if item["quantity"] <= item["reorder_level"]]
+    low.sort(key=lambda item: (item["quantity"], item["name"]))
+    return [item["name"] for item in low]
+'''
+hints = [
+  "A list comprehension with an if keeps only the items you want.",
+  "Sorting by a tuple key - (quantity, name) - sorts by quantity, then breaks ties by name.",
+]
+
+[[exercises.tests]]
+name = "The example"
+call = '''
+print(low_stock([
+    {"name": "pens", "quantity": 4, "reorder_level": 10},
+    {"name": "paper", "quantity": 50, "reorder_level": 20},
+    {"name": "ink", "quantity": 4, "reorder_level": 5},
+]))
+'''
+expected = "['ink', 'pens']"
+
+[[exercises.tests]]
+name = "Nothing low"
+call = "print(low_stock([{'name': 'a', 'quantity': 9, 'reorder_level': 1}]))"
+expected = "[]"
+hidden = true
+
+[[exercises.tests]]
+name = "Exactly at the reorder level"
+call = '''
+print(low_stock([
+    {"name": "tape", "quantity": 0, "reorder_level": 0},
+    {"name": "glue", "quantity": 3, "reorder_level": 3},
+    {"name": "clips", "quantity": 1, "reorder_level": 9},
+]))
+'''
+expected = "['tape', 'clips', 'glue']"
+hidden = true
+
+[quiz]
+title = "Data Structures"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does this print?"
+code = '''
+a = [1, 2]
+b = a
+b.append(3)
+print(a)
+'''
+options = ["[1, 2]", "[1, 2, 3]", "[3]", "An error"]
+correct = [1]
+explanation = "b = a makes both names refer to the same list, so appending through b changes what a sees."
+
+[[quiz.questions]]
+prompt = "Which structure is the best fit for looking up a product's price by its code?"
+options = ["list", "tuple", "set", "dict"]
+correct = [3]
+explanation = "A dictionary maps keys (product codes) to values (prices) and finds one in a single step."
+
+[[quiz.questions]]
+prompt = "What is len({1, 2, 2, 3, 3, 3})?"
+options = ["6", "3", "1", "An error"]
+correct = [1]
+explanation = "A set keeps only unique values: {1, 2, 3}."
+
+[[quiz.questions]]
+prompt = "What does [n * 2 for n in range(4) if n % 2 == 1] produce?"
+options = ["[2, 6]", "[0, 2, 4, 6]", "[1, 3]", "[2, 4, 6]"]
+correct = [0]
+explanation = "range(4) is 0-3; the odd ones are 1 and 3; doubled they are 2 and 6."
+
+[[quiz.questions]]
+prompt = "What does stock.get('ruler', 0) return when 'ruler' is not a key?"
+options = ["None", "0", "It raises KeyError", "'ruler'"]
+correct = [1]
+explanation = "get() returns the default you give it when the key is missing, instead of raising KeyError."

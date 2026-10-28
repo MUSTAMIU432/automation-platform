@@ -60,13 +60,14 @@ describe('AdminLayout', () => {
 
       const nav = screen.getByRole('navigation', { name: 'Administration' })
       const links = within(nav).getAllByRole('link')
-      expect(links).toHaveLength(18)
+      expect(links).toHaveLength(19)
       for (const link of links) expect(link.querySelector('svg')).not.toBeNull()
       for (const group of [
         'Overview',
         'Accounts',
         'Review workflow',
         'Marketplace',
+        'Learning',
         'Communication',
       ]) {
         expect(within(nav).getByText(group)).toBeInTheDocument()

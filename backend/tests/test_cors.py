@@ -77,6 +77,27 @@ def test_upload_endpoint_is_not_reachable_from_an_unknown_origin(client):
     assert 'Access-Control-Allow-Origin' not in response
 
 
+@pytest.mark.django_db
+def test_lesson_file_upload_and_download_are_reachable_from_the_app_origin(client):
+    preflight = client.options(
+        '/learning/lessons/1/materials/',
+        HTTP_ORIGIN=LOCAL_ORIGIN,
+        HTTP_ACCESS_CONTROL_REQUEST_METHOD='POST',
+        HTTP_ACCESS_CONTROL_REQUEST_HEADERS='authorization',
+    )
+    download = client.get('/learning/materials/2/download/', HTTP_ORIGIN=LOCAL_ORIGIN)
+
+    assert preflight['Access-Control-Allow-Origin'] == LOCAL_ORIGIN
+    assert download['Access-Control-Allow-Origin'] == LOCAL_ORIGIN
+
+
+@pytest.mark.django_db
+def test_lesson_files_are_not_reachable_from_an_unknown_origin(client):
+    response = client.get('/learning/materials/2/download/', HTTP_ORIGIN='http://evil.example')
+
+    assert 'Access-Control-Allow-Origin' not in response
+
+
 def test_django_admin_is_not_reachable_from_the_app_origin(client):
     # The point of naming endpoints rather than loosening the pattern: the admin
     # site is on this origin and must not become a browser-callable API.

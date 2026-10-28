@@ -1,0 +1,324 @@
+position = 2
+slug = "data-types"
+title = "Data Types and Operators"
+summary = "Numbers, text and truth values, how to convert between them, and the operators that combine them."
+objectives = [
+  "Use int, float, str and bool values and check a value's type",
+  "Convert between types and know which conversions can fail",
+  "Combine values with arithmetic, comparison, logical and assignment operators",
+  "Format and manipulate strings",
+  "Predict the result of an expression using operator precedence",
+]
+project = "Grade calculator and basic expense calculator: turn raw scores into a letter grade, and a list of expenses into totals and an average."
+
+[[lessons]]
+slug = "core-types"
+title = "Numbers, strings, booleans and conversion"
+summary = "Python's four basic types, checking which one you have, and converting between them."
+minutes = 25
+objectives = [
+  "Describe int, float, str and bool",
+  "Check a value's type with type() and isinstance()",
+  "Convert values with int(), float(), str() and bool()",
+]
+body = '''
+## The four basic types
+
+Every value in Python has a **type**, which decides what you can do with it.
+
+- `int` - whole numbers of any size: `42`, `-7`, `10**30`.
+- `float` - numbers with a fractional part: `3.14`, `-0.5`, `2e6` (two million).
+- `str` - text, in single or double quotes: `"hello"`, `'Dar es Salaam'`.
+- `bool` - truth values: `True` and `False` (capitalised).
+
+```python
+count = 3            # int
+price = 4.75         # float
+city = "Arusha"      # str
+is_open = True       # bool
+
+print(type(count), type(price), type(city), type(is_open))
+```
+
+## Checking types
+
+`type(value)` tells you a value's type. To *test* a type, prefer
+`isinstance(value, kind)`, which also accepts a tuple of types:
+
+```python
+value = 7.0
+print(isinstance(value, float))          # True
+print(isinstance(value, (int, float)))   # True - is it any kind of number?
+```
+
+## Converting between types
+
+Conversion functions build a new value of another type:
+
+```python
+print(int("42") + 1)       # 43
+print(float("2.5") * 2)    # 5.0
+print(str(19) + " years")  # 19 years
+print(int(3.99))           # 3 - int() truncates toward zero, it does not round
+print(round(3.99))         # 4
+```
+
+Not every conversion can succeed. `int("hello")` or `int("3.5")` raises a
+`ValueError`, so input from a user should be validated - you will learn how in the
+modules on control flow and exceptions.
+
+## Truthiness
+
+Every value can be used as a condition. These are **falsy**: `False`, `0`, `0.0`,
+the empty string `""`, and empty collections. Almost everything else is
+**truthy**. `bool()` shows the result:
+
+```python
+print(bool(0), bool(""), bool("0"), bool(5))   # False False True True
+```
+
+> Floats are stored in binary, so some decimals are not exact:
+> `0.1 + 0.2` is `0.30000000000000004`. For money, store whole cents as `int`, or
+> use the `decimal` module.
+'''
+
+[[lessons]]
+slug = "operators-and-strings"
+title = "Operators, precedence and working with text"
+summary = "Arithmetic, comparison, logical and assignment operators, and the everyday string toolkit."
+minutes = 35
+objectives = [
+  "Use arithmetic operators, including //, % and **",
+  "Combine comparisons with and, or and not",
+  "Predict evaluation order from operator precedence",
+  "Format, slice and transform strings",
+]
+body = '''
+## Arithmetic
+
+```python
+a, b = 17, 5
+print(a + b, a - b, a * b)   # 22 12 85
+print(a / b)                 # 3.4  - true division, always a float
+print(a // b)                # 3    - floor division
+print(a % b)                 # 2    - remainder (modulo)
+print(a ** 2)                # 289  - power
+```
+
+`%` is more useful than it looks: `n % 2 == 0` tests for an even number, and
+`minutes % 60` gives the minutes past the hour.
+
+## Comparison and logic
+
+Comparisons produce a `bool`: `==`, `!=`, `<`, `<=`, `>`, `>=`. Combine them with
+`and`, `or` and `not`. Python also lets you chain comparisons:
+
+```python
+age = 20
+print(age >= 18 and age < 65)   # True
+print(18 <= age < 65)           # True - the same test, chained
+print(not age == 20)            # False
+```
+
+`and` and `or` **short-circuit**: `x and y` does not evaluate `y` when `x` is
+falsy. That makes `count > 0 and total / count > 10` safe even when `count` is 0.
+
+## Assignment operators
+
+`x += 1` is shorthand for `x = x + 1`; the same works for `-=`, `*=`, `/=`, `//=`,
+`%=` and `**=`.
+
+## Precedence
+
+Python evaluates `**` first, then `*`, `/`, `//` and `%`, then `+` and `-`, then
+comparisons, then `not`, `and`, and finally `or`. When in doubt, add parentheses -
+they make your intent clear to readers too:
+
+```python
+print(2 + 3 * 4)       # 14, not 20
+print((2 + 3) * 4)     # 20
+print(-2 ** 2)         # -4: ** binds tighter than the unary minus
+```
+
+## Working with strings
+
+Strings are **immutable** - methods return a new string rather than changing the
+original:
+
+```python
+name = "  amina juma  "
+clean = name.strip().title()
+print(clean)                     # Amina Juma
+print(clean.upper(), len(clean)) # AMINA JUMA 10
+print(clean.replace("Juma", "J."))
+print("ina" in clean)            # True
+print(clean.split())             # ['Amina', 'Juma']
+print("-".join(["2025", "01", "31"]))
+```
+
+Strings can be **indexed** and **sliced** from 0; negative indexes count from the end:
+
+```python
+word = "Python"
+print(word[0], word[-1])   # P n
+print(word[0:3])           # Pyt - up to, not including, index 3
+print(word[::-1])          # nohtyP - reversed
+```
+
+f-strings accept a **format spec** after a colon, for decimals, padding and
+thousands separators:
+
+```python
+total = 1234.5
+print(f"Total: {total:,.2f}")   # Total: 1,234.50
+print(f"[{'left':<8}]")         # [left    ]
+print(f"{0.256:.1%}")           # 25.6%
+```
+'''
+
+[[exercises]]
+slug = "grade-calculator"
+title = "Grade calculator"
+lesson = "operators-and-strings"
+difficulty = "easy"
+instructions = '''
+Write a function `letter_grade(score)` that takes a score from 0 to 100 and
+returns its letter grade as a string:
+
+- 80 or above: `"A"`
+- 70 to 79: `"B"`
+- 60 to 69: `"C"`
+- 50 to 59: `"D"`
+- below 50: `"F"`
+
+Scores may be floats, such as `79.5` (which is a `"B"`). Your function should
+**return** the grade, not print it.
+'''
+starter = '''
+def letter_grade(score):
+    # Return "A", "B", "C", "D" or "F".
+    pass
+'''
+solution = '''
+def letter_grade(score):
+    if score >= 80:
+        return "A"
+    if score >= 70:
+        return "B"
+    if score >= 60:
+        return "C"
+    if score >= 50:
+        return "D"
+    return "F"
+'''
+hints = [
+  "Check the highest band first: if score >= 80, return \"A\". Then the next band down.",
+  "Once a return runs, the function ends, so later checks do not need an upper bound.",
+]
+
+[[exercises.tests]]
+name = "letter_grade(85)"
+call = "print(letter_grade(85))"
+expected = "A"
+
+[[exercises.tests]]
+name = "letter_grade(79.5)"
+call = "print(letter_grade(79.5))"
+expected = "B"
+
+[[exercises.tests]]
+name = "Every boundary"
+call = "print([letter_grade(s) for s in (80, 70, 60, 50, 49.9, 0, 100)])"
+expected = "['A', 'B', 'C', 'D', 'F', 'F', 'A']"
+hidden = true
+
+[[exercises]]
+slug = "expense-summary"
+title = "Expense summary"
+lesson = "operators-and-strings"
+difficulty = "medium"
+instructions = '''
+Read one line of input: expense amounts separated by commas, such as
+`1200, 350.5, 99`. Print three lines - the total, the average and the largest
+expense - each with two decimal places and a thousands separator:
+
+```text
+Total: 1,649.50
+Average: 549.83
+Largest: 1,200.00
+```
+
+Amounts may have spaces around them. There is always at least one amount.
+'''
+starter = '''
+line = input()
+'''
+solution = '''
+line = input()
+amounts = [float(part) for part in line.split(",")]
+
+total = sum(amounts)
+print(f"Total: {total:,.2f}")
+print(f"Average: {total / len(amounts):,.2f}")
+print(f"Largest: {max(amounts):,.2f}")
+'''
+hints = [
+  "line.split(\",\") gives a list of strings; float() ignores surrounding spaces.",
+  "sum(), len() and max() work on a list of numbers.",
+  "The format spec :,.2f adds a thousands separator and two decimal places.",
+]
+
+[[exercises.tests]]
+name = "Three expenses"
+stdin = "1200, 350.5, 99\n"
+expected = "Total: 1,649.50\nAverage: 549.83\nLargest: 1,200.00"
+
+[[exercises.tests]]
+name = "One expense"
+stdin = "42\n"
+expected = "Total: 42.00\nAverage: 42.00\nLargest: 42.00"
+hidden = true
+
+[[exercises.tests]]
+name = "Large amounts"
+stdin = "250000,1000000.25,  75000\n"
+expected = "Total: 1,325,000.25\nAverage: 441,666.75\nLargest: 1,000,000.25"
+hidden = true
+
+[quiz]
+title = "Data Types and Operators"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does this print?"
+code = '''
+print(17 // 5, 17 % 5)
+'''
+options = ["3.4 2", "3 2", "3 3", "4 2"]
+correct = [1]
+explanation = "// is floor division (3) and % is the remainder (2)."
+
+[[quiz.questions]]
+prompt = "What is the value of int(3.99)?"
+options = ["4", "3", "3.99", "An error"]
+correct = [1]
+explanation = "int() truncates toward zero; use round() to round."
+
+[[quiz.questions]]
+prompt = "Which of these values are falsy? Choose every one."
+kind = "multiple"
+options = ["0", "\"0\"", "\"\"", "[]", "-1"]
+correct = [0, 2, 3]
+explanation = "Zero, the empty string and empty collections are falsy. The string \"0\" is not empty, so it is truthy, and so is -1."
+
+[[quiz.questions]]
+prompt = "What does 2 + 3 * 2 ** 2 evaluate to?"
+options = ["100", "14", "20", "36"]
+correct = [1]
+explanation = "** first (2 ** 2 = 4), then * (3 * 4 = 12), then + (2 + 12 = 14)."
+
+[[quiz.questions]]
+prompt = "What does \"Python\"[1:4] evaluate to?"
+options = ["\"Pyt\"", "\"yth\"", "\"ytho\"", "\"Pyth\""]
+correct = [1]
+explanation = "A slice starts at index 1 ('y') and stops before index 4, giving 'yth'."

@@ -77,6 +77,9 @@ RELEASE_PROPOSALS = 'administration.release_proposals'
 MANAGE_PLATFORM_ROLES = 'administration.manage_platform_roles'
 # Publish ideas for sale, price them, set the accounts buyers pay into, and confirm payments.
 MANAGE_MARKETPLACE = 'administration.manage_marketplace'
+# Author courses - lessons, notes and their files, exercises, quizzes - and publish them.
+# Django's own model permission, so the same grant also opens the courses in the Django admin.
+MANAGE_COURSES = 'learning.change_course'
 
 # The console's own permissions: the gate, the additional capabilities, and
 # *staffing* - making reviewers and handing out the platform's other jobs - but
@@ -98,6 +101,7 @@ CONSOLE_PERMISSIONS = (
     MANAGE_REVIEWERS,
     MANAGE_PLATFORM_ROLES,
     MANAGE_MARKETPLACE,
+    MANAGE_COURSES,
 )
 
 ALL_PERMISSIONS = (
@@ -112,6 +116,7 @@ ALL_PERMISSIONS = (
     RELEASE_PROPOSALS,
     MANAGE_PLATFORM_ROLES,
     MANAGE_MARKETPLACE,
+    MANAGE_COURSES,
 )
 
 
@@ -145,6 +150,7 @@ class AdminCapabilities:
     can_release_proposals: bool = False
     can_manage_platform_roles: bool = False
     can_manage_marketplace: bool = False
+    can_manage_courses: bool = False
 
 
 NO_CAPABILITIES = AdminCapabilities()
@@ -177,6 +183,7 @@ def capabilities_for(user: User | None) -> AdminCapabilities:
         can_release_proposals=active_user.has_perm(RELEASE_PROPOSALS),
         can_manage_platform_roles=active_user.has_perm(MANAGE_PLATFORM_ROLES),
         can_manage_marketplace=active_user.has_perm(MANAGE_MARKETPLACE),
+        can_manage_courses=active_user.has_perm(MANAGE_COURSES),
     )
 
 

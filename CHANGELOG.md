@@ -6,6 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Learning: courses, coding exercises and quizzes
+
+A learning area at `/app/learn` and a course-authoring console at
+`/app/admin/courses`, shipped with **Python Programming: Beginner to Advanced**.
+See [`docs/learning.md`](docs/learning.md).
+
+- **Learners** browse and enroll, read lessons with highlighted, copyable code and
+  downloadable lesson files, practise in a code editor, take quizzes, track
+  progress, submit a capstone and complete the course.
+- **Administrators** (`canManageCourses`) write everything learners see: courses,
+  modules, lesson notes with a live preview, lesson files (stored in R2 and only
+  downloadable by enrolled learners), exercises with hidden tests and reference
+  solutions, quizzes, and publishing.
+- **Learner code never runs in Django.** Run and Submit go to a self-hosted,
+  Piston-compatible sandbox (`CODE_EXECUTION_URL`), off until configured. Grading
+  compares output on the server against hidden tests whose inputs and expected
+  outputs never reach the learner.
+- **Content** for the Python course lives in `backend/learning/content/` as TOML;
+  `seed_python_course` loads it once. Its tests compile every example and run
+  every reference solution against its own tests.
+- New dependencies: CodeMirror 6 and the Lezer Python grammar (frontend), `moto`
+  for tests only.
+
 ### Added — Uploaded files in Cloudflare R2
 
 Idea attachments, marketplace documents and profile photos now live in a

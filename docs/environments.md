@@ -118,6 +118,11 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `R2_BUCKET_NAME`             |        | **deployed**       | The private bucket holding uploaded files, e.g. `mustanet-automation` |
 | `R2_ENDPOINT_URL`            |        | **deployed**       | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, with no bucket name or path after it |
 | `ATTACHMENTS_STORAGE_BACKEND` |       | no                 | Django storage class for uploaded files. Defaults to the R2 (S3) backend when the four `R2_*` variables are set, otherwise to the filesystem under `backend/media/attachments/`. Deployed environments must use R2 |
+| `CODE_EXECUTION_URL`         |        | no (off)           | The sandbox that runs learners' Python code (Piston-compatible). Unset turns Run and Submit off. Learner code never runs in Django. See [learning.md](learning.md#running-learner-code-safely) |
+| `CODE_EXECUTION_TOKEN`       | **yes**| no                 | **Secret.** Bearer token for the sandbox's authenticating proxy |
+| `CODE_EXECUTION_PYTHON_VERSION` |     | no (`3.12.0`)      | Python version installed in the sandbox |
+| `CODE_EXECUTION_TIMEOUT_MS`  |        | no (`3000`)        | Per-run time limit |
+| `CODE_EXECUTION_MEMORY_LIMIT_BYTES` | | no (`134217728`)  | Per-run memory limit |
 
 Notes:
 

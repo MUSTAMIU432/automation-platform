@@ -193,3 +193,75 @@
     inset 0 0 0 100px var(--color-neu);
   transition: background-color 99999s ease-out 0s;
 }
+
+/*
+  Python syntax colours, shared by the learning area's code editor (light) and its
+  lesson examples (dark). Both use @lezer/highlight's classHighlighter, so a token
+  has the same class - and the same meaning - in either place.
+*/
+.code-editor .tok-keyword {
+  color: #8b2fc9;
+  font-weight: 600;
+}
+.code-editor .tok-string {
+  color: #0f7a4f;
+}
+.code-editor .tok-comment {
+  color: #6b7d75;
+  font-style: italic;
+}
+.code-editor .tok-number,
+.code-editor .tok-bool,
+.code-editor .tok-atom {
+  color: #b45309;
+}
+.code-editor .tok-definition {
+  color: #1d4ed8;
+}
+.code-editor .tok-className,
+.code-editor .tok-typeName {
+  color: #0e7490;
+}
+.code-editor .tok-operator {
+  color: #475569;
+}
+.code-editor .cm-gutters {
+  background: #f6faf8;
+  border-right: 1px solid #e2ece7;
+  color: #94a3a0;
+}
+.code-editor .cm-activeLine {
+  background: rgba(85, 230, 176, 0.08);
+}
+.code-editor .cm-activeLineGutter {
+  background: rgba(85, 230, 176, 0.14);
+}
+.code-editor .cm-focused {
+  outline: none;
+}
+
+.code-dark .tok-keyword {
+  color: #c792ea;
+}
+.code-dark .tok-string {
+  color: #a5e8b8;
+}
+.code-dark .tok-comment {
+  color: #7f9a90;
+  font-style: italic;
+}
+.code-dark .tok-number,
+.code-dark .tok-bool,
+.code-dark .tok-atom {
+  color: #f6c177;
+}
+.code-dark .tok-definition {
+  color: #82aaff;
+}
+.code-dark .tok-className,
+.code-dark .tok-typeName {
+  color: #7fdbca;
+}
+.code-dark .tok-operator {
+  color: #b8cfc6;
+}

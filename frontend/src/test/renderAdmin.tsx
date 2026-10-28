@@ -23,6 +23,7 @@ export const FULL_ADMIN: AdminCapabilities = {
   canReleaseProposals: true,
   canManagePlatformRoles: true,
   canManageMarketplace: true,
+  canManageCourses: true,
 }
 
 export const READ_ONLY_ADMIN: AdminCapabilities = {
