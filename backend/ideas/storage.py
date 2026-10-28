@@ -6,10 +6,12 @@ Everything else - `ideas/services.py`, `ideas/views.py` - calls the four
 functions below and never constructs a storage backend, opens a path, or
 knows whether the bytes are sitting on the local disk or in an object-storage
 bucket. That indirection is the whole point: `config/settings/base.py`'s
-`STORAGES['attachments']` entry names the backend class, and swapping from
-the filesystem to an object-storage driver (once one is actually installed
-and configured) is a settings change, not a change to this module or to
-anything that calls it.
+`STORAGES['attachments']` entry names the backend class - the local
+filesystem in development and CI, Cloudflare R2 (through `django-storages`'
+S3 backend) in every deployed environment - and swapping between them is a
+settings change, not a change to this module or to anything that calls it.
+The one thing the backends do not share is how they fail; see
+`STORAGE_ERRORS`.
 
 **The storage key is never a value a caller supplies.** Every key this module
 hands out comes from `generate_storage_key`, which builds it from the idea's
@@ -29,10 +31,20 @@ that safe.
 import logging
 import uuid
 
+from botocore.exceptions import BotoCoreError, ClientError
 from django.core.files.base import File
 from django.core.files.storage import Storage, storages
 
 logger = logging.getLogger(__name__)
+
+# What a backend raises when the storage itself fails. The filesystem backend
+# raises `OSError`; the S3 backend used for R2 raises botocore's own
+# exceptions, which are not `OSError` - left out, an R2 outage would escape as
+# a 500 instead of `AttachmentStorageError`, and a failed delete would raise
+# after the database row was already gone. A missing object is still
+# `FileNotFoundError` (an `OSError`) on both, so callers that check for it
+# first keep working.
+STORAGE_ERRORS = (OSError, BotoCoreError, ClientError)
 
 
 class AttachmentStorageError(Exception):
@@ -84,10 +96,15 @@ def save_object(key: str, file: File) -> str:
     backend appends a suffix rather than overwriting the existing object -
     so an accidental overwrite is prevented at this layer too, not only by
     the database constraint.
+
+    `file` is wrapped in a plain `File` so the backend never sees an upload's
+    `content_type` - the browser's claim, which the S3 backend would otherwise
+    record as the stored object's `Content-Type`. It falls back to the type of
+    the server-generated key's extension instead.
     """
     try:
-        return attachment_storage().save(key, file)
-    except OSError as exc:
+        return attachment_storage().save(key, File(file))
+    except STORAGE_ERRORS as exc:
         raise AttachmentStorageError(f'Could not store {key!r}: {exc}') from exc
 
 
@@ -104,7 +121,7 @@ def open_object(key: str):
         return attachment_storage().open(key, 'rb')
     except FileNotFoundError:
         raise
-    except OSError as exc:
+    except STORAGE_ERRORS as exc:
         raise AttachmentStorageError(f'Could not open {key!r}: {exc}') from exc
 
 
@@ -126,5 +143,5 @@ def delete_object(key: str) -> None:
         storage = attachment_storage()
         if storage.exists(key):
             storage.delete(key)
-    except OSError:
+    except STORAGE_ERRORS:
         logger.warning('Could not delete attachment object %r from storage.', key, exc_info=True)

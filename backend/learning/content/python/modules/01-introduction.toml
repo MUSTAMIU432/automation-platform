@@ -1,0 +1,391 @@
+position = 1
+slug = "introduction"
+title = "Introduction to Python"
+summary = "What Python is, how to run it, and the shape of a Python program: syntax, variables, input, output and your first debugging."
+objectives = [
+  "Explain what Python is and where it is used",
+  "Install Python, set up an editor and run code both as a script and interactively",
+  "Read Python's syntax rules: indentation, comments and error messages",
+  "Store values in well-named variables and constants",
+  "Read input from the user and print formatted output",
+]
+project = "Personal information and simple calculator programs: ask for a name and two numbers, then print a greeting and the results of each arithmetic operation."
+
+[[lessons]]
+slug = "what-is-python"
+title = "What Python is, and running your first program"
+summary = "Where Python is used, how to install it, and the two ways to run Python code."
+minutes = 20
+objectives = [
+  "Describe what Python is and name the fields where it is used",
+  "Install Python and check the installed version",
+  "Run code in the interactive interpreter and as a script",
+]
+body = '''
+## What Python is
+
+Python is a general-purpose, high-level programming language. *General-purpose*
+means it is not tied to one kind of problem; *high-level* means you describe what
+you want in terms close to how you think about it, and Python handles details
+such as memory for you. It is also **interpreted**: you do not compile a program
+before running it - the Python interpreter reads your code and runs it directly.
+
+Python is used almost everywhere software is written:
+
+- **Web backends** - Django, FastAPI and Flask power APIs and websites (this platform's own backend is Django).
+- **Automation** - scripts that rename files, fill spreadsheets, call APIs or send reports.
+- **Data science and AI** - pandas, NumPy, scikit-learn and PyTorch are all Python libraries.
+- **Teaching and research** - its readable syntax makes it a common first language.
+
+## Installing Python
+
+Download Python 3 from python.org (on Windows, tick **Add python.exe to PATH**
+during installation). On macOS and Linux it is often already installed. Check
+the version from a terminal:
+
+```text
+$ python3 --version
+Python 3.12.3
+```
+
+> On Windows the command is usually `python` or `py`, not `python3`.
+
+Any recent Python 3 release works for this course. For an editor, Visual Studio
+Code with the Python extension is a good free choice: it highlights syntax,
+points out mistakes as you type, and runs your file with one click.
+
+## Two ways to run Python
+
+The **interactive interpreter** (the REPL - read, evaluate, print, loop) runs
+one statement at a time and shows the result immediately. Start it by typing
+`python3` with nothing after it. The `>>>` prompt waits for you:
+
+```text
+>>> 2 + 3
+5
+>>> print("Hello, Python!")
+Hello, Python!
+```
+
+It is perfect for trying things out. Type `exit()` to leave.
+
+A **script** is a file of Python code, saved with a `.py` extension, that runs
+from top to bottom. Save this as `hello.py`:
+
+```python
+print("Hello, Python!")
+print("This is my first script.")
+```
+
+Run it from the terminal in the same folder:
+
+```text
+$ python3 hello.py
+Hello, Python!
+This is my first script.
+```
+
+Use the REPL to experiment and scripts for anything you want to keep or run again.
+'''
+
+[[lessons]]
+slug = "syntax-and-errors"
+title = "Syntax, indentation, comments and errors"
+summary = "The rules that make Python code valid, and how to read the messages Python gives you when it is not."
+minutes = 25
+objectives = [
+  "Use indentation to group statements into blocks",
+  "Write comments that explain why, not what",
+  "Tell syntax errors from runtime errors and read a traceback",
+]
+body = '''
+## Statements and indentation
+
+A Python program is a sequence of **statements**, normally one per line. Many
+languages use braces `{ }` to group statements into a block; Python uses
+**indentation** instead. Every line in a block must be indented by the same
+amount - the convention is four spaces:
+
+```python
+temperature = 31
+
+if temperature > 30:
+    print("It is hot today.")
+    print("Drink some water.")
+
+print("This line always runs.")
+```
+
+The two indented lines belong to the `if`; the last line does not. Indentation is
+not decoration in Python - changing it changes what the program means.
+
+## Comments
+
+A `#` starts a **comment**: Python ignores everything after it on that line.
+Good comments explain *why* the code does something, because the code already
+says *what* it does:
+
+```python
+# Prices are stored in cents to avoid floating-point rounding errors.
+price_in_cents = 1999
+```
+
+## Errors are information
+
+Python stops and prints an error when it cannot continue. There are two broad kinds.
+
+A **syntax error** means the code is not valid Python, so nothing runs at all:
+
+```text
+>>> print("Hello"
+  File "<stdin>", line 1
+    print("Hello"
+         ^
+SyntaxError: '(' was never closed
+```
+
+A **runtime error** (an *exception*) happens while a valid program is running:
+
+```text
+>>> print(10 / 0)
+Traceback (most recent call last):
+  File "<stdin>", line 1, in <module>
+ZeroDivisionError: division by zero
+```
+
+Read a traceback from the **bottom up**: the last line names the error type and
+the message; the lines above show where it happened. Common beginner errors are
+`NameError` (a misspelled or undefined variable), `TypeError` (an operation on the
+wrong type, like `"3" + 4`) and `IndentationError`.
+
+> Errors are not a sign that you are bad at programming. Every programmer sees
+> them all day. Read the message - it usually tells you exactly what is wrong.
+'''
+
+[[lessons]]
+slug = "variables-input-output"
+title = "Variables, input, output and basic debugging"
+summary = "Naming values, reading what the user types, printing results clearly and finding your own mistakes."
+minutes = 30
+objectives = [
+  "Create variables and follow Python's naming conventions",
+  "Use constants for values that should not change",
+  "Read text with input() and convert it to numbers",
+  "Print formatted output with f-strings and debug with print()",
+]
+body = '''
+## Variables
+
+A **variable** is a name that refers to a value. You create one by assigning to it
+with `=`:
+
+```python
+name = "Amina"
+age = 21
+height_m = 1.68
+```
+
+Python works out the type from the value - you never declare it. Names may contain
+letters, digits and underscores, cannot start with a digit, and are case-sensitive
+(`age` and `Age` are different). The convention, from Python's style guide PEP 8, is
+`snake_case`: lowercase words joined by underscores. Choose names that say what
+the value *means*: `total_price`, not `tp` or `x`.
+
+## Constants
+
+Python has no special constant type. By convention, a name in `UPPER_CASE` is a
+**constant** - a value the program should never change:
+
+```python
+VAT_RATE = 0.18
+MAX_LOGIN_ATTEMPTS = 5
+```
+
+## Output with print()
+
+`print()` writes values to the screen, separated by spaces. An **f-string** - a
+string with `f` before the quote - puts values straight into text:
+
+```python
+name = "Amina"
+age = 21
+print("Name:", name)
+print(f"{name} is {age} years old.")
+print(f"Next year {name} will be {age + 1}.")
+```
+
+## Input with input()
+
+`input()` shows a prompt, waits for the user to type a line, and returns it as a
+**string** - always a string, even if the user typed digits. Convert it with
+`int()` or `float()` before doing arithmetic:
+
+```python
+name = input("What is your name? ")
+year = int(input("What year were you born? "))
+print(f"Hello, {name}! You turn {2025 - year} this year.")
+```
+
+## Basic debugging
+
+When a program gives the wrong answer, find out what the values really are.
+The simplest tool is to **print them**:
+
+```python
+price = input("Price: ")
+quantity = input("Quantity: ")
+print("DEBUG:", repr(price), repr(quantity))  # shows '5' '3' - strings!
+total = float(price) * int(quantity)
+print(f"Total: {total}")
+```
+
+`repr()` shows a value exactly as Python sees it, quotes included, so you can tell
+the string `'5'` from the number `5`. Change one thing at a time, run again, and
+check whether the output moved closer to what you expected. Remove the debug lines
+when you are done.
+'''
+
+[[exercises]]
+slug = "greeting-card"
+title = "Personal greeting"
+lesson = "variables-input-output"
+difficulty = "easy"
+instructions = '''
+Write a program that reads two lines of input: a person's **name**, then their
+**age** in years. Print exactly two lines:
+
+```text
+Hello, <name>!
+Next year you will be <age + 1>.
+```
+
+For example, the input `Amina` and `21` prints `Hello, Amina!` and
+`Next year you will be 22.`
+'''
+starter = '''
+name = input()
+age = input()
+
+# Print the two lines here.
+'''
+solution = '''
+name = input()
+age = int(input())
+
+print(f"Hello, {name}!")
+print(f"Next year you will be {age + 1}.")
+'''
+hints = [
+  "input() always returns a string - convert the age with int() before adding 1.",
+  "An f-string such as f\"Hello, {name}!\" puts a variable's value inside text.",
+  "Call input() with no prompt text, so nothing extra is printed.",
+]
+
+[[exercises.tests]]
+name = "Amina, 21"
+stdin = "Amina\n21\n"
+expected = "Hello, Amina!\nNext year you will be 22."
+
+[[exercises.tests]]
+name = "A two-word name"
+stdin = "Juma Bakari\n40\n"
+expected = "Hello, Juma Bakari!\nNext year you will be 41."
+hidden = true
+
+[[exercises.tests]]
+name = "Age zero"
+stdin = "Neema\n0\n"
+expected = "Hello, Neema!\nNext year you will be 1."
+hidden = true
+
+[[exercises]]
+slug = "simple-calculator"
+title = "Simple calculator"
+lesson = "variables-input-output"
+difficulty = "easy"
+instructions = '''
+Read two whole numbers, one per line. Print their **sum**, **difference**,
+**product** and **quotient**, one per line, in exactly this format:
+
+```text
+7 + 2 = 9
+7 - 2 = 5
+7 * 2 = 14
+7 / 2 = 3.5
+```
+
+The second number is never zero.
+'''
+starter = '''
+a = int(input())
+b = int(input())
+'''
+solution = '''
+a = int(input())
+b = int(input())
+
+print(f"{a} + {b} = {a + b}")
+print(f"{a} - {b} = {a - b}")
+print(f"{a} * {b} = {a * b}")
+print(f"{a} / {b} = {a / b}")
+'''
+hints = [
+  "Use one f-string per line, for example f\"{a} + {b} = {a + b}\".",
+  "The / operator always gives a float, so 8 / 2 prints as 4.0.",
+]
+
+[[exercises.tests]]
+name = "7 and 2"
+stdin = "7\n2\n"
+expected = "7 + 2 = 9\n7 - 2 = 5\n7 * 2 = 14\n7 / 2 = 3.5"
+
+[[exercises.tests]]
+name = "An even division"
+stdin = "8\n2\n"
+expected = "8 + 2 = 10\n8 - 2 = 6\n8 * 2 = 16\n8 / 2 = 4.0"
+hidden = true
+
+[[exercises.tests]]
+name = "Negative numbers"
+stdin = "-6\n4\n"
+expected = "-6 + 4 = -2\n-6 - 4 = -10\n-6 * 4 = -24\n-6 / 4 = -1.5"
+hidden = true
+
+[quiz]
+title = "Introduction to Python"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does Python use to group statements into a block, such as the body of an if?"
+options = ["Curly braces { }", "Indentation", "The keywords begin and end", "Semicolons"]
+correct = [1]
+explanation = "Python uses indentation - conventionally four spaces - to show which statements belong to a block."
+
+[[quiz.questions]]
+prompt = "What does this print if the user types 5?"
+code = '''
+x = input()
+print(x * 2)
+'''
+options = ["10", "55", "An error", "5 5"]
+correct = [1]
+explanation = "input() returns the string '5', and multiplying a string by 2 repeats it: '55'."
+
+[[quiz.questions]]
+prompt = "Which of these are valid, conventional Python variable names? Choose every one."
+kind = "multiple"
+options = ["total_price", "2nd_place", "user_name", "first-name"]
+correct = [0, 2]
+explanation = "Names cannot start with a digit or contain hyphens. snake_case names such as total_price follow PEP 8."
+
+[[quiz.questions]]
+prompt = "When reading a traceback, where do you find the type of error and its message?"
+options = ["The first line", "The last line", "The middle", "Python does not say"]
+correct = [1]
+explanation = "Read tracebacks bottom-up: the last line names the exception, such as ZeroDivisionError: division by zero."
+
+[[quiz.questions]]
+prompt = "How is a constant written in Python, by convention?"
+options = ["const RATE = 0.18", "RATE = 0.18", "final rate = 0.18", "rate := 0.18"]
+correct = [1]
+explanation = "Python has no constant keyword; an UPPER_CASE name signals a value that should not change."

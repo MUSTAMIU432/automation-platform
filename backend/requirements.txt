@@ -34,3 +34,8 @@ redis==8.1.0
 # The production WSGI server (Render's start command: gunicorn config.wsgi:application).
 # Not used in local development, which runs `manage.py runserver`.
 gunicorn==26.2.0
+# Uploaded files in Cloudflare R2 through its S3-compatible API (config/settings/base.py,
+# ideas/storage.py). django-storages provides the Django `Storage` backend
+# (storages.backends.s3.S3Storage); boto3 is the S3 client it drives.
+django-storages==1.14.6
+boto3==1.43.118

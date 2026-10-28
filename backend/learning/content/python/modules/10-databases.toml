@@ -1,0 +1,390 @@
+position = 10
+slug = "databases-and-sql"
+title = "Databases and SQL"
+summary = "Relational databases from the ground up: SQL, design and normalisation, transactions and constraints, and using PostgreSQL from Python safely."
+objectives = [
+  "Explain tables, rows, keys and relationships",
+  "Write SQL to create, read, update and delete data, including joins",
+  "Use transactions and constraints to keep data correct",
+  "Design and normalise a small schema",
+  "Access PostgreSQL from Python with parameterised queries",
+  "Prevent SQL injection, and explain what an ORM and migrations do",
+]
+project = "Persistent student and course registration system: students, courses and enrollments in PostgreSQL, with constraints that stop double enrollment and over-full courses, accessed through a small Python data layer."
+
+[[lessons]]
+slug = "sql-fundamentals"
+title = "Relational concepts, SQL and database design"
+summary = "Tables and keys, the SQL you will use every day, and designing tables that keep data consistent."
+minutes = 45
+objectives = [
+  "Describe tables, primary keys and foreign keys",
+  "Write CREATE, INSERT, SELECT, UPDATE and DELETE statements",
+  "Join tables and aggregate with GROUP BY",
+  "Use constraints and normalise a schema",
+]
+body = '''
+## Relational databases
+
+A **relational database** stores data in **tables**. Each **row** is one record and
+each **column** one attribute. A **primary key** uniquely identifies each row; a
+**foreign key** points at a row in another table, which is how tables relate.
+**SQL** (Structured Query Language) is how you define and query them. PostgreSQL,
+MySQL and SQLite all speak it, with small differences.
+
+## Creating tables, with constraints
+
+```sql
+CREATE TABLE students (
+    id SERIAL PRIMARY KEY,
+    email TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL
+);
+
+CREATE TABLE courses (
+    id SERIAL PRIMARY KEY,
+    code TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    capacity INTEGER NOT NULL CHECK (capacity > 0)
+);
+
+CREATE TABLE enrollments (
+    student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    course_id INTEGER NOT NULL REFERENCES courses(id),
+    enrolled_on DATE NOT NULL DEFAULT CURRENT_DATE,
+    PRIMARY KEY (student_id, course_id)
+);
+```
+
+**Constraints** make the database refuse bad data, whatever code wrote it:
+`NOT NULL`, `UNIQUE`, `CHECK`, and `REFERENCES` (a foreign key). The composite
+primary key on `enrollments` makes enrolling the same student twice impossible.
+
+## CRUD
+
+The four basic operations - **C**reate, **R**ead, **U**pdate, **D**elete:
+
+```sql
+INSERT INTO students (email, full_name) VALUES ('amina@example.com', 'Amina Juma');
+
+SELECT full_name, email FROM students WHERE email LIKE '%@example.com' ORDER BY full_name;
+
+UPDATE courses SET capacity = 40 WHERE code = 'CS101';
+
+DELETE FROM enrollments WHERE student_id = 1 AND course_id = 2;
+```
+
+> An `UPDATE` or `DELETE` without a `WHERE` changes **every** row. Write the
+> `WHERE` first.
+
+## Joins and aggregates
+
+A **join** combines rows from related tables. `GROUP BY` with an aggregate such as
+`COUNT`, `SUM` or `AVG` summarises groups of rows:
+
+```sql
+SELECT c.code, c.title, COUNT(e.student_id) AS enrolled
+FROM courses AS c
+LEFT JOIN enrollments AS e ON e.course_id = c.id
+GROUP BY c.id, c.code, c.title
+HAVING COUNT(e.student_id) < c.capacity
+ORDER BY enrolled DESC;
+```
+
+`LEFT JOIN` keeps courses with no enrollments (counting 0); an inner `JOIN` would
+drop them. `HAVING` filters groups the way `WHERE` filters rows.
+
+## Designing and normalising
+
+**Normalisation** means storing each fact exactly once. If a `registrations` table
+repeated the course title on every row, renaming a course would mean updating many
+rows - and missing one leaves the data contradicting itself. Instead, split
+repeated facts into their own table and refer to them by key, as `enrollments`
+refers to `courses`. The common rules of thumb:
+
+- every column holds a single value, not a list (first normal form);
+- every non-key column describes the whole key, not part of it (second);
+- non-key columns do not depend on other non-key columns (third).
+
+## Transactions
+
+A **transaction** groups statements so they all succeed or none do. Moving money
+between accounts must never debit one without crediting the other:
+
+```sql
+BEGIN;
+UPDATE accounts SET balance = balance - 500 WHERE id = 1;
+UPDATE accounts SET balance = balance + 500 WHERE id = 2;
+COMMIT;   -- or ROLLBACK; to undo both
+```
+'''
+
+[[lessons]]
+slug = "python-and-postgresql"
+title = "PostgreSQL from Python, SQL injection and ORMs"
+summary = "Connecting with psycopg, running queries safely with parameters, and what ORMs and migrations add."
+minutes = 40
+objectives = [
+  "Connect to PostgreSQL with psycopg and run queries",
+  "Use transactions from Python",
+  "Explain and prevent SQL injection",
+  "Explain what an ORM and migrations do",
+]
+body = '''
+## Connecting with psycopg
+
+**psycopg** (version 3) is the standard PostgreSQL driver for Python - it is what
+this platform's own backend uses. Install it with `pip install "psycopg[binary]"`.
+Read the connection string from the environment, never from source code:
+
+```python
+import os
+import psycopg
+
+with psycopg.connect(os.environ["DATABASE_URL"]) as connection:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, full_name FROM students WHERE email = %s",
+            ("amina@example.com",),
+        )
+        row = cursor.fetchone()
+        print(row)
+```
+
+Leaving the `with connection` block **commits** the transaction if it finished
+cleanly, and **rolls it back** if an exception escaped - so a half-finished
+group of changes is never saved.
+
+## SQL injection
+
+Never build SQL by pasting user input into a string:
+
+```python
+# DANGEROUS - never do this
+email = "x' OR '1'='1"
+query = f"SELECT * FROM students WHERE email = '{email}'"
+print(query)   # the input has rewritten the query to match every student
+```
+
+That is **SQL injection**: input becomes part of the SQL itself. An attacker can
+read, change or delete data they should never touch. The fix is **parameterised
+queries**: write placeholders (`%s` in psycopg, `?` in sqlite3) and pass the values
+separately. The driver sends them as data, so they can never change the query:
+
+```python
+import sqlite3
+
+connection = sqlite3.connect(":memory:")
+connection.execute("CREATE TABLE students (email TEXT, full_name TEXT)")
+connection.execute("INSERT INTO students VALUES (?, ?)", ("amina@example.com", "Amina"))
+
+email = "x' OR '1'='1"
+rows = connection.execute("SELECT * FROM students WHERE email = ?", (email,)).fetchall()
+print(rows)   # [] - the input was treated as an ordinary string
+```
+
+Placeholders work for **values** only. If a table or column name must vary, choose
+it from a fixed allow-list in your code.
+
+## ORMs and migrations
+
+An **ORM** (object-relational mapper) such as SQLAlchemy or Django's ORM maps tables
+to classes and rows to objects, and writes parameterised SQL for you:
+
+```python
+# Django ORM - the same query as above, safely parameterised
+# Student.objects.filter(email="amina@example.com").first()
+```
+
+ORMs save a lot of repetitive code and make injection hard to introduce by
+accident. You still need to understand the SQL they generate - to keep queries
+efficient and to avoid the "N+1" problem of one extra query per row in a loop.
+
+A **migration** is a versioned, repeatable change to the schema - add a table, add a
+column, add a constraint. Tools such as Alembic and Django's `makemigrations` and
+`migrate` create and apply them, so every environment's database ends up with
+exactly the same structure.
+'''
+
+[[exercises]]
+slug = "course-registration"
+title = "Safe course registration"
+lesson = "python-and-postgresql"
+difficulty = "hard"
+instructions = '''
+Using `sqlite3` (the same ideas as PostgreSQL, in memory), write a small
+registration data layer. A connection and these tables are created for you:
+
+```sql
+courses(code TEXT PRIMARY KEY, capacity INTEGER NOT NULL)
+enrollments(student TEXT, code TEXT, PRIMARY KEY (student, code))
+```
+
+Write `enroll(connection, student, code)`, which returns a string:
+
+- `"enrolled"` - the student was added to the course;
+- `"no such course"` - the code does not exist;
+- `"already enrolled"` - the student is already in that course;
+- `"full"` - the course has reached its capacity.
+
+Use **parameterised queries only** (`?` placeholders) - a hidden test tries SQL
+injection. Write `roster(connection, code)` returning the course's students as a
+sorted list.
+'''
+starter = '''
+import sqlite3
+
+
+def setup():
+    connection = sqlite3.connect(":memory:")
+    connection.execute("CREATE TABLE courses (code TEXT PRIMARY KEY, capacity INTEGER NOT NULL)")
+    connection.execute(
+        "CREATE TABLE enrollments (student TEXT, code TEXT, PRIMARY KEY (student, code))"
+    )
+    return connection
+
+
+def enroll(connection, student, code):
+    ...
+
+
+def roster(connection, code):
+    ...
+'''
+solution = '''
+import sqlite3
+
+
+def setup():
+    connection = sqlite3.connect(":memory:")
+    connection.execute("CREATE TABLE courses (code TEXT PRIMARY KEY, capacity INTEGER NOT NULL)")
+    connection.execute(
+        "CREATE TABLE enrollments (student TEXT, code TEXT, PRIMARY KEY (student, code))"
+    )
+    return connection
+
+
+def enroll(connection, student, code):
+    course = connection.execute("SELECT capacity FROM courses WHERE code = ?", (code,)).fetchone()
+    if course is None:
+        return "no such course"
+    taken = connection.execute(
+        "SELECT COUNT(*) FROM enrollments WHERE code = ?", (code,)
+    ).fetchone()[0]
+    try:
+        with connection:
+            if taken >= course[0]:
+                existing = connection.execute(
+                    "SELECT 1 FROM enrollments WHERE student = ? AND code = ?", (student, code)
+                ).fetchone()
+                return "already enrolled" if existing else "full"
+            connection.execute(
+                "INSERT INTO enrollments (student, code) VALUES (?, ?)", (student, code)
+            )
+    except sqlite3.IntegrityError:
+        return "already enrolled"
+    return "enrolled"
+
+
+def roster(connection, code):
+    rows = connection.execute(
+        "SELECT student FROM enrollments WHERE code = ? ORDER BY student", (code,)
+    )
+    return [student for (student,) in rows]
+'''
+hints = [
+  "Look the course up first: SELECT capacity FROM courses WHERE code = ?",
+  "The primary key on (student, code) raises sqlite3.IntegrityError on a duplicate - catch it.",
+  "Compare SELECT COUNT(*) of the course's enrollments with its capacity.",
+]
+
+[[exercises.tests]]
+name = "Enroll, then a duplicate"
+call = '''
+db = setup()
+db.execute("INSERT INTO courses VALUES ('CS101', 2)")
+print(enroll(db, "amina", "CS101"), enroll(db, "amina", "CS101"), enroll(db, "juma", "MA200"))
+'''
+expected = "enrolled already enrolled no such course"
+
+[[exercises.tests]]
+name = "Capacity and roster"
+call = '''
+db = setup()
+db.execute("INSERT INTO courses VALUES ('CS101', 2)")
+print([enroll(db, s, "CS101") for s in ("neema", "baraka", "zuri")])
+print(roster(db, "CS101"))
+'''
+expected = "['enrolled', 'enrolled', 'full']\n['baraka', 'neema']"
+hidden = true
+
+[[exercises.tests]]
+name = "SQL injection is just a strange name"
+call = '''
+db = setup()
+db.execute("INSERT INTO courses VALUES ('CS101', 5)")
+print(enroll(db, "x'); DELETE FROM courses; --", "CS101"))
+print(enroll(db, "amina", "CS101' OR '1'='1"))
+print(db.execute("SELECT COUNT(*) FROM courses").fetchone()[0], roster(db, "CS101"))
+'''
+expected = "enrolled\nno such course\n1 [\"x'); DELETE FROM courses; --\"]"
+hidden = true
+
+[quiz]
+title = "Databases and SQL"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does a foreign key do?"
+options = [
+  "Encrypts a column",
+  "Refers to a row in another table, so related rows stay consistent",
+  "Makes a column unique",
+  "Speeds up every query",
+]
+correct = [1]
+explanation = "A foreign key references another table's key; the database refuses values that point at nothing."
+
+[[quiz.questions]]
+prompt = "Which query is safe from SQL injection?"
+options = [
+  "cursor.execute(f\"SELECT * FROM users WHERE name = '{name}'\")",
+  "cursor.execute(\"SELECT * FROM users WHERE name = '\" + name + \"'\")",
+  "cursor.execute(\"SELECT * FROM users WHERE name = %s\", (name,))",
+  "cursor.execute(\"SELECT * FROM users WHERE name = %s\" % name)",
+]
+correct = [2]
+explanation = "Only the parameterised form sends the value separately from the SQL. Formatting the value into the string - with f-strings, + or % - is injectable."
+
+[[quiz.questions]]
+prompt = "What does a transaction guarantee?"
+options = [
+  "Queries run faster",
+  "Its statements all take effect, or none of them do",
+  "Data is backed up",
+  "Only one user can connect",
+]
+correct = [1]
+explanation = "A transaction is atomic: COMMIT applies every change; ROLLBACK, or an error, applies none."
+
+[[quiz.questions]]
+prompt = "A LEFT JOIN from courses to enrollments…"
+options = [
+  "Drops courses with no enrollments",
+  "Keeps every course, with NULLs where there is no matching enrollment",
+  "Returns only enrollments",
+  "Is the same as an inner JOIN",
+]
+correct = [1]
+explanation = "A LEFT JOIN keeps every row of the left table even without a match."
+
+[[quiz.questions]]
+prompt = "What is the goal of normalisation?"
+options = [
+  "Store each fact exactly once, so data cannot contradict itself",
+  "Put all data in one table",
+  "Make every column a number",
+  "Remove primary keys",
+]
+correct = [0]
+explanation = "Normalisation removes duplicated facts by splitting them into related tables."

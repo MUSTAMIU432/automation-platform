@@ -48,6 +48,7 @@ from django.contrib.auth.models import Group
 from django.contrib.auth.models import Permission as AuthPermission
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from administration import authorization
@@ -459,11 +460,13 @@ def _platform_admin_group() -> Group:
     both actions would be individually authorized.
     """
     group, _ = Group.objects.get_or_create(name=PLATFORM_ADMIN_GROUP)
-    codenames = [code.split('.', 1)[1] for code in authorization.CONSOLE_PERMISSIONS]
-    permissions = AuthPermission.objects.filter(
-        content_type__app_label='administration', codename__in=codenames
-    )
-    if permissions.count() != len(codenames):
+    # Each permission by its own app: most are the console's, `MANAGE_COURSES` is Learning's.
+    query = Q()
+    for code in authorization.CONSOLE_PERMISSIONS:
+        app_label, codename = code.split('.', 1)
+        query |= Q(content_type__app_label=app_label, codename=codename)
+    permissions = AuthPermission.objects.filter(query)
+    if permissions.count() != len(authorization.CONSOLE_PERMISSIONS):
         raise AdministrationError('The administration permissions are missing. Run migrate first.')
     group.permissions.add(*permissions)
     return group

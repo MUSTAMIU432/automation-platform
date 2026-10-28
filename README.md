@@ -73,6 +73,8 @@ use yet.
 - [`docs/git-workflow.md`](docs/git-workflow.md) — branches and pull requests
 - [`docs/environments.md`](docs/environments.md) — environment variables and
   environments
+- [`docs/learning.md`](docs/learning.md) — the learning area: courses, the
+  authoring console, the Python course and the code-execution sandbox
 - [`docs/ideas-domain.md`](docs/ideas-domain.md) — the ideas & problem
   submission domain: entities, lifecycle, visibility and boundaries
 

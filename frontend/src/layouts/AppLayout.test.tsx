@@ -203,14 +203,22 @@ describe('AppLayout', () => {
     renderAt('/app')
 
     const nav = within(screen.getByRole('navigation', { name: 'Main' }))
-    for (const section of ['1 · Start', '2 · Your people', '3 · Idea to solution', '4 · Market']) {
+    for (const section of [
+      '1 · Start',
+      '2 · Your people',
+      '3 · Idea to solution',
+      '4 · Market',
+      '5 · Learn',
+    ]) {
       expect(nav.getByText(section)).toBeInTheDocument()
     }
     const order = nav.getAllByRole('link').map((link) => link.textContent)
     expect(order.indexOf('Dashboard')).toBe(0)
     expect(order.indexOf('Ideas')).toBeLessThan(order.indexOf('Automation'))
     expect(order.indexOf('Automation')).toBeLessThan(order.indexOf('Implementation'))
-    expect(order.at(-1)).toBe('Marketplace')
+    // The journey ends at the market; learning sits beside it, in its own section after.
+    expect(order.at(-2)).toBe('Marketplace')
+    expect(order.at(-1)).toBe('Learning')
     expect(nav.getByRole('link', { name: 'Implementation' })).toHaveAttribute(
       'href',
       '/app/automation/projects',

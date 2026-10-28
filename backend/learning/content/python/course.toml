@@ -1,0 +1,76 @@
+# Python Programming: Beginner to Advanced.
+#
+# One file per module lives in modules/ and is loaded in position order. Run
+# `python manage.py seed_python_course` after editing (add --publish the first
+# time). See learning/content.py for the format.
+
+slug = "python-programming"
+title = "Python Programming: Beginner to Advanced"
+subtitle = "Learn Python through structured lessons, hands-on coding exercises, projects, and practical assessments."
+level = "all_levels"
+estimated_hours = 60
+description = '''
+Start from your first `print()` and finish by designing, testing and deploying a
+real backend service. Twelve modules take you from variables and loops through
+data structures, functions and object-oriented design, to files, testing,
+databases and web APIs - each with lessons, runnable examples, coding exercises
+graded by hidden tests, and a quiz. The course ends with a capstone project you
+build, test and document yourself.
+'''
+audience = [
+  "Complete beginners writing their first program",
+  "University students taking or revising a programming course",
+  "Software developers adding Python to the languages they know",
+  "Anyone preparing for backend development, automation, AI or data science",
+]
+outcomes = [
+  "Write clear, idiomatic Python programs from a blank file",
+  "Choose the right data structure for a problem and explain why",
+  "Organise code into functions, modules and classes that are easy to change",
+  "Handle errors and files safely, and work with JSON and CSV data",
+  "Use generators, decorators, closures and type hints with confidence",
+  "Test code with pytest, use logging, and keep code formatted and linted",
+  "Store data in PostgreSQL safely, without SQL injection",
+  "Build a validated, authenticated REST API with FastAPI",
+  "Configure, containerise and deploy a Python service responsibly",
+]
+
+[capstone]
+brief = '''
+Build one complete project on your own, as you would at work: a working
+application, its source code in a repository, automated tests, documentation,
+and a short explanation of the design decisions you made and why.
+'''
+requirements = [
+  "A public or shareable repository containing all source code",
+  "Automated tests (pytest) that pass, covering the core behaviour and its edge cases",
+  "A README that explains what the project does and how to install, run and test it",
+  "Configuration read from the environment, with no secrets committed",
+  "Input validation and clear error handling at every boundary",
+  "A short explanation of your design decisions, trade-offs and what you would do next",
+]
+
+[[capstone.options]]
+key = "inventory"
+title = "Inventory management system"
+summary = "Products, stock levels and movements, with low-stock reports and CSV import/export."
+
+[[capstone.options]]
+key = "student-api"
+title = "Student management API"
+summary = "A FastAPI service for students, courses and grades, with authentication and PostgreSQL."
+
+[[capstone.options]]
+key = "expenses"
+title = "Expense tracking application"
+summary = "Record, categorise and summarise expenses by month, with budgets and JSON/CSV export."
+
+[[capstone.options]]
+key = "automation"
+title = "Task automation service"
+summary = "A service that runs scheduled jobs - file processing, reports or API sync - with logging and retries."
+
+[[capstone.options]]
+key = "registration"
+title = "Course registration backend"
+summary = "Courses, sections, capacity and waitlists, with transactional enrollment in PostgreSQL."

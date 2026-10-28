@@ -31,6 +31,10 @@ from identity.schema import Mutation as IdentityMutation
 from identity.schema import Query as IdentityQuery
 from invitations.schema import Mutation as InvitationsMutation
 from invitations.schema import Query as InvitationsQuery
+from learning.authoring_schema import Mutation as CourseAuthoringMutation
+from learning.authoring_schema import Query as CourseAuthoringQuery
+from learning.schema import Mutation as LearningMutation
+from learning.schema import Query as LearningQuery
 from marketplace.schema import Mutation as MarketplaceMutation
 from marketplace.schema import Query as MarketplaceQuery
 from messaging.schema import Mutation as MessagingMutation
@@ -89,6 +93,8 @@ class Query(
     DeliveryQuery,
     ImplementationQuery,
     MarketplaceQuery,
+    LearningQuery,
+    CourseAuthoringQuery,
     AdministrationQuery,
     PlatformRolesQuery,
     WebsiteQuery,
@@ -128,6 +134,8 @@ class Mutation(
     DeliveryMutation,
     ImplementationMutation,
     MarketplaceMutation,
+    LearningMutation,
+    CourseAuthoringMutation,
     AdministrationMutation,
     PlatformRolesMutation,
 ):

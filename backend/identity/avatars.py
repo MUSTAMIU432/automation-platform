@@ -14,6 +14,7 @@ import hashlib
 import logging
 import uuid
 
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.core.files.base import File
 from django.core.files.storage import storages
@@ -22,6 +23,9 @@ from identity.models import User
 
 logger = logging.getLogger(__name__)
 
+# A storage failure on either backend: `OSError` from the filesystem, botocore's
+# own exceptions (not `OSError`) from R2. See `ideas.storage.STORAGE_ERRORS`.
+STORAGE_ERRORS = (OSError, BotoCoreError, ClientError)
 
 _TYPES = (
     ('.jpg', 'image/jpeg'),
@@ -71,7 +75,7 @@ def set_avatar(user: User, uploaded) -> User:
     key = f'avatars/{user.pk}/{uuid.uuid4().hex}{extension}'
     try:
         stored_key = storage.save(key, File(uploaded))
-    except OSError:
+    except STORAGE_ERRORS:
         logger.exception('Could not store avatar for user %s', user.pk)
         raise AvatarError('We could not save your photo. Please try again.') from None
 
@@ -97,5 +101,5 @@ def _delete(key: str) -> None:
         storage = storages['attachments']
         if storage.exists(key):
             storage.delete(key)
-    except OSError:
+    except STORAGE_ERRORS:
         logger.warning('Could not delete avatar object %r', key, exc_info=True)

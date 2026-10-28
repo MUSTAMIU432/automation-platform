@@ -23,6 +23,7 @@ from config.views import health
 from graphql_api.views import graphql_view
 from ideas.views import download_attachment_view, upload_attachment_view
 from identity.views import avatar_view, user_avatar_view
+from learning.views import download_material_view, upload_material_view
 from marketplace.views import document_view as market_document_view
 from marketplace.views import gateway_callback_view as market_gateway_callback_view
 from reviews.views import admin_proposal_pdf_view
@@ -69,6 +70,18 @@ urlpatterns = [
         'marketplace/ideas/<int:idea_id>/document/',
         market_document_view,
         name='market-idea-document',
+    ),
+    # Lesson files: uploaded by a course manager, downloaded by the lesson's learners.
+    # See `learning/views.py`.
+    path(
+        'learning/lessons/<int:lesson_id>/materials/',
+        upload_material_view,
+        name='learning-material-upload',
+    ),
+    path(
+        'learning/materials/<int:material_id>/download/',
+        download_material_view,
+        name='learning-material-download',
     ),
     # The payment gateway's report of a phone payment's outcome. Server to server: not in
     # CORS. See `marketplace/gateways.py`.

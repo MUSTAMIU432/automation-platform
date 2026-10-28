@@ -1,0 +1,365 @@
+position = 3
+slug = "control-flow"
+title = "Control Flow"
+summary = "Making decisions with if, repeating work with for and while, and steering loops with break, continue and pass."
+objectives = [
+  "Branch with if, elif and else",
+  "Repeat work with for loops over sequences and ranges",
+  "Use while loops for repetition with an unknown count",
+  "Control loops with break, continue and pass",
+  "Validate user input with a loop",
+]
+project = "Quiz application and number-guessing game: ask questions and keep score, and let the player guess a secret number with higher/lower hints."
+
+[[lessons]]
+slug = "conditionals"
+title = "Making decisions: if, elif and else"
+summary = "Running code only when a condition holds, and choosing between several paths."
+minutes = 25
+objectives = [
+  "Write if, elif and else chains",
+  "Order conditions so the right branch runs",
+  "Use conditional expressions for simple choices",
+]
+body = '''
+## if
+
+An `if` statement runs its block only when its condition is truthy:
+
+```python
+balance = 120
+price = 80
+
+if balance >= price:
+    balance -= price
+    print("Purchase complete.")
+print(f"Balance: {balance}")
+```
+
+## elif and else
+
+`elif` ("else if") adds more conditions; `else` catches everything left over.
+Python checks the conditions **top to bottom** and runs only the **first** block
+whose condition is true:
+
+```python
+temperature = 24
+
+if temperature >= 30:
+    advice = "Stay in the shade."
+elif temperature >= 20:
+    advice = "A perfect day."
+elif temperature >= 10:
+    advice = "Bring a jacket."
+else:
+    advice = "It is cold - dress warmly."
+
+print(advice)
+```
+
+Because only the first match runs, order matters: if `>= 10` came first, a
+24-degree day would get the jacket advice.
+
+## Nested conditions
+
+A block can contain another `if`. Keep nesting shallow - two levels is usually
+the most a reader can follow; beyond that, combine conditions with `and` or split
+the work into functions:
+
+```python
+is_member = True
+total = 150
+
+if total >= 100:
+    if is_member:
+        discount = 0.15
+    else:
+        discount = 0.05
+else:
+    discount = 0
+
+print(f"Discount: {discount:.0%}")
+```
+
+## Conditional expressions
+
+For a simple choice between two values, a **conditional expression** fits on one line:
+
+```python
+age = 16
+status = "adult" if age >= 18 else "minor"
+print(status)
+```
+
+## match (Python 3.10+)
+
+When one value is compared against several literal options, `match` can read
+more clearly than a long `elif` chain:
+
+```python
+command = "stop"
+
+match command:
+    case "start":
+        print("Starting.")
+    case "stop" | "quit":
+        print("Stopping.")
+    case _:
+        print("Unknown command.")
+```
+'''
+
+[[lessons]]
+slug = "loops"
+title = "Loops: for, while, break and continue"
+summary = "Repeating work over a sequence or until a condition changes, and validating input."
+minutes = 35
+objectives = [
+  "Loop over sequences and ranges with for",
+  "Loop until a condition changes with while",
+  "Use break, continue and pass correctly",
+  "Write nested loops and an input-validation loop",
+]
+body = '''
+## for loops
+
+A `for` loop runs its block once for each item in a sequence:
+
+```python
+for city in ["Dodoma", "Mwanza", "Arusha"]:
+    print(f"Visiting {city}")
+```
+
+`range()` produces numbers: `range(5)` is 0 to 4, `range(1, 6)` is 1 to 5, and
+`range(0, 10, 2)` counts in steps of 2. When you need the position too, use
+`enumerate()` rather than counting yourself:
+
+```python
+total = 0
+for n in range(1, 6):
+    total += n
+print(total)   # 15
+
+for index, fruit in enumerate(["mango", "banana"], start=1):
+    print(index, fruit)
+```
+
+## while loops
+
+A `while` loop repeats as long as its condition is true. Use it when you do not
+know in advance how many times to repeat:
+
+```python
+balance = 1000
+years = 0
+while balance < 2000:
+    balance *= 1.08
+    years += 1
+print(f"Doubled after {years} years")
+```
+
+Make sure something inside the loop eventually makes the condition false - or
+the loop never ends.
+
+## break, continue and pass
+
+- `break` leaves the loop immediately.
+- `continue` skips the rest of this iteration and moves to the next.
+- `pass` does nothing; it holds a place where Python needs a statement.
+
+```python
+for n in range(1, 20):
+    if n % 2 == 0:
+        continue          # skip even numbers
+    if n > 9:
+        break             # stop once past 9
+    print(n, end=" ")     # 1 3 5 7 9
+print()
+```
+
+## Nested loops
+
+A loop inside a loop runs the inner loop completely for each pass of the outer one:
+
+```python
+for row in range(1, 4):
+    line = ""
+    for col in range(1, 4):
+        line += f"{row * col:4}"
+    print(line)
+```
+
+## Validating input
+
+A `while True` loop with `break` keeps asking until the input is acceptable:
+
+```python
+while True:
+    text = input("Enter your age: ")
+    if text.isdigit() and 0 < int(text) < 130:
+        age = int(text)
+        break
+    print("Please enter a whole number between 1 and 129.")
+
+print(f"Thanks - you are {age}.")
+```
+'''
+
+[[exercises]]
+slug = "fizzbuzz"
+title = "FizzBuzz"
+lesson = "loops"
+difficulty = "easy"
+instructions = '''
+Read a whole number `n`. Print the numbers from 1 to `n`, one per line, except:
+
+- for multiples of 3, print `Fizz` instead of the number;
+- for multiples of 5, print `Buzz`;
+- for multiples of both 3 and 5, print `FizzBuzz`.
+'''
+starter = '''
+n = int(input())
+'''
+solution = '''
+n = int(input())
+
+for i in range(1, n + 1):
+    if i % 15 == 0:
+        print("FizzBuzz")
+    elif i % 3 == 0:
+        print("Fizz")
+    elif i % 5 == 0:
+        print("Buzz")
+    else:
+        print(i)
+'''
+hints = [
+  "range(1, n + 1) goes from 1 up to and including n.",
+  "Check for multiples of both 3 and 5 first - otherwise 15 would print Fizz.",
+]
+
+[[exercises.tests]]
+name = "n = 5"
+stdin = "5\n"
+expected = "1\n2\nFizz\n4\nBuzz"
+
+[[exercises.tests]]
+name = "n = 15"
+stdin = "15\n"
+expected = "1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz"
+hidden = true
+
+[[exercises.tests]]
+name = "n = 1"
+stdin = "1\n"
+expected = "1"
+hidden = true
+
+[[exercises]]
+slug = "guessing-game"
+title = "Number-guessing game"
+lesson = "loops"
+difficulty = "medium"
+instructions = '''
+Build the core of a guessing game. The first input line is the **secret**
+number. Every line after it is one **guess**. For each guess, print:
+
+- `Too low` if it is below the secret,
+- `Too high` if it is above it,
+- `Correct! Guesses: N` (N counts valid guesses) when it matches - then stop reading.
+
+If a line is not a whole number, print `Please enter a whole number.` - it does
+not count as a guess. There is always a correct guess eventually.
+'''
+starter = '''
+secret = int(input())
+'''
+solution = '''
+secret = int(input())
+guesses = 0
+
+while True:
+    text = input().strip()
+    if not text.lstrip("-").isdigit():
+        print("Please enter a whole number.")
+        continue
+    guesses += 1
+    guess = int(text)
+    if guess < secret:
+        print("Too low")
+    elif guess > secret:
+        print("Too high")
+    else:
+        print(f"Correct! Guesses: {guesses}")
+        break
+'''
+hints = [
+  "Use while True: and break out of the loop on the correct guess.",
+  "str.isdigit() tells you whether a string is made only of digits - check before calling int().",
+  "Only count a guess after you know it is a valid number.",
+]
+
+[[exercises.tests]]
+name = "Three guesses"
+stdin = "42\n50\n25\n42\n"
+expected = "Too high\nToo low\nCorrect! Guesses: 3"
+
+[[exercises.tests]]
+name = "An invalid line is not a guess"
+stdin = "7\nseven\n7\n"
+expected = "Please enter a whole number.\nCorrect! Guesses: 1"
+hidden = true
+
+[[exercises.tests]]
+name = "Stops after the correct guess"
+stdin = "3\n1\n2\n3\n4\n"
+expected = "Too low\nToo low\nCorrect! Guesses: 3"
+hidden = true
+
+[quiz]
+title = "Control Flow"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does this print?"
+code = '''
+score = 85
+if score >= 50:
+    print("Pass")
+elif score >= 80:
+    print("Distinction")
+else:
+    print("Fail")
+'''
+options = ["Pass", "Distinction", "Pass and Distinction", "Fail"]
+correct = [0]
+explanation = "Only the first true branch runs. score >= 50 is checked first, so Distinction is never reached - the conditions are in the wrong order."
+
+[[quiz.questions]]
+prompt = "Which numbers does range(2, 10, 3) produce?"
+options = ["2, 5, 8", "2, 5, 8, 11", "3, 6, 9", "2, 4, 6, 8"]
+correct = [0]
+explanation = "Start at 2, add 3 each time, stop before 10: 2, 5, 8."
+
+[[quiz.questions]]
+prompt = "What does continue do inside a loop?"
+options = ["Ends the loop", "Skips the rest of the current iteration", "Does nothing", "Restarts the loop from the beginning"]
+correct = [1]
+explanation = "continue jumps to the next iteration; break ends the loop; pass does nothing."
+
+[[quiz.questions]]
+prompt = "When is a while loop a better choice than a for loop?"
+options = ["When looping over a list", "When you do not know in advance how many times to repeat", "Never - for is always better", "When counting from 1 to 10"]
+correct = [1]
+explanation = "for suits a known sequence; while suits repetition until a condition changes, such as valid input."
+
+[[quiz.questions]]
+prompt = "How many lines does this print?"
+code = '''
+for i in range(3):
+    for j in range(2):
+        print(i, j)
+'''
+options = ["5", "6", "3", "2"]
+correct = [1]
+explanation = "The inner loop runs twice for each of the outer loop's three passes: 3 x 2 = 6."

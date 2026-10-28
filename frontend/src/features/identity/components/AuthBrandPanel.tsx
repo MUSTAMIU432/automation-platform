@@ -4,10 +4,30 @@ import { BulbGlyph, CheckGlyph, GearGlyph, LayersGlyph } from '../../../componen
 import { Logo } from '../../../components/Logo'
 
 const JOURNEY_STEPS = [
-  { title: 'Discover', description: 'Describe a real-world problem.', Glyph: BulbGlyph },
-  { title: 'Validate', description: 'Clarify the need and refine the idea.', Glyph: CheckGlyph },
-  { title: 'Build', description: 'Organize requirements and tasks.', Glyph: GearGlyph },
-  { title: 'Measure', description: 'Review progress and outcomes.', Glyph: LayersGlyph },
+  {
+    title: 'Discover',
+    description:
+      'Describe a real-world problem your team or community faces: who it affects, how often it happens and what it costs today.',
+    Glyph: BulbGlyph,
+  },
+  {
+    title: 'Validate',
+    description:
+      'Reviewers help clarify the need, test the idea against real requirements and refine it into a clear, approved proposal.',
+    Glyph: CheckGlyph,
+  },
+  {
+    title: 'Build',
+    description:
+      'An approved idea becomes a project, with organized requirements, assigned tasks and a delivery team building the solution.',
+    Glyph: GearGlyph,
+  },
+  {
+    title: 'Measure',
+    description:
+      'Track progress, review outcomes and confirm the finished solution really solves the problem it started from.',
+    Glyph: LayersGlyph,
+  },
 ]
 
 /**
@@ -43,15 +63,16 @@ export function AuthBrandPanel() {
           Solutions
         </span>
       </h2>
-      <p className="mx-auto mt-5 hidden max-w-md text-base leading-relaxed text-white/80 lg:mx-0 lg:block">
+      <p className="mx-auto mt-5 hidden max-w-xl text-base leading-relaxed text-white/80 lg:mx-0 lg:block">
         Turn real-world problems into structured requirements, collaborative projects and practical
-        digital solutions.
+        digital solutions. Share an idea, have it reviewed by the right people, and follow it all
+        the way from a first description to a working result you can measure.
       </p>
       <ul className="mt-10 hidden max-w-xl gap-3 lg:grid xl:grid-cols-2 xl:gap-4">
         {JOURNEY_STEPS.map(({ title, description, Glyph }, index) => (
           <li
             key={title}
-            className="flex items-center gap-3 rounded-2xl border border-white/20 bg-[linear-gradient(145deg,rgba(255,255,255,0.14),rgba(255,255,255,0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_20px_40px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md"
+            className="flex items-start gap-3 rounded-2xl border border-white/20 bg-[linear-gradient(145deg,rgba(255,255,255,0.14),rgba(255,255,255,0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_20px_40px_-24px_rgba(0,0,0,0.8)] backdrop-blur-md"
           >
             <span
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),rgba(85,230,176,0.12))] text-white motion-safe:animate-[pulse-glow_3.5s_ease-in-out_infinite]"

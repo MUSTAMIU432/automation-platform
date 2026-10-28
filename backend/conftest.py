@@ -45,3 +45,21 @@ def _fast_password_hasher(settings):
     fixture.
     """
     settings.PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
+
+@pytest.fixture(autouse=True)
+def _local_file_storage(settings, tmp_path):
+    """
+    Keep every test's uploaded files in its own temporary directory.
+
+    A developer's backend/.env may hold real R2 credentials, which switch the
+    `default` and `attachments` storages to the bucket (config/settings/base.py).
+    Without this, a test that uploads without choosing its own storage would
+    write to that bucket. Tests that exercise R2 replace this with an
+    in-process fake (ideas/tests/test_r2_storage.py).
+    """
+    local = {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+        'OPTIONS': {'location': str(tmp_path)},
+    }
+    settings.STORAGES = {**settings.STORAGES, 'default': local, 'attachments': local}

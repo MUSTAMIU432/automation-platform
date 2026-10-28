@@ -1,0 +1,537 @@
+position = 11
+slug = "apis-and-backend"
+title = "APIs and Backend Development"
+summary = "How the web talks - HTTP, REST and JSON - and building a validated, authenticated, tested API with FastAPI and PostgreSQL."
+objectives = [
+  "Explain HTTP requests and responses, status codes and REST design",
+  "Build FastAPI routes with Pydantic validation and dependency injection",
+  "Connect an API to PostgreSQL",
+  "Hash passwords, authenticate requests and keep configuration secure",
+  "Handle errors, paginate and filter, and test and document an API",
+  "Explain how Django and GraphQL fit together in a platform such as this one",
+]
+project = "Secure course management REST API: courses and students with create/read/update/delete endpoints, validation, PostgreSQL storage, hashed passwords and token authentication, pagination and filtering, and a pytest suite."
+
+[[lessons]]
+slug = "http-rest-json"
+title = "HTTP, REST and JSON"
+summary = "The request/response cycle every API is built on, and the conventions that make an API predictable."
+minutes = 30
+objectives = [
+  "Describe an HTTP request and response",
+  "Choose the right method and status code",
+  "Design resource-oriented REST URLs",
+  "Call an API from Python",
+]
+body = '''
+## Requests and responses
+
+Every interaction on the web is an **HTTP request** answered by an **HTTP
+response**. A request has a **method**, a **URL**, **headers** and sometimes a
+**body**; a response has a **status code**, headers and usually a body - for APIs,
+almost always **JSON**.
+
+```text
+POST /courses HTTP/1.1
+Host: api.example.com
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOi...
+
+{"code": "CS101", "title": "Intro to Python", "capacity": 40}
+```
+
+```text
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{"id": 7, "code": "CS101", "title": "Intro to Python", "capacity": 40}
+```
+
+## Methods and status codes
+
+- `GET` reads, `POST` creates, `PUT` replaces, `PATCH` partly updates, `DELETE` removes.
+- `GET` must never change data, and `PUT` and `DELETE` should be **idempotent** - repeating them has the same effect as doing them once.
+
+Status codes tell the client what happened: `200 OK`, `201 Created`,
+`204 No Content`; `400 Bad Request`, `401 Unauthorized` (not signed in),
+`403 Forbidden` (signed in, not allowed), `404 Not Found`, `409 Conflict`,
+`422 Unprocessable Entity` (invalid data); `500 Internal Server Error` is always
+the server's fault.
+
+## REST
+
+**REST** organises an API around **resources** named by nouns, with the method
+saying what to do:
+
+```text
+GET    /courses            list courses (?page=2&level=beginner)
+POST   /courses            create a course
+GET    /courses/7          one course
+PATCH  /courses/7          update part of it
+DELETE /courses/7          delete it
+GET    /courses/7/students the students in course 7
+```
+
+## Calling an API from Python
+
+The `requests` library makes HTTP calls simple. Always set a timeout, and check
+the status before trusting the body:
+
+```python
+import requests
+
+response = requests.get(
+    "https://api.example.com/courses",
+    params={"level": "beginner"},
+    timeout=10,
+)
+response.raise_for_status()          # raises for 4xx and 5xx
+for course in response.json()["items"]:
+    print(course["code"], course["title"])
+```
+'''
+
+[[lessons]]
+slug = "fastapi"
+title = "Building APIs with FastAPI, Pydantic and PostgreSQL"
+summary = "Routes, validation with Pydantic models, dependency injection, a database, errors, pagination and tests."
+minutes = 50
+objectives = [
+  "Define FastAPI routes with path and query parameters",
+  "Validate request and response bodies with Pydantic",
+  "Share resources such as a database session with dependency injection",
+  "Return proper errors, paginate and filter, and test the API",
+]
+body = '''
+## A first API
+
+**FastAPI** builds APIs from type-hinted Python functions. Install it with
+`pip install "fastapi[standard]"`, save this as `main.py` and run
+`fastapi dev main.py`:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI(title="Course API")
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+```
+
+FastAPI generates interactive documentation for every route at `/docs`, from your
+code and type hints - documentation that cannot drift out of date.
+
+## Validation with Pydantic
+
+A **Pydantic** model describes the shape of data. FastAPI validates every request
+body against it and answers `422` with a precise error when the data is wrong -
+before your function runs:
+
+```python
+from pydantic import BaseModel, Field
+
+class CourseIn(BaseModel):
+    code: str = Field(pattern=r"^[A-Z]{2,4}\d{3}$")
+    title: str = Field(min_length=3, max_length=200)
+    capacity: int = Field(gt=0, le=500)
+
+class CourseOut(CourseIn):
+    id: int
+```
+
+Separate input and output models let you accept only what clients may set and
+return only what they may see - never a password hash, for example.
+
+## Routes, errors and dependency injection
+
+```python
+from fastapi import Depends, FastAPI, HTTPException, Query, status
+
+app = FastAPI()
+COURSES: dict[int, dict] = {}
+
+def get_store() -> dict[int, dict]:
+    return COURSES       # in a real app: a database session
+
+@app.post("/courses", status_code=status.HTTP_201_CREATED, response_model=CourseOut)
+def create_course(course: CourseIn, store: dict = Depends(get_store)):
+    if any(existing["code"] == course.code for existing in store.values()):
+        raise HTTPException(status.HTTP_409_CONFLICT, "That course code is taken.")
+    course_id = len(store) + 1
+    store[course_id] = {"id": course_id, **course.model_dump()}
+    return store[course_id]
+
+@app.get("/courses/{course_id}", response_model=CourseOut)
+def get_course(course_id: int, store: dict = Depends(get_store)):
+    if course_id not in store:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "No such course.")
+    return store[course_id]
+
+@app.get("/courses")
+def list_courses(
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    search: str = "",
+    store: dict = Depends(get_store),
+):
+    matches = [c for c in store.values() if search.lower() in c["title"].lower()]
+    start = (page - 1) * size
+    return {"items": matches[start : start + size], "total": len(matches), "page": page}
+```
+
+`Depends(...)` is **dependency injection**: FastAPI calls `get_store` and passes the
+result in. In tests you can override a dependency with a fake, and in production
+the same mechanism provides the database session and the current user.
+
+Always **paginate** list endpoints (cap the page size) and validate filters, so one
+request can never ask the server for everything at once.
+
+## PostgreSQL integration
+
+In a real service, the dependency yields a database session (SQLAlchemy is the
+usual choice with FastAPI) and closes it when the request ends:
+
+```python
+import os
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
+
+engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True)
+
+def get_session():
+    with Session(engine) as session:
+        yield session
+```
+
+## Testing the API
+
+FastAPI's `TestClient` calls the app in-process - no server needed:
+
+```python
+from fastapi.testclient import TestClient
+
+client = TestClient(app)
+
+def test_create_then_read_course():
+    created = client.post("/courses", json={"code": "CS101", "title": "Python", "capacity": 30})
+    assert created.status_code == 201
+    assert client.get(f"/courses/{created.json()['id']}").json()["code"] == "CS101"
+
+def test_invalid_capacity_is_rejected():
+    response = client.post("/courses", json={"code": "CS102", "title": "Web", "capacity": 0})
+    assert response.status_code == 422
+```
+'''
+
+[[lessons]]
+slug = "auth-security-integration"
+title = "Authentication, security and integrating with Django and GraphQL"
+summary = "Hashing passwords, token authentication and authorization, secure configuration, and how Python services join an existing platform."
+minutes = 40
+objectives = [
+  "Hash and verify passwords correctly",
+  "Explain token authentication and the difference from authorization",
+  "Keep secrets out of code",
+  "Describe how Django and GraphQL serve this platform's API",
+]
+body = '''
+## Passwords are hashed, never stored
+
+Store a **hash** of a password, never the password itself. A password hash must be
+**slow** and **salted** - a random salt per user means identical passwords produce
+different hashes, and slowness makes guessing expensive. Use a dedicated algorithm
+such as Argon2, bcrypt or PBKDF2, never a plain fast hash like SHA-256:
+
+```python
+import hashlib
+import hmac
+import secrets
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 600_000)
+    return f"{salt.hex()}${digest.hex()}"
+
+def verify_password(password: str, stored: str) -> bool:
+    salt_hex, digest_hex = stored.split("$")
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt_hex), 600_000)
+    return hmac.compare_digest(digest.hex(), digest_hex)
+```
+
+`hmac.compare_digest` compares in constant time, so response timing reveals nothing
+about how much of a guess was right. In production, prefer a maintained library
+(Django and passlib/pwdlib do this for you).
+
+## Authentication and authorization
+
+**Authentication** answers *who are you?*; **authorization** answers *what may you
+do?* A common API pattern: the client signs in once, receives a short-lived signed
+**token** (often a JWT), and sends it on every request as
+`Authorization: Bearer <token>`. A FastAPI dependency checks the token and returns
+the current user; each route then checks that this user may act on this resource -
+for example, that a student may read only their own grades. Answer `401` when the
+caller is not authenticated and `403` (or `404`, to avoid revealing that something
+exists) when they are not allowed.
+
+## Secure configuration
+
+- Read secrets - database URLs, signing keys, API keys - from **environment variables**, never from code or the repository.
+- Keep a `.env.example` with placeholders, and keep the real `.env` out of Git.
+- Fail at startup when a required secret is missing, rather than running with a default.
+- Never log secrets or tokens, and never return internal error details to clients.
+- Serve APIs only over HTTPS, and restrict CORS to the browser origins you trust.
+
+## Optional extension: Django and GraphQL in this platform
+
+FastAPI is one way to build Python services; this platform's own backend is
+**Django**, which bundles an ORM, migrations, an admin site and authentication.
+Instead of many REST endpoints, its API is a single **GraphQL** endpoint built with
+Strawberry: clients send a query describing exactly the fields they want, and the
+server's schema defines what may be asked. This very course is served that way:
+
+```python
+import strawberry
+
+@strawberry.type
+class CourseType:
+    slug: str
+    title: str
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    def courses(self, info: strawberry.Info) -> list[CourseType]:
+        # In the platform, a selector decides what this user may see.
+        return [CourseType(slug="python-programming", title="Python Programming")]
+
+schema = strawberry.Schema(query=Query)
+```
+
+A separate Python service - say, a FastAPI service that runs a heavy automation job
+- integrates with a platform like this one by calling its API with a service
+account's token, or by exchanging messages through a queue, rather than by reading
+the platform's database directly. That keeps each service's data and rules in one
+place.
+'''
+
+[[exercises]]
+slug = "paginate"
+title = "Pagination and filtering"
+lesson = "fastapi"
+difficulty = "medium"
+instructions = '''
+Write `paginate(items, page=1, size=10, search="")`, the core of a list endpoint.
+
+- Keep only items whose `"title"` contains `search`, ignoring case.
+- Return a dictionary with `items` (the requested page), `page`, `size`, `total`
+  (matching items) and `pages` (the number of pages; `0` when nothing matches).
+- Raise `ValueError("page must be at least 1")` when `page < 1` and
+  `ValueError("size must be between 1 and 100")` when `size` is out of range.
+- A page beyond the last returns an empty `items` list, not an error.
+'''
+starter = '''
+def paginate(items, page=1, size=10, search=""):
+    ...
+'''
+solution = '''
+import math
+
+
+def paginate(items, page=1, size=10, search=""):
+    if page < 1:
+        raise ValueError("page must be at least 1")
+    if not 1 <= size <= 100:
+        raise ValueError("size must be between 1 and 100")
+    term = search.lower()
+    matches = [item for item in items if term in item["title"].lower()]
+    start = (page - 1) * size
+    return {
+        "items": matches[start : start + size],
+        "page": page,
+        "size": size,
+        "total": len(matches),
+        "pages": math.ceil(len(matches) / size),
+    }
+'''
+hints = [
+  "The first item on page p is at index (p - 1) * size.",
+  "math.ceil(total / size) gives the number of pages, and is 0 when total is 0.",
+  "Validate page and size before doing any work.",
+]
+
+[[exercises.tests]]
+name = "Second page"
+call = '''
+items = [{"title": f"Course {n}"} for n in range(1, 26)]
+result = paginate(items, page=2, size=10)
+print([item["title"] for item in result["items"]][:2], result["total"], result["pages"])
+'''
+expected = "['Course 11', 'Course 12'] 25 3"
+
+[[exercises.tests]]
+name = "Search and an empty page"
+call = '''
+items = [{"title": "Intro to Python"}, {"title": "Web APIs"}, {"title": "Advanced python"}]
+print(paginate(items, search="PYTHON", size=1))
+print(paginate(items, page=9))
+print(paginate([], size=5)["pages"])
+'''
+expected = '''
+{'items': [{'title': 'Intro to Python'}], 'page': 1, 'size': 1, 'total': 2, 'pages': 2}
+{'items': [], 'page': 9, 'size': 10, 'total': 3, 'pages': 1}
+0
+'''
+hidden = true
+
+[[exercises.tests]]
+name = "Invalid parameters"
+call = '''
+for kwargs in ({"page": 0}, {"size": 0}, {"size": 101}):
+    try:
+        paginate([], **kwargs)
+    except ValueError as error:
+        print(error)
+'''
+expected = "page must be at least 1\nsize must be between 1 and 100\nsize must be between 1 and 100"
+hidden = true
+
+[[exercises]]
+slug = "password-hashing"
+title = "Hashing and verifying passwords"
+lesson = "auth-security-integration"
+difficulty = "hard"
+instructions = '''
+Write `hash_password(password)` and `verify_password(password, stored)` using only
+the standard library (`hashlib`, `hmac`, `secrets`):
+
+- `hash_password` returns `"pbkdf2_sha256$<iterations>$<salt hex>$<hash hex>"`,
+  using PBKDF2-HMAC-SHA256, a fresh random 16-byte salt and **100,000** iterations.
+- `verify_password` returns `True` only for the right password. It must read the
+  iterations and salt from `stored`, compare with `hmac.compare_digest`, and return
+  `False` (not raise) for a malformed `stored` value.
+
+Two hashes of the same password must differ, because the salt is random.
+'''
+starter = '''
+import hashlib
+import hmac
+import secrets
+
+ITERATIONS = 100_000
+
+
+def hash_password(password: str) -> str:
+    ...
+
+
+def verify_password(password: str, stored: str) -> bool:
+    ...
+'''
+solution = '''
+import hashlib
+import hmac
+import secrets
+
+ITERATIONS = 100_000
+
+
+def hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, ITERATIONS)
+    return f"pbkdf2_sha256${ITERATIONS}${salt.hex()}${digest.hex()}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algorithm, iterations, salt_hex, digest_hex = stored.split("$")
+        if algorithm != "pbkdf2_sha256":
+            return False
+        salt = bytes.fromhex(salt_hex)
+        rounds = int(iterations)
+    except ValueError:
+        return False
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, rounds)
+    return hmac.compare_digest(digest.hex(), digest_hex)
+'''
+hints = [
+  "secrets.token_bytes(16) gives a random salt; .hex() turns bytes into text.",
+  "Split the stored string on \"$\" to get the algorithm, iterations, salt and hash back.",
+  "Unpacking the wrong number of parts, int() and bytes.fromhex() all raise ValueError on bad input.",
+]
+
+[[exercises.tests]]
+name = "Right and wrong passwords"
+call = '''
+stored = hash_password("correct horse")
+print(verify_password("correct horse", stored), verify_password("wrong", stored))
+'''
+expected = "True False"
+
+[[exercises.tests]]
+name = "Format and salting"
+call = '''
+first, second = hash_password("same"), hash_password("same")
+parts = first.split("$")
+print(parts[0], parts[1], len(parts[2]), len(parts[3]), first != second)
+'''
+expected = "pbkdf2_sha256 100000 32 64 True"
+hidden = true
+
+[[exercises.tests]]
+name = "Malformed stored values"
+call = '''
+print([verify_password("x", value) for value in ("", "a$b", "pbkdf2_sha256$x$zz$00", "md5$1$00$00")])
+'''
+expected = "[False, False, False, False]"
+hidden = true
+
+[quiz]
+title = "APIs and Backend Development"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "Which status code fits a request with a valid token for a user who may not access the resource?"
+options = ["401 Unauthorized", "403 Forbidden", "400 Bad Request", "500 Internal Server Error"]
+correct = [1]
+explanation = "401 means not authenticated; 403 means authenticated but not allowed (404 is also used to avoid revealing the resource exists)."
+
+[[quiz.questions]]
+prompt = "What does FastAPI do when a request body fails its Pydantic model?"
+options = [
+  "Calls your function with partial data",
+  "Responds 422 with details of what is wrong, without running your function",
+  "Crashes the server",
+  "Ignores the invalid fields silently",
+]
+correct = [1]
+explanation = "Validation happens before the route runs; invalid input gets a 422 describing each problem."
+
+[[quiz.questions]]
+prompt = "Why use a slow, salted algorithm such as PBKDF2 or Argon2 for passwords?"
+options = [
+  "So passwords can be decrypted later",
+  "So identical passwords hash differently and guessing is expensive",
+  "Because SHA-256 is not available in Python",
+  "To make sign-in faster",
+]
+correct = [1]
+explanation = "Hashes are one-way. Salt defeats precomputed tables; slowness makes brute force costly."
+
+[[quiz.questions]]
+prompt = "Which HTTP methods should be idempotent? Choose every one."
+kind = "multiple"
+options = ["GET", "PUT", "DELETE", "POST"]
+correct = [0, 1, 2]
+explanation = "Repeating GET, PUT or DELETE has the same effect as doing it once; POST usually creates something new each time."
+
+[[quiz.questions]]
+prompt = "Where should a production database password live?"
+options = [
+  "In settings.py",
+  "In .env.example",
+  "In an environment variable set by the deployment platform",
+  "In the README",
+]
+correct = [2]
+explanation = "Secrets come from the environment (or a secret manager), never from code or committed files."

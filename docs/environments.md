@@ -113,6 +113,16 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `FRONTEND_URL`               | **yes**| **deployed**       | Public origin of the browser app, no trailing slash (a trailing `/` is stripped). The reset and activation links point *into the frontend*, so this decides where a user lands after clicking one. Required in a deployed environment and must be `https://` there - an `http://` link would hand the single-use token in its query string to the network in the clear. Local defaults to the Vite dev server |
 | `PASSWORD_RESET_TOKEN_LIFETIME_MINUTES` | | no (`60`) | How long an emailed password-reset link stays usable. Deliberately short: the link is only needed at the moment its owner clicks it |
 | `ACTIVATION_TOKEN_LIFETIME_HOURS` | | no (`48`)  | How long an emailed account-activation link stays usable |
+| `R2_ACCESS_KEY_ID`           | **yes**| **deployed**       | Cloudflare R2 API token's Access Key ID. See [Object storage (Cloudflare R2)](#object-storage-cloudflare-r2) |
+| `R2_SECRET_ACCESS_KEY`       | **yes**| **deployed**       | **Secret.** The same token's Secret Access Key. Shown once by Cloudflare when the token is created |
+| `R2_BUCKET_NAME`             |        | **deployed**       | The private bucket holding uploaded files, e.g. `mustanet-automation` |
+| `R2_ENDPOINT_URL`            |        | **deployed**       | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, with no bucket name or path after it |
+| `ATTACHMENTS_STORAGE_BACKEND` |       | no                 | Django storage class for uploaded files. Defaults to the R2 (S3) backend when the four `R2_*` variables are set, otherwise to the filesystem under `backend/media/attachments/`. Deployed environments must use R2 |
+| `CODE_EXECUTION_URL`         |        | no (off)           | The sandbox that runs learners' Python code (Piston-compatible). Unset turns Run and Submit off. Learner code never runs in Django. See [learning.md](learning.md#running-learner-code-safely) |
+| `CODE_EXECUTION_TOKEN`       | **yes**| no                 | **Secret.** Bearer token for the sandbox's authenticating proxy |
+| `CODE_EXECUTION_PYTHON_VERSION` |     | no (`3.12.0`)      | Python version installed in the sandbox |
+| `CODE_EXECUTION_TIMEOUT_MS`  |        | no (`3000`)        | Per-run time limit |
+| `CODE_EXECUTION_MEMORY_LIMIT_BYTES` | | no (`134217728`)  | Per-run memory limit |
 
 Notes:
 
@@ -234,6 +244,84 @@ follows.
   only once every subdomain is HTTPS-only; preload is effectively
   permanent. With those two left off, `manage.py check --deploy` reports
   warnings `security.W005` and `security.W021`; that is expected.
+
+## Object storage (Cloudflare R2)
+
+Uploaded files (idea attachments, marketplace documents, profile photos) live
+in a private Cloudflare R2 bucket, reached through R2's S3-compatible API with
+`django-storages`' `storages.backends.s3.S3Storage`. PostgreSQL holds only each
+file's metadata and its server-generated storage key. Static files are not
+affected; they stay on Django's `StaticFilesStorage`.
+
+How it is wired (`backend/config/settings/base.py`):
+
+- The two credentials switch R2 on. With `R2_ACCESS_KEY_ID` and
+  `R2_SECRET_ACCESS_KEY` both set, the `attachments` and `default` storages use
+  R2, and `R2_BUCKET_NAME` plus a well-formed `R2_ENDPOINT_URL` become required.
+  With neither set, files stay on the local filesystem (so copying
+  `.env.example` as-is still starts locally). One without the other, a missing
+  bucket, or an endpoint that is not `https://<host>` with no path is refused at
+  startup, naming the variable but never printing its value.
+- Objects are private. There is no public bucket URL anywhere: every download
+  goes through an authenticated, authorized Django view
+  (`/ideas/<id>/attachments/<id>/download/`, `/users/<id>/avatar/`,
+  `/marketplace/ideas/<id>/document/`), which streams the object back with the
+  server's own content type and `Content-Disposition: attachment`. No R2 URL,
+  key or credential ever appears in a GraphQL or JSON response.
+- Authenticated (presigned, SigV4) URL generation stays on with a 5-minute
+  expiry, so any future `storage.url(...)` call yields a short-lived signed
+  link, never a permanent one. Objects are also stored with
+  `Content-Disposition: attachment`, so even a signed link downloads rather
+  than renders.
+- `file_overwrite` is off, and every key is a fresh `uuid4` under
+  `ideas/<idea id>/`, `marketplace/<idea id>/` or `avatars/<user id>/`, so an upload
+  can never replace another object.
+- `config.settings.production` refuses to start without R2. A deployed
+  instance's local disk is ephemeral, so files written there would vanish on
+  the next deploy or restart while their database rows still pointed at them.
+
+### Render setup
+
+On the backend web service in the Render dashboard:
+
+1. **Environment** → **Add Environment Variable**, and add each of these
+   (paste the secret values from where you stored them when the R2 token was
+   created; never commit them or paste them into a chat or ticket):
+
+   | Key | Value |
+   | --- | ----- |
+   | `R2_ACCESS_KEY_ID` | the R2 token's Access Key ID |
+   | `R2_SECRET_ACCESS_KEY` | the R2 token's Secret Access Key |
+   | `R2_BUCKET_NAME` | `mustanet-automation` |
+   | `R2_ENDPOINT_URL` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` (your account id; Cloudflare dashboard → R2 → bucket → **Settings** → S3 API) |
+
+2. **Save, rebuild, and deploy** (or **Save changes** then **Manual Deploy** →
+   **Deploy latest commit**). The build installs `boto3` and `django-storages`
+   from `backend/requirements.txt`.
+3. If the deploy fails at startup, the log names the missing or malformed
+   variable - fix it and redeploy. Nothing secret is printed.
+
+Add the variables **before** deploying this change: production settings refuse
+to start without them.
+
+### Verifying an upload
+
+1. Sign in to the deployed app, open one of your ideas and attach a small PDF
+   (or set a profile photo).
+2. In the Cloudflare dashboard → **R2** → `mustanet-automation` → **Objects**,
+   a new object appears under `ideas/<idea id>/` (or `avatars/<user id>/`) with
+   a random 32-character name and the right extension.
+3. Download the attachment from the app: it should arrive intact.
+4. Delete the attachment in the app: the object disappears from the bucket.
+5. Optional, from a machine with the backend's environment loaded (for example
+   a Render Shell): `python manage.py r2_check` writes, reads back and deletes
+   one small probe object and reports each step, without printing any
+   credential.
+
+Files uploaded *before* this change were written to the instance's local disk
+and are not in R2; their rows will 404 on download. If the old instance had a
+persistent disk, copy `backend/media/attachments/` into the bucket with the
+same relative keys (for example with `rclone copy`) before relying on them.
 
 ## HTTPS behind a proxy
 

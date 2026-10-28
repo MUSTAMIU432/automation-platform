@@ -1,0 +1,352 @@
+position = 5
+slug = "functions"
+title = "Functions and Modular Programming"
+summary = "Packaging logic into reusable, documented functions, and organising code into modules and packages."
+objectives = [
+  "Define and call functions that take parameters and return values",
+  "Use positional, keyword, default and variable-length arguments",
+  "Explain scope and namespaces, and avoid global state",
+  "Write small lambda functions where they help",
+  "Split a program into modules and packages and import between them",
+  "Document functions with type hints and docstrings",
+]
+project = "Reusable student management application: a package of small, documented functions to add, find, update and report on students, used by a short main script."
+
+[[lessons]]
+slug = "defining-functions"
+title = "Defining functions, arguments and return values"
+summary = "Writing functions, passing arguments in every way Python allows, and returning results."
+minutes = 35
+objectives = [
+  "Define a function and return a value from it",
+  "Pass positional and keyword arguments, with defaults",
+  "Accept any number of arguments with *args and **kwargs",
+  "Avoid the mutable default argument trap",
+]
+body = '''
+## Why functions
+
+A **function** is a named, reusable block of code. Functions let you write logic
+once, test it once, and give it a name that explains what it does. A program built
+from small functions is easier to read, test and change than one long script.
+
+```python
+def area_of_rectangle(width, height):
+    return width * height
+
+print(area_of_rectangle(3, 4))   # 12
+```
+
+`def` starts the definition; `width` and `height` are **parameters**; the values
+you pass in a call are **arguments**. `return` ends the function and hands a value
+back. A function with no `return` returns `None`.
+
+> Prefer returning a value to printing it. A returned value can be printed, saved,
+> tested or passed to another function; printed text can only be read.
+
+## Positional and keyword arguments
+
+Arguments can be matched by position or by name. Names make calls with several
+arguments much clearer:
+
+```python
+def describe(name, role, years):
+    return f"{name} has been a {role} for {years} years."
+
+print(describe("Amina", "developer", 3))
+print(describe(name="Juma", years=5, role="designer"))
+```
+
+## Default values
+
+A parameter with a default may be left out of a call:
+
+```python
+def greet(name, greeting="Hello"):
+    return f"{greeting}, {name}!"
+
+print(greet("Neema"))              # Hello, Neema!
+print(greet("Neema", "Karibu"))    # Karibu, Neema!
+```
+
+Never use a mutable value such as `[]` as a default: it is created **once**, when
+the function is defined, and shared by every call. Use `None` instead:
+
+```python
+def add_tag(tag, tags=None):
+    if tags is None:
+        tags = []
+    tags.append(tag)
+    return tags
+```
+
+## Any number of arguments
+
+`*args` collects extra positional arguments into a tuple; `**kwargs` collects
+extra keyword arguments into a dictionary:
+
+```python
+def total(*amounts):
+    return sum(amounts)
+
+def build_profile(name, **details):
+    return {"name": name, **details}
+
+print(total(10, 20, 30))                          # 60
+print(build_profile("Baraka", city="Mbeya", age=30))
+```
+
+## Returning several values
+
+Return a tuple and unpack it at the call:
+
+```python
+def min_max(values):
+    return min(values), max(values)
+
+low, high = min_max([4, 9, 1])
+print(low, high)   # 1 9
+```
+'''
+
+[[lessons]]
+slug = "scope-modules-docs"
+title = "Scope, lambdas, modules, type hints and docstrings"
+summary = "Where names live, small anonymous functions, organising code into files, and documenting what a function expects."
+minutes = 40
+objectives = [
+  "Explain local and global scope",
+  "Use lambda for short key functions",
+  "Import from modules and packages and structure a small project",
+  "Add type hints and docstrings",
+]
+body = '''
+## Scope and namespaces
+
+Names created inside a function are **local**: they exist only while the function
+runs, and they do not clash with names elsewhere. Python looks a name up in the
+local scope first, then in enclosing functions, then in the module (global), then
+in the built-ins - the **LEGB** rule.
+
+```python
+rate = 0.1   # global
+
+def with_tax(amount):
+    tax = amount * rate      # reads the global rate
+    return amount + tax      # tax is local
+
+print(with_tax(100))   # 110.0
+```
+
+Reading a global is allowed; changing one needs the `global` keyword, and is
+almost always a sign the value should be a parameter and a return value instead.
+Functions that depend only on their arguments are easier to test and reuse.
+
+## lambda
+
+A `lambda` is a small, unnamed function written as one expression. It is most
+useful as a `key` for sorting:
+
+```python
+people = [("Amina", 31), ("Juma", 24), ("Neema", 28)]
+by_age = sorted(people, key=lambda person: person[1])
+print(by_age)
+```
+
+If a lambda needs a name or more than one expression, write a `def` instead.
+
+## Modules and packages
+
+Any `.py` file is a **module**. Import a whole module, or names from it:
+
+```python
+import math
+from statistics import mean
+
+print(math.sqrt(16), mean([2, 4, 6]))
+```
+
+A **package** is a folder of modules. A small project might look like this:
+
+```text
+students/
+    __init__.py       # marks the folder as a package
+    records.py        # add_student, find_student
+    reports.py        # average_mark, top_students
+main.py               # from students.records import add_student
+```
+
+Code that should run only when a file is executed directly, not when it is
+imported, goes under a main guard:
+
+```python
+def main():
+    print("Running the student manager")
+
+if __name__ == "__main__":
+    main()
+```
+
+## Type hints and docstrings
+
+**Type hints** say what a function expects and returns. Python does not enforce
+them at runtime, but editors and tools such as mypy use them to catch mistakes
+early. A **docstring** - a string as the first statement - explains the function:
+
+```python
+def average_mark(marks: list[float]) -> float:
+    """Return the mean of `marks`, or 0.0 for an empty list."""
+    if not marks:
+        return 0.0
+    return sum(marks) / len(marks)
+
+print(average_mark([70, 85, 91]))
+help(average_mark)
+```
+'''
+
+[[exercises]]
+slug = "student-records"
+title = "Reusable student functions"
+lesson = "scope-modules-docs"
+difficulty = "medium"
+instructions = '''
+Write three small functions that work on a list of student dictionaries, each
+with `name` (a string) and `marks` (a list of numbers).
+
+- `average(marks)` returns the mean of a list of marks, rounded to 1 decimal
+  place, or `0.0` for an empty list.
+- `add_student(students, name, marks=None)` appends a new student (with an empty
+  list of marks if none are given) and **returns the list**. Do not use a mutable
+  default.
+- `top_student(students)` returns the name of the student with the highest
+  average, or `None` if the list is empty. On a tie, the earlier student wins.
+'''
+starter = '''
+def average(marks: list[float]) -> float:
+    ...
+
+
+def add_student(students: list[dict], name: str, marks: list[float] | None = None) -> list[dict]:
+    ...
+
+
+def top_student(students: list[dict]) -> str | None:
+    ...
+'''
+solution = '''
+def average(marks: list[float]) -> float:
+    """The mean of `marks`, to one decimal place; 0.0 for none."""
+    if not marks:
+        return 0.0
+    return round(sum(marks) / len(marks), 1)
+
+
+def add_student(students: list[dict], name: str, marks: list[float] | None = None) -> list[dict]:
+    """Append a student and return the list."""
+    students.append({"name": name, "marks": list(marks) if marks else []})
+    return students
+
+
+def top_student(students: list[dict]) -> str | None:
+    """The name with the best average; the first one on a tie."""
+    if not students:
+        return None
+    best = max(students, key=lambda student: average(student["marks"]))
+    return best["name"]
+'''
+hints = [
+  "Use marks=None as the default, then create a fresh list inside the function.",
+  "max(students, key=...) returns the first maximum it finds, which handles ties.",
+  "top_student can reuse your average() function in its key.",
+]
+
+[[exercises.tests]]
+name = "average([70, 85, 90])"
+call = "print(average([70, 85, 90]))"
+expected = "81.7"
+
+[[exercises.tests]]
+name = "Adding and choosing the top student"
+call = '''
+students = []
+add_student(students, "Amina", [88, 92])
+add_student(students, "Juma", [95, 70])
+print(top_student(students))
+print(average([]))
+'''
+expected = "Amina\n0.0"
+
+[[exercises.tests]]
+name = "No shared default list"
+call = '''
+first = add_student([], "A")
+second = add_student([], "B")
+first[0]["marks"].append(50)
+print(second[0]["marks"])
+'''
+expected = "[]"
+hidden = true
+
+[[exercises.tests]]
+name = "Empty list and ties"
+call = '''
+print(top_student([]))
+print(top_student([{"name": "X", "marks": [80]}, {"name": "Y", "marks": [80]}]))
+'''
+expected = "None\nX"
+hidden = true
+
+[quiz]
+title = "Functions and Modular Programming"
+pass_percentage = 70
+
+[[quiz.questions]]
+prompt = "What does this function return when called as f(3)?"
+code = '''
+def f(x):
+    y = x * 2
+'''
+options = ["6", "None", "3", "An error"]
+correct = [1]
+explanation = "The function never returns anything, so a call evaluates to None."
+
+[[quiz.questions]]
+prompt = "Why is def add(item, items=[]) a problem?"
+options = [
+  "Lists cannot be default values",
+  "The same list is shared by every call that uses the default",
+  "It is slower than using None",
+  "There is no problem",
+]
+correct = [1]
+explanation = "A default is evaluated once, when the function is defined. Use None and create a new list inside."
+
+[[quiz.questions]]
+prompt = "In def f(*args, **kwargs), what is kwargs?"
+options = ["A tuple of extra positional arguments", "A dictionary of extra keyword arguments", "A list", "A required parameter"]
+correct = [1]
+explanation = "**kwargs collects extra keyword arguments into a dictionary; *args collects positional ones into a tuple."
+
+[[quiz.questions]]
+prompt = "What does the if __name__ == \"__main__\": guard do?"
+options = [
+  "Runs the code only when the file is executed directly, not when imported",
+  "Makes the module private",
+  "Speeds up imports",
+  "Is required in every file",
+]
+correct = [0]
+explanation = "When a file is imported, __name__ is the module's name; it is \"__main__\" only for the file being run."
+
+[[quiz.questions]]
+prompt = "Which statements about type hints are true? Choose every one."
+kind = "multiple"
+options = [
+  "Python checks them every time the function runs",
+  "Editors and tools such as mypy use them to find mistakes",
+  "They document what a function expects and returns",
+  "They make code run faster",
+]
+correct = [1, 2]
+explanation = "Type hints are not enforced at runtime and do not speed code up; they document intent and power static checkers."

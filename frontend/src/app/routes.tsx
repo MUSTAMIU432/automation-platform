@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AccountSettingsPage } from '../features/identity/components/AccountSettingsPage'
 
 import type * as AdminPages from '../features/administration/pages'
+import type * as LearnPages from '../features/learning/pages'
 
 import { ActivateAccountPage } from '../features/identity/components/ActivateAccountPage'
 import { AuthPage } from '../features/identity/components/AuthPage'
@@ -91,6 +92,15 @@ type AdminPageName = keyof typeof AdminPages
 function adminPage(name: AdminPageName) {
   return async () => ({
     Component: (await import('../features/administration/pages'))[name],
+  })
+}
+
+type LearnPageName = keyof typeof LearnPages
+
+/** A learning page, loaded with the code editor the first time the learning area is visited. */
+function learnPage(name: LearnPageName) {
+  return async () => ({
+    Component: (await import('../features/learning/pages'))[name],
   })
 }
 
@@ -200,6 +210,18 @@ export const router = createBrowserRouter([
               },
               { path: 'settings/:section', element: <AccountSettingsPage /> },
               { path: 'help', element: <HelpPage /> },
+              { path: 'learn', lazy: learnPage('LearnHomePage') },
+              { path: 'learn/courses', lazy: learnPage('CourseCatalogPage') },
+              { path: 'learn/courses/:courseSlug', lazy: learnPage('CourseOverviewPage') },
+              {
+                path: 'learn/courses/:courseSlug/lessons/:lessonId',
+                lazy: learnPage('LessonPage'),
+              },
+              {
+                path: 'learn/courses/:courseSlug/exercises/:exerciseId',
+                lazy: learnPage('ExercisePage'),
+              },
+              { path: 'learn/courses/:courseSlug/quizzes/:quizId', lazy: learnPage('QuizPage') },
               {
                 path: 'admin',
                 lazy: async () => ({
@@ -240,6 +262,20 @@ export const router = createBrowserRouter([
                   },
                   { path: 'reviewers', lazy: adminPage('AdminReviewersPage') },
                   { path: 'roles', lazy: adminPage('AdminPlatformRolesPage') },
+                  { path: 'courses', lazy: adminPage('AdminCoursesPage') },
+                  { path: 'courses/:courseId', lazy: adminPage('AdminCourseEditorPage') },
+                  {
+                    path: 'courses/:courseId/lessons/:lessonId',
+                    lazy: adminPage('AdminLessonEditorPage'),
+                  },
+                  {
+                    path: 'courses/:courseId/modules/:moduleId/exercises/:exerciseId',
+                    lazy: adminPage('AdminExerciseEditorPage'),
+                  },
+                  {
+                    path: 'courses/:courseId/modules/:moduleId/quiz',
+                    lazy: adminPage('AdminQuizEditorPage'),
+                  },
                   { path: 'proposals', lazy: adminPage('AdminProposalsPage') },
                   { path: 'automation', lazy: adminPage('AdminAutomationPage') },
                   /*

@@ -22,6 +22,8 @@ export interface AdminCapabilities {
   canManagePlatformRoles: boolean
   /** Publish ideas for sale, price them, set payment methods and confirm payments. */
   canManageMarketplace: boolean
+  /** Author and publish courses: lessons and their files, exercises, quizzes. */
+  canManageCourses: boolean
 }
 
 export const NO_ADMIN_CAPABILITIES: AdminCapabilities = {
@@ -36,6 +38,7 @@ export const NO_ADMIN_CAPABILITIES: AdminCapabilities = {
   canReleaseProposals: false,
   canManagePlatformRoles: false,
   canManageMarketplace: false,
+  canManageCourses: false,
 }
 
 const CAPABILITIES_QUERY = `
@@ -52,6 +55,7 @@ const CAPABILITIES_QUERY = `
       canReleaseProposals
       canManagePlatformRoles
       canManageMarketplace
+      canManageCourses
     }
   }
 `

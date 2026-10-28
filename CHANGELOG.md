@@ -6,6 +6,60 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added — Learning: courses, coding exercises and quizzes
+
+A learning area at `/app/learn` and a course-authoring console at
+`/app/admin/courses`, shipped with **Python Programming: Beginner to Advanced**.
+See [`docs/learning.md`](docs/learning.md).
+
+- **Learners** browse and enroll, read lessons with highlighted, copyable code and
+  downloadable lesson files, practise in a code editor, take quizzes, track
+  progress, submit a capstone and complete the course.
+- **Administrators** (`canManageCourses`) write everything learners see: courses,
+  modules, lesson notes with a live preview, lesson files (stored in R2 and only
+  downloadable by enrolled learners), exercises with hidden tests and reference
+  solutions, quizzes, and publishing.
+- **Learner code never runs in Django.** Run and Submit go to a self-hosted,
+  Piston-compatible sandbox (`CODE_EXECUTION_URL`), off until configured. Grading
+  compares output on the server against hidden tests whose inputs and expected
+  outputs never reach the learner.
+- **Content** for the Python course lives in `backend/learning/content/` as TOML;
+  `seed_python_course` loads it once. Its tests compile every example and run
+  every reference solution against its own tests.
+- New dependencies: CodeMirror 6 and the Lezer Python grammar (frontend), `moto`
+  for tests only.
+
+### Added — Uploaded files in Cloudflare R2
+
+Idea attachments, marketplace documents and profile photos now live in a
+private Cloudflare R2 bucket in every deployed environment, through
+`django-storages`' S3 backend. Uploads, downloads and the API are unchanged:
+PostgreSQL still holds the metadata and server-generated keys, and every
+download is still streamed through an authorized view.
+
+- **Settings** (`config/settings/base.py`) — the `R2_ACCESS_KEY_ID` /
+  `R2_SECRET_ACCESS_KEY` pair switches the `attachments` and `default` storages
+  to R2 (`R2_BUCKET_NAME`, `R2_ENDPOINT_URL`): region `auto`, SigV4, no
+  overwrites, signed URLs only and expiring after five minutes, objects stored
+  as `Content-Disposition: attachment`. Without the credentials, local
+  development and CI keep files on disk. A half-set or malformed configuration
+  is refused at startup, naming the variable but never its value. Static files
+  are untouched.
+- **Production** (`config/settings/production.py`) refuses to start without
+  R2: a deployed instance's own disk does not survive a deploy.
+- **Fixed** — a storage failure on R2 is now handled the way a disk failure
+  already was (`ideas.storage.STORAGE_ERRORS`). botocore's exceptions are not
+  `OSError`, so an R2 outage would otherwise have surfaced as a 500 rather than
+  a 502, and a failed object delete would have raised after the row was gone.
+  The stored object's content type is now the server's, not the browser's
+  claim.
+- **`manage.py r2_check`** writes, reads back and deletes one probe object.
+- **Tests** run the real S3 backend against `moto` (new dev dependency), never
+  Cloudflare; a project-wide fixture keeps every test's files in a temporary
+  directory even if `backend/.env` holds real R2 credentials.
+- **Docs** — [`docs/environments.md`](docs/environments.md#object-storage-cloudflare-r2)
+  covers the variables, Render setup and how to verify an upload.
+
 ### Changed — Documentation: the platform track, written down against the code
 
 The submission-context work left two domain documents describing a codebase

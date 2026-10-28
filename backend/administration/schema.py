@@ -118,6 +118,7 @@ class AdminCapabilitiesType:
     can_release_proposals: bool
     can_manage_platform_roles: bool
     can_manage_marketplace: bool
+    can_manage_courses: bool
 
     @staticmethod
     def from_capabilities(capabilities: AdminCapabilities) -> 'AdminCapabilitiesType':
@@ -133,6 +134,7 @@ class AdminCapabilitiesType:
             can_release_proposals=capabilities.can_release_proposals,
             can_manage_platform_roles=capabilities.can_manage_platform_roles,
             can_manage_marketplace=capabilities.can_manage_marketplace,
+            can_manage_courses=capabilities.can_manage_courses,
         )
 
 
