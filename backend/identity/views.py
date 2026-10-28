@@ -73,7 +73,7 @@ def user_avatar_view(request: HttpRequest, user_id: int) -> HttpResponse:
 
     try:
         handle = storages['attachments'].open(key, 'rb')
-    except (FileNotFoundError, OSError):
+    except avatars.STORAGE_ERRORS:
         raise Http404 from None
 
     extension = '.' + key.rsplit('.', 1)[-1]

@@ -16,6 +16,7 @@ from django.core.exceptions import ImproperlyConfigured
 from .base import *  # noqa: F403
 from .base import (
     ALLOWED_HOSTS,
+    ATTACHMENTS_STORAGE_BACKEND,
     CACHES,
     CORS_ALLOWED_ORIGINS,
     CSRF_TRUSTED_ORIGINS,
@@ -26,6 +27,8 @@ from .base import (
     ENVIRONMENT,
     FRONTEND_URL,
     JWT_SIGNING_KEY,
+    R2_CONFIGURED,
+    R2_STORAGE_BACKEND,
     SECRET_KEY,
     SHARED_CACHE_ALIASES,
     env,
@@ -163,6 +166,23 @@ if not FRONTEND_URL.startswith('https://'):
         f'FRONTEND_URL must be an https:// origin in a deployed environment '
         f'(got {FRONTEND_URL!r}); an emailed link over plain http would expose '
         'the one-time token in it to anyone on the network path.'
+    )
+
+# Uploaded files. A deployed instance's own disk is ephemeral - it is replaced on
+# every deploy and restart - so files written there would vanish while their
+# database rows still pointed at them. They go to the private R2 bucket instead,
+# and starting without it is refused. See config/settings/base.py.
+if not R2_CONFIGURED:
+    raise ImproperlyConfigured(
+        'R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME and R2_ENDPOINT_URL must be '
+        'set in a deployed environment: uploaded files live in Cloudflare R2, and the '
+        "instance's own disk does not survive a deploy. See docs/environments.md."
+    )
+
+if ATTACHMENTS_STORAGE_BACKEND != R2_STORAGE_BACKEND:
+    raise ImproperlyConfigured(
+        f'ATTACHMENTS_STORAGE_BACKEND must be {R2_STORAGE_BACKEND} in a deployed environment '
+        f'(got {ATTACHMENTS_STORAGE_BACKEND!r}).'
     )
 
 # Transport security. Cookies are never sent over plain HTTP; this is not

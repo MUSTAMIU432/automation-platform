@@ -4,3 +4,6 @@ pytest==9.1.1
 pytest-django==4.14.0
 pytest-cov==7.1.0
 ruff==0.16.8
+# An in-process S3 API for the R2 storage tests (ideas/tests/test_r2_storage.py), so they
+# run the real S3 backend without credentials or a network request.
+moto[s3]==5.2.4

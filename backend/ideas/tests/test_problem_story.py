@@ -20,6 +20,7 @@ from ideas import services
 from ideas.dev_categories import seed_dev_categories
 from ideas.models import IDEA_STORY_FIELDS, Attachment, Category, Idea
 from ideas.services import IdeaError, IdeaInput
+from ideas.tests.conftest import R2_BUCKET, r2_object_keys
 from identity.models import User
 from identity.tokens import issue_access_token
 from organizations.models import Membership, MembershipRole, Role
@@ -660,3 +661,25 @@ class TestSupportingDocuments:
 
         assert response.json()['success'] is False
         assert Attachment.objects.count() == 0
+
+
+@pytest.mark.django_db
+class TestSupportingDocumentsOnR2:
+    """The same pipeline step with the evidence in the R2 bucket (an in-process fake)."""
+
+    def test_evidence_in_the_bucket_survives_submission(self, client, world, r2_bucket):
+        idea_id = create_via_api(client, world)['idea']['id']
+
+        uploaded = client.post(
+            f'/ideas/{idea_id}/attachments/',
+            data={'file': SimpleUploadedFile('form.pdf', PDF_BYTES, 'application/pdf')},
+            HTTP_AUTHORIZATION=f'Bearer {issue_access_token(world["author"].pk)[0]}',
+        )
+        assert uploaded.status_code == 201, uploaded.content
+        submitted = run(client, SUBMIT_IDEA, 'submitIdea', {'id': idea_id}, user=world['author'])
+
+        assert submitted['idea']['status'] == 'SUBMITTED_TO_ORGANIZATION'
+        attachment = Attachment.objects.get(idea_id=idea_id)
+        assert r2_object_keys(r2_bucket) == [attachment.storage_key]
+        stored = r2_bucket.get_object(Bucket=R2_BUCKET, Key=attachment.storage_key)
+        assert stored['Body'].read() == PDF_BYTES

@@ -48,12 +48,23 @@ VALID_PRODUCTION_ENV = {
     # Where the emailed links point. Must be https in a deployed environment
     # or the one-time token in the link is handed to the network in the clear.
     'FRONTEND_URL': 'https://app.example.test',
+    # Uploaded files. A deployed instance's disk does not survive a deploy, so
+    # production refuses to start without R2 (tests/test_storage_configuration.py).
+    # `.invalid` can never resolve, and settings never connect anyway.
+    'R2_ACCESS_KEY_ID': 'test-r2-access-key-id',
+    'R2_SECRET_ACCESS_KEY': 'test-r2-secret-access-key-not-real',
+    'R2_BUCKET_NAME': 'test-bucket',
+    'R2_ENDPOINT_URL': 'https://test-account.r2.cloudflarestorage.invalid',
 }
 
 
 def clean_env(module, overrides=None):
     """A minimal environment for `module`. An override of None unsets the variable."""
-    env = {k: v for k, v in os.environ.items() if not k.startswith(('DJANGO_', 'CORS_', 'CSRF_'))}
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if not k.startswith(('DJANGO_', 'CORS_', 'CSRF_', 'R2_', 'ATTACHMENTS_'))
+    }
     env.pop('ENVIRONMENT', None)
     env.pop('DATABASE_URL', None)
     env.update(VALID_PRODUCTION_ENV)

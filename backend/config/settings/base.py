@@ -7,6 +7,7 @@ production) import from this module and override only what differs.
 
 from datetime import timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import environ
 from django.core.exceptions import ImproperlyConfigured
@@ -339,47 +340,146 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 
-# Attachment object storage (S2-007)
+# Uploaded-file storage (S2-007): local disk, or Cloudflare R2
 # ---------------------------------------------------------------------------------
 # `ideas.storage` is the only module that ever calls `storages['attachments']`
 # directly - see its module docstring. Everything below exists so that module
 # never has to know whether it is writing to the local disk or to an
-# object-storage bucket.
+# object-storage bucket. Idea attachments, marketplace documents and profile
+# photos all go through it; PostgreSQL holds only their metadata and keys.
 #
-# `ATTACHMENTS_STORAGE_BACKEND` names a Django `Storage` subclass by import
-# path, exactly like Django's own `STORAGES` setting expects. The default is
-# the filesystem backend that ships with Django, which is what every local
-# and CI environment uses today - there is no object-storage backend
-# installed or configured in this codebase yet, and this file does not
-# pretend otherwise. A deployment that has actually provisioned one (S3,
-# GCS, Azure Blob, ...) installs the matching driver package (e.g.
-# `django-storages`) and points this at its backend class; that backend then
-# reads its own settings (bucket name, region, credentials, ...) the way it
-# normally does. No code in `ideas/` changes either way - the swap is
-# entirely a settings/environment concern, which is the point of routing
-# every attachment read/write through Django's pluggable storage registry
-# instead of touching a path or a client library directly.
+# Deployed environments keep the files in a private Cloudflare R2 bucket,
+# reached through R2's S3-compatible API with `django-storages`' S3 backend
+# (production.py refuses to start without it: a deployed instance's own disk
+# does not survive a deploy). The two R2 credentials are the switch. Without
+# them, local development and CI keep files on disk under
+# backend/media/attachments/, and R2_BUCKET_NAME / R2_ENDPOINT_URL are ignored -
+# so backend/.env.example, which ships those two filled in, still starts as
+# copied. With them, the bucket and a well-formed endpoint are required too.
+# A refusal names the variable, never its value.
 #
-# `location` is only meaningful to the filesystem backend (it is where the
-# accepted files actually live on disk) and is omitted for anything else, so
-# switching backends never leaves a stale, backend-specific option behind for
-# the new backend to trip over.
+# `ATTACHMENTS_STORAGE_BACKEND` can still name any Django `Storage` subclass by
+# import path, exactly like Django's own `STORAGES` setting expects; it
+# defaults to whichever of the two backends the credentials select. `location`
+# is only meaningful to the filesystem backend and is omitted for anything
+# else, so switching backends never leaves a stale, backend-specific option
+# behind for the new backend to trip over.
+#
+# Static files are not affected: they stay on Django's `StaticFilesStorage`.
+R2_STORAGE_BACKEND = 'storages.backends.s3.S3Storage'
+FILESYSTEM_STORAGE_BACKEND = 'django.core.files.storage.FileSystemStorage'
+
+# How long a presigned URL from `Storage.url()` stays valid, in seconds. Nothing
+# hands one out today - every download is streamed through a view that has
+# authorized the caller - so this only bounds what a future caller could leak.
+R2_SIGNED_URL_SECONDS = 300
+
+
+def r2_storage_options(access_key, secret_key, bucket_name, endpoint_url) -> dict:
+    """
+    `S3Storage` options for a private R2 bucket. The R2 storage tests build
+    their storage from this too, so they exercise exactly these options.
+    """
+    from botocore.config import Config
+
+    return {
+        'access_key': access_key,
+        'secret_key': secret_key,
+        'bucket_name': bucket_name,
+        'endpoint_url': endpoint_url,
+        # R2 has one region, `auto`.
+        'region_name': 'auto',
+        # Given a `client_config`, django-storages ignores its own
+        # `signature_version` option, so SigV4 is set here.
+        'client_config': Config(
+            signature_version='s3v4',
+            # boto3 1.36+ adds integrity checksums to every request by default,
+            # which R2 has not always accepted. Only when an operation needs one.
+            request_checksum_calculation='when_required',
+            response_checksum_validation='when_required',
+        ),
+        # Private objects: no ACL, and URLs only ever signed and short-lived.
+        'default_acl': None,
+        'querystring_auth': True,
+        'querystring_expire': R2_SIGNED_URL_SECONDS,
+        # A key already in the bucket gets a new name rather than being replaced.
+        'file_overwrite': False,
+        # Even a signed link downloads rather than renders in the browser.
+        'object_parameters': {'ContentDisposition': 'attachment'},
+    }
+
+
+_r2_access_key_id = env('R2_ACCESS_KEY_ID', default='')
+_r2_secret_access_key = env('R2_SECRET_ACCESS_KEY', default='')
+R2_BUCKET_NAME = env('R2_BUCKET_NAME', default='')
+R2_ENDPOINT_URL = env('R2_ENDPOINT_URL', default='').rstrip('/')
+
+if bool(_r2_access_key_id) != bool(_r2_secret_access_key):
+    _r2_missing = 'R2_SECRET_ACCESS_KEY' if _r2_access_key_id else 'R2_ACCESS_KEY_ID'
+    raise ImproperlyConfigured(
+        f'{_r2_missing} must be set: R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY are a pair '
+        '(see backend/.env.example).'
+    )
+
+R2_CONFIGURED = bool(_r2_access_key_id and _r2_secret_access_key)
+
+if R2_CONFIGURED:
+    if not R2_BUCKET_NAME:
+        raise ImproperlyConfigured(
+            'R2_BUCKET_NAME must be set when the R2 credentials are (see backend/.env.example).'
+        )
+    _r2_endpoint = urlsplit(R2_ENDPOINT_URL)
+    if (
+        _r2_endpoint.scheme != 'https'
+        or not _r2_endpoint.hostname
+        or _r2_endpoint.path
+        or _r2_endpoint.query
+        or '<' in R2_ENDPOINT_URL
+    ):
+        raise ImproperlyConfigured(
+            "R2_ENDPOINT_URL must be the account's S3 API endpoint, "
+            'https://<ACCOUNT_ID>.r2.cloudflarestorage.com, with the real account id and no '
+            'bucket name or path after it (see backend/.env.example).'
+        )
+
 ATTACHMENTS_STORAGE_BACKEND = env(
-    'ATTACHMENTS_STORAGE_BACKEND', default='django.core.files.storage.FileSystemStorage'
+    'ATTACHMENTS_STORAGE_BACKEND',
+    default=R2_STORAGE_BACKEND if R2_CONFIGURED else FILESYSTEM_STORAGE_BACKEND,
 )
-_ATTACHMENTS_STORAGE_OPTIONS: dict = {}
-if ATTACHMENTS_STORAGE_BACKEND == 'django.core.files.storage.FileSystemStorage':
-    _ATTACHMENTS_STORAGE_OPTIONS['location'] = str(BASE_DIR / 'media' / 'attachments')
+
+_R2_STORAGE = (
+    {
+        'BACKEND': R2_STORAGE_BACKEND,
+        'OPTIONS': r2_storage_options(
+            _r2_access_key_id, _r2_secret_access_key, R2_BUCKET_NAME, R2_ENDPOINT_URL
+        ),
+    }
+    if R2_CONFIGURED
+    else None
+)
+
+if ATTACHMENTS_STORAGE_BACKEND == R2_STORAGE_BACKEND:
+    if _R2_STORAGE is None:
+        raise ImproperlyConfigured(
+            f'ATTACHMENTS_STORAGE_BACKEND is {R2_STORAGE_BACKEND}, which needs R2_ACCESS_KEY_ID, '
+            'R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME and R2_ENDPOINT_URL (see backend/.env.example).'
+        )
+    _ATTACHMENTS_STORAGE = _R2_STORAGE
+elif ATTACHMENTS_STORAGE_BACKEND == FILESYSTEM_STORAGE_BACKEND:
+    _ATTACHMENTS_STORAGE = {
+        'BACKEND': FILESYSTEM_STORAGE_BACKEND,
+        'OPTIONS': {'location': str(BASE_DIR / 'media' / 'attachments')},
+    }
+else:
+    _ATTACHMENTS_STORAGE = {'BACKEND': ATTACHMENTS_STORAGE_BACKEND, 'OPTIONS': {}}
 
 STORAGES = {
     # Django's own defaults (https://docs.djangoproject.com/en/5.2/ref/settings/#storages) -
-    # spelled out explicitly because defining `STORAGES` at all overrides them.
-    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    # spelled out explicitly because defining `STORAGES` at all overrides them - except
+    # that `default` follows R2 too, so a future `FileField` lands in the bucket as well.
+    'default': _R2_STORAGE or {'BACKEND': FILESYSTEM_STORAGE_BACKEND},
     'staticfiles': {'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
-    'attachments': {
-        'BACKEND': ATTACHMENTS_STORAGE_BACKEND,
-        'OPTIONS': _ATTACHMENTS_STORAGE_OPTIONS,
-    },
+    'attachments': _ATTACHMENTS_STORAGE,
 }
 
 # The hard ceiling on one uploaded file, enforced server-side in
