@@ -8,6 +8,7 @@ import { CourseCatalogPage } from './CourseCatalogPage'
 import { CourseOverviewPage } from './CourseOverviewPage'
 import { ExercisePage } from './ExercisePage'
 import { LearnHomePage } from './LearnHomePage'
+import { LearningLayout } from './LearningLayout'
 import { LessonPage } from './LessonPage'
 import { QuizPage } from './QuizPage'
 
@@ -491,10 +492,89 @@ describe('my learning', () => {
     expect(screen.getByText('Lesson: What is Python')).toBeInTheDocument()
   })
 
-  it('points a newcomer to the catalog', async () => {
+  it('lets a newcomer enroll in a course right there', async () => {
     api.myLearningRequest.mockResolvedValue({ courses: [], recentActivity: [] })
+    api.coursesRequest.mockResolvedValue([SUMMARY])
+    api.enrollRequest.mockResolvedValue({ success: true, message: 'Enrolled.', field: null })
+    render(
+      <MemoryRouter initialEntries={['/app/learn']}>
+        <Routes>
+          <Route path="/app/learn" element={<LearnHomePage />} />
+          <Route path="/app/learn/courses/:courseSlug" element={<p>Course page</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByRole('heading', { name: 'Start a course' })).toBeInTheDocument()
+    expect(screen.getByText('1 modules')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'See modules and lessons' })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Enroll for free' }))
+
+    await waitFor(() => expect(api.enrollRequest).toHaveBeenCalledWith('1'))
+    expect(await screen.findByText('Course page')).toBeInTheDocument()
+  })
+
+  it('says so when no course is open yet', async () => {
+    api.myLearningRequest.mockResolvedValue({ courses: [], recentActivity: [] })
+    api.coursesRequest.mockResolvedValue([])
     renderAt('/learn', '/learn', <LearnHomePage />)
 
-    expect(await screen.findByText('You are not enrolled in a course yet.')).toBeInTheDocument()
+    expect(await screen.findByText('No course is open yet.')).toBeInTheDocument()
+  })
+})
+
+describe('the learning menu and course contents', () => {
+  function renderLearning(path: string) {
+    return render(
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/app/learn" element={<LearningLayout />}>
+            <Route path="courses/:courseSlug/lessons/:lessonId" element={<p>Lesson body</p>} />
+            <Route path="courses" element={<p>Catalog</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+  }
+
+  it('offers my learning and the catalog on every learning page', () => {
+    renderLearning('/app/learn/courses')
+
+    const menu = within(screen.getByRole('navigation', { name: 'Learning' }))
+    expect(menu.getByRole('link', { name: 'My learning' })).toHaveAttribute('href', '/app/learn')
+    expect(menu.getByRole('link', { name: 'Course catalog' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByText('Catalog')).toBeInTheDocument()
+  })
+
+  it('lists the modules, lessons, exercises and quiz beside a lesson', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    renderLearning('/app/learn/courses/python/lessons/12')
+
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    const menu = within(contents)
+    expect(menu.getByText('Introduction')).toBeInTheDocument()
+    expect(menu.getByRole('link', { name: 'Variables' })).toHaveAttribute('aria-current', 'page')
+    expect(menu.getByRole('link', { name: /What is Python/ })).toHaveTextContent('(done)')
+    expect(menu.getByRole('link', { name: 'Calculator' })).toBeInTheDocument()
+    expect(menu.getByRole('link', { name: 'Module quiz' })).toBeInTheDocument()
+    expect(screen.getByText('Lesson body')).toBeInTheDocument()
+  })
+
+  it('lets a learner who has not enrolled do it from the contents', async () => {
+    api.courseRequest.mockResolvedValue(course(false))
+    api.enrollRequest.mockResolvedValue({ success: true, message: 'Enrolled.', field: null })
+    renderLearning('/app/learn/courses/python/lessons/12')
+
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    fireEvent.click(within(contents).getByRole('button', { name: 'Enroll for free' }))
+
+    await waitFor(() => expect(api.enrollRequest).toHaveBeenCalledWith('1'))
+    await waitFor(() => expect(api.courseRequest).toHaveBeenCalledTimes(2))
   })
 })

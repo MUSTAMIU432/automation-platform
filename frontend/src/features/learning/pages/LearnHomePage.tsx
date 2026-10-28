@@ -1,7 +1,14 @@
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 
-import { ArrowRightIcon, CapIcon, CheckCircleIcon } from '../../../components/AppIcons'
-import { myLearningRequest, type Activity } from '../api/learningApi'
+import { ArrowRightIcon, CapIcon, CheckCircleIcon, ClockIcon } from '../../../components/AppIcons'
+import {
+  coursesRequest,
+  enrollRequest,
+  myLearningRequest,
+  type Activity,
+  type CourseSummary,
+} from '../api/learningApi'
 import { Empty, ErrorNotice, Loading, ProgressBar } from '../components/States'
 import { glassPanel, primaryButton, secondaryButton } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
@@ -14,6 +21,99 @@ const ACTIVITY_LABELS: Record<Activity['kind'], string> = {
 
 function when(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
+/**
+ * Published courses the learner has not joined, each with what is in it and a
+ * button to enroll - registration right where a new learner lands.
+ */
+function AvailableCourses({ first }: { first: boolean }) {
+  const navigate = useNavigate()
+  const catalog = useLearningQuery(
+    'catalog',
+    () => coursesRequest(),
+    'We could not load the courses.',
+  )
+  const [enrolling, setEnrolling] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const open = (catalog.data ?? []).filter((course) => !course.enrolled)
+
+  async function enroll(course: CourseSummary) {
+    setEnrolling(course.id)
+    setError(null)
+    try {
+      const result = await enrollRequest(course.id)
+      if (result.success) navigate(`/app/learn/courses/${course.slug}`)
+      else setError(result.message)
+    } catch {
+      setError('We could not reach the server. Please try again.')
+    } finally {
+      setEnrolling(null)
+    }
+  }
+
+  if (catalog.error) return <ErrorNotice message={catalog.error} onRetry={catalog.reload} />
+  if (!catalog.data) return first ? <Loading label="Loading the courses…" /> : null
+  if (open.length === 0) {
+    return first ? (
+      <Empty
+        title="No course is open yet."
+        description="Courses appear here as soon as they are published."
+      />
+    ) : null
+  }
+
+  return (
+    <section aria-labelledby="available-courses" className="space-y-4">
+      <div>
+        <h2 id="available-courses" className="text-lg font-semibold text-slate-900">
+          {first ? 'Start a course' : 'More courses'}
+        </h2>
+        <p className="text-sm text-slate-500">
+          Free to join. Each course is a set of modules, with lessons, exercises and a quiz.
+        </p>
+      </div>
+      {error && <ErrorNotice message={error} />}
+      <div className="grid gap-4 md:grid-cols-2">
+        {open.map((course) => (
+          <article key={course.id} className={`${glassPanel} flex flex-col p-5`}>
+            <div className="flex items-start gap-4">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-600 ring-1 ring-brand-100">
+                <CapIcon className="h-5 w-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-slate-900">{course.title}</h3>
+                {course.subtitle && (
+                  <p className="mt-0.5 text-sm text-slate-600">{course.subtitle}</p>
+                )}
+                <p className="mt-2 inline-flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-500">
+                  <span>{course.levelLabel}</span>
+                  <span>{course.moduleCount} modules</span>
+                  <span>{course.lessonCount} lessons</span>
+                  <span className="inline-flex items-center gap-1">
+                    <ClockIcon className="h-3.5 w-3.5" /> {course.estimatedHours} h
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={enrolling !== null}
+                onClick={() => void enroll(course)}
+                className={primaryButton}
+              >
+                {enrolling === course.id ? 'Enrolling…' : 'Enroll for free'}
+              </button>
+              <Link to={`/app/learn/courses/${course.slug}`} className={secondaryButton}>
+                See modules and lessons
+              </Link>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
 }
 
 /**
@@ -43,17 +143,7 @@ export function LearnHomePage() {
       {mine.error && <ErrorNotice message={mine.error} onRetry={mine.reload} />}
       {mine.loading && !mine.data && <Loading label="Loading your courses…" />}
 
-      {mine.data && courses.length === 0 && (
-        <Empty
-          title="You are not enrolled in a course yet."
-          description="Choose a course from the catalog. Lessons, exercises and quizzes are free to start."
-          action={
-            <Link to="/app/learn/courses" className={primaryButton}>
-              Browse courses
-            </Link>
-          }
-        />
-      )}
+      {mine.data && courses.length === 0 && <AvailableCourses first />}
 
       {current && (
         <section
@@ -162,6 +252,8 @@ export function LearnHomePage() {
           </section>
         </div>
       )}
+
+      {courses.length > 0 && <AvailableCourses first={false} />}
     </div>
   )
 }

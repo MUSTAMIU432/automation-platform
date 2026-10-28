@@ -210,18 +210,22 @@ export const router = createBrowserRouter([
               },
               { path: 'settings/:section', element: <AccountSettingsPage /> },
               { path: 'help', element: <HelpPage /> },
-              { path: 'learn', lazy: learnPage('LearnHomePage') },
-              { path: 'learn/courses', lazy: learnPage('CourseCatalogPage') },
-              { path: 'learn/courses/:courseSlug', lazy: learnPage('CourseOverviewPage') },
               {
-                path: 'learn/courses/:courseSlug/lessons/:lessonId',
-                lazy: learnPage('LessonPage'),
+                // One layout for every learning page: the learning menu, and a course's contents.
+                path: 'learn',
+                lazy: learnPage('LearningLayout'),
+                children: [
+                  { index: true, lazy: learnPage('LearnHomePage') },
+                  { path: 'courses', lazy: learnPage('CourseCatalogPage') },
+                  { path: 'courses/:courseSlug', lazy: learnPage('CourseOverviewPage') },
+                  { path: 'courses/:courseSlug/lessons/:lessonId', lazy: learnPage('LessonPage') },
+                  {
+                    path: 'courses/:courseSlug/exercises/:exerciseId',
+                    lazy: learnPage('ExercisePage'),
+                  },
+                  { path: 'courses/:courseSlug/quizzes/:quizId', lazy: learnPage('QuizPage') },
+                ],
               },
-              {
-                path: 'learn/courses/:courseSlug/exercises/:exerciseId',
-                lazy: learnPage('ExercisePage'),
-              },
-              { path: 'learn/courses/:courseSlug/quizzes/:quizId', lazy: learnPage('QuizPage') },
               {
                 path: 'admin',
                 lazy: async () => ({

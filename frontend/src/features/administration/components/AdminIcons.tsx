@@ -208,6 +208,16 @@ export function RoleIcon({ size }: { size?: AdminIconSize }) {
   )
 }
 
+/** The learning area as learners see it: a graduation cap. */
+export function LearnerIcon({ size }: { size?: AdminIconSize }) {
+  return (
+    <Icon size={size}>
+      <path d="m2.5 9 9.5-4.5L21.5 9 12 13.5 2.5 9Z" />
+      <path d="M6.5 11v4.5c1.5 1.5 3.5 2.2 5.5 2.2s4-.7 5.5-2.2V11M21.5 9v5" />
+    </Icon>
+  )
+}
+
 /** Courses: an open book. */
 export function CourseIcon({ size }: { size?: AdminIconSize }) {
   return (

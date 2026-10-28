@@ -9,6 +9,7 @@ import {
   DashboardIcon,
   IdeaIcon,
   InvitationIcon,
+  LearnerIcon,
   MarketIcon,
   MenuIcon,
   MessageIcon,
@@ -92,7 +93,11 @@ const GROUPS: Array<{ label: string; sections: Section[] }> = [
   },
   {
     label: 'Learning',
-    sections: [{ to: '/app/admin/courses', label: 'Courses', icon: CourseIcon }],
+    sections: [
+      { to: '/app/admin/courses', label: 'Courses', icon: CourseIcon },
+      // Leaves the console: the catalog, enrollment and lessons as a learner sees them.
+      { to: '/app/learn', label: 'Learner view', icon: LearnerIcon },
+    ],
   },
   {
     label: 'Communication',

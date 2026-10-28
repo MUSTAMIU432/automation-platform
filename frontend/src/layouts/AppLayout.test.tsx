@@ -217,8 +217,8 @@ describe('AppLayout', () => {
     expect(order.indexOf('Ideas')).toBeLessThan(order.indexOf('Automation'))
     expect(order.indexOf('Automation')).toBeLessThan(order.indexOf('Implementation'))
     // The journey ends at the market; learning sits beside it, in its own section after.
-    expect(order.at(-2)).toBe('Marketplace')
-    expect(order.at(-1)).toBe('Learning')
+    expect(order.at(-3)).toBe('Marketplace')
+    expect(order.slice(-2)).toEqual(['My learning', 'Course catalog'])
     expect(nav.getByRole('link', { name: 'Implementation' })).toHaveAttribute(
       'href',
       '/app/automation/projects',

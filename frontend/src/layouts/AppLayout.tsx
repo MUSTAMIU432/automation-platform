@@ -22,6 +22,7 @@ import {
   GearIcon,
   GridIcon,
   HelpIcon,
+  ListIcon,
   MenuIcon,
   PanelCollapseIcon,
   PanelExpandIcon,
@@ -604,7 +605,10 @@ function AppShell() {
     {
       // Beside the journey rather than a step in it: building the skills to take part.
       title: '5 · Learn',
-      items: [{ to: '/app/learn', label: 'Learning', Icon: CapIcon }],
+      items: [
+        { to: '/app/learn', label: 'My learning', Icon: CapIcon, end: true },
+        { to: '/app/learn/courses', label: 'Course catalog', Icon: ListIcon },
+      ],
     },
   ]
 
