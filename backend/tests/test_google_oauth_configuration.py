@@ -115,13 +115,16 @@ class TestClientIdVariableName:
     def test_explicitly_empty_resolves_to_empty_so_google_login_fails_closed(self):
         assert _read_client_id('base', _local_env(GOOGLE_OAUTH_CLIENT_ID='')) == ''
 
-    def test_whitespace_only_is_treated_as_configured_but_unusable(self):
-        # Pinned deliberately rather than "fixed": django-environ does not
-        # strip, so a stray space yields a non-empty value that can never
-        # match a real audience - and the mutation must still fail closed on
-        # it (proved in TestGoogleLoginFailsClosed below) rather than
-        # silently skip audience verification.
-        assert _read_client_id('base', _local_env(GOOGLE_OAUTH_CLIENT_ID=' ')) == ' '
+    def test_whitespace_only_is_treated_as_not_configured(self):
+        # The settings strip the value (a host's form easily adds a line break),
+        # so whitespace alone is the same as empty - and Google login fails
+        # closed on it (TestGoogleLoginFailsClosed below).
+        assert _read_client_id('base', _local_env(GOOGLE_OAUTH_CLIENT_ID=' \n')) == ''
+
+    def test_a_pasted_line_break_around_the_id_is_trimmed(self):
+        padded = f'\n{FAKE_CLIENT_ID}\n'
+
+        assert _read_client_id('base', _local_env(GOOGLE_OAUTH_CLIENT_ID=padded)) == FAKE_CLIENT_ID
 
 
 class TestGoogleLoginFailsClosed:

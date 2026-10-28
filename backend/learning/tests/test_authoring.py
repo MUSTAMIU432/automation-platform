@@ -551,8 +551,16 @@ class TestLessonFiles:
 def test_existing_platform_administrators_are_given_the_courses():
     from importlib import import_module
 
-    from django.apps import apps
     from django.contrib.auth.models import Group, Permission
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    # The registry the migration runs with, never the real one: the function edits app configs.
+    apps = (
+        MigrationExecutor(connection)
+        .loader.project_state(('learning', '0002_platform_admins_manage_courses'))
+        .apps
+    )
 
     group = Group.objects.create(name='Platform administrators')
     admin = get_user_model().objects.create_user(email='old-admin@example.com', password='x')

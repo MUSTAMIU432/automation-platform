@@ -14,9 +14,12 @@ def grant_to_platform_administrators(apps, schema_editor):
     app_config = apps.get_app_config('learning')
     # A migration's app registry holds stubs without `models_module`, which
     # `create_permissions` checks; the stub is set for the call and put back after.
-    app_config.models_module = True
-    create_permissions(app_config, apps=apps, verbosity=0)
-    app_config.models_module = None
+    original = getattr(app_config, 'models_module', None)
+    app_config.models_module = original or True
+    try:
+        create_permissions(app_config, apps=apps, verbosity=0)
+    finally:
+        app_config.models_module = original
     Group = apps.get_model('auth', 'Group')
     Permission = apps.get_model('auth', 'Permission')
     group = Group.objects.filter(name=PLATFORM_ADMIN_GROUP).first()
