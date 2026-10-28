@@ -312,7 +312,7 @@ const FOOTER_LINKS = [
 ]
 
 function sidebarLinkClass(active: boolean, collapsed: boolean): string {
-  return `group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
+  return `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
     collapsed ? 'lg:justify-center lg:px-0 lg:py-3' : ''
   } ${
     active
@@ -361,7 +361,7 @@ function Sidebar({
       }`}
     >
       <div
-        className={`mb-3 hidden items-center justify-between gap-2 border-b border-jade/10 pb-3 lg:flex ${whenCollapsed(
+        className={`mb-2 hidden items-center justify-between gap-2 border-b border-jade/10 pb-2 lg:flex ${whenCollapsed(
           'lg:justify-center',
         )}`}
       >
@@ -389,9 +389,9 @@ function Sidebar({
 
       <nav aria-label="Main" className="flex-1">
         {sections.map((section, index) => (
-          <div key={section.title} className={index > 0 ? 'mt-4 border-t border-jade/10 pt-4' : ''}>
+          <div key={section.title} className={index > 0 ? 'mt-2 border-t border-jade/10 pt-2' : ''}>
             <p
-              className={`px-3 pb-2 text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-sage ${whenCollapsed(
+              className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-sage ${whenCollapsed(
                 'lg:sr-only',
               )}`}
             >
@@ -432,34 +432,8 @@ function Sidebar({
         ))}
       </nav>
 
-      {/* The platform's promise, as a quiet card at the foot of the menu. */}
-      <div
-        className={`relative mt-4 hidden overflow-hidden rounded-2xl bg-gradient-to-br from-jade via-pine to-forest p-4 text-white ${
-          collapsed ? '' : 'lg:block'
-        }`}
-      >
-        <span
-          aria-hidden="true"
-          className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.8),rgba(85,230,176,0.45)_35%,rgba(11,143,101,0.2)_70%)]"
-        />
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 200 80"
-          className="absolute inset-x-0 bottom-0 h-16 w-full text-mint/40"
-          fill="none"
-          preserveAspectRatio="none"
-        >
-          <path d="M0 60 C 50 30, 90 80, 140 50 S 200 40, 200 40" stroke="currentColor" />
-          <path d="M0 70 C 60 45, 100 90, 150 62 S 200 55, 200 55" stroke="currentColor" />
-        </svg>
-        <p className="relative text-base font-semibold leading-snug">
-          Turning Ideas into Real Solutions
-        </p>
-        <span aria-hidden="true" className="relative mt-3 block h-0.5 w-8 rounded-full bg-mint" />
-      </div>
-
       {/* Your account and help: always at the foot, apart from the journey above. */}
-      <nav aria-label="Settings and help" className="mt-3 border-t border-jade/10 pt-3">
+      <nav aria-label="Settings and help" className="mt-2 border-t border-jade/10 pt-2">
         <ul className="space-y-1">
           {FOOTER_LINKS.map(({ to, label, Icon }) => (
             <li key={to}>
