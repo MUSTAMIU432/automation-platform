@@ -25,4 +25,7 @@ def on_starting(server):
     instead of serving a half-migrated schema.
     """
     server.log.info('Applying database migrations')
-    subprocess.run([sys.executable, str(_MANAGE_PY), 'migrate', '--noinput'], check=True)
+    # Fixed interpreter and arguments - no untrusted input.
+    subprocess.run(  # noqa: S603
+        [sys.executable, str(_MANAGE_PY), 'migrate', '--noinput'], check=True
+    )
