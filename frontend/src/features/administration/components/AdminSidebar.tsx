@@ -212,7 +212,7 @@ export function AdminSidebar() {
         ref={nav}
         id={navId}
         aria-label="Administration"
-        className={`mt-1 overflow-y-auto [scrollbar-width:none] lg:block lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden ${
+        className={`mt-1 overflow-y-auto [scrollbar-width:none] lg:block lg:min-h-0 lg:flex-1 lg:[mask-image:linear-gradient(to_bottom,transparent,black_14px,black_calc(100%-14px),transparent)] [&::-webkit-scrollbar]:hidden ${
           menuOpen ? 'block' : 'hidden'
         }`}
       >

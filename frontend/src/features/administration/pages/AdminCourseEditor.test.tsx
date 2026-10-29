@@ -179,3 +179,56 @@ describe('AdminCourseEditorPage drag and drop', () => {
     ])
   })
 })
+
+describe('AdminCourseEditorPage details', () => {
+  it('opens on the curriculum and moves between tabs', async () => {
+    renderEditor()
+
+    expect(await screen.findByRole('tab', { name: /Curriculum/ })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+
+    expect(screen.getByRole('heading', { name: 'Delete this course' })).toBeInTheDocument()
+    expect(screen.queryByRole('list', { name: 'Lessons in Basics' })).not.toBeInTheDocument()
+  })
+
+  it('shows the save bar only once something changed, and saves lists as lists', async () => {
+    api.updateCourseRequest.mockResolvedValue({ ...OK, message: 'Course saved.' })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Details' }))
+    expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Subtitle'), { target: { value: 'From zero' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add an outcome' }))
+    fireEvent.change(screen.getByLabelText('Outcome 1'), { target: { value: 'Write Python' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add an audience' }))
+    expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'Details •' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    await waitFor(() =>
+      expect(api.updateCourseRequest).toHaveBeenCalledWith(
+        '1',
+        expect.objectContaining({
+          subtitle: 'From zero',
+          outcomes: ['Write Python'],
+          audience: [],
+        }),
+      ),
+    )
+  })
+
+  it('throws edits away on Discard', async () => {
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Details' }))
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renamed' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+
+    expect(screen.getByLabelText('Title')).toHaveValue('Python')
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
+  })
+})
