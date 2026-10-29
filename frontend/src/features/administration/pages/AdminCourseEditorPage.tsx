@@ -37,6 +37,7 @@ import {
 import { CourseIcon } from '../components/AdminIcons'
 import { EmptyState, ErrorState, LoadingState, Notice, glassSurface } from '../components/AdminUi'
 import { BackLink } from '../components/BackLink'
+import { ChoiceField } from '../components/ChoiceField'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   ArrowDownIcon,
@@ -55,6 +56,7 @@ import {
   inputClasses,
   quietButton,
 } from '../components/CourseEditorUi'
+import { AUDIENCE_SUGGESTIONS, OUTCOME_SUGGESTIONS } from '../components/courseSuggestions'
 import { useAdminQuery } from '../hooks/useAdminQuery'
 
 const LEVELS = [
@@ -387,26 +389,30 @@ function DetailsPanel({ api, course }: { api: CourseFormApi; course: AdminCourse
           title="Audience and outcomes"
           description="Who it is for, and what a learner can do by the end. Each shows as a short list on the course page."
         >
-          <div>
-            <p className="mb-2 text-sm font-semibold text-slate-800">Who it is for</p>
-            <ListEditor
-              label="Audience"
-              items={form.audience}
-              onChange={(audience) => update({ audience })}
-              placeholder="Complete beginners who want to automate their work"
-              addLabel="Add an audience"
-            />
-          </div>
-          <div>
-            <p className="mb-2 text-sm font-semibold text-slate-800">Learning outcomes</p>
-            <ListEditor
-              label="Outcome"
-              items={form.outcomes}
-              onChange={(outcomes) => update({ outcomes })}
-              placeholder="Write and test a small program on your own"
-              addLabel="Add an outcome"
-            />
-          </div>
+          <ChoiceField
+            label="Who it is for"
+            hint="The kinds of learner the course is written for."
+            items={form.audience}
+            onChange={(audience) => update({ audience })}
+            suggestions={AUDIENCE_SUGGESTIONS}
+            chooseLabel="Choose audience"
+            dialogTitle="Who is this course for?"
+            dialogDescription="Tick every kind of learner it suits, or add your own."
+            addPlaceholder="Describe another audience"
+            emptyText="No audience yet - choose who the course is for"
+          />
+          <ChoiceField
+            label="Learning outcomes"
+            hint="What a learner can do by the end."
+            items={form.outcomes}
+            onChange={(outcomes) => update({ outcomes })}
+            suggestions={OUTCOME_SUGGESTIONS}
+            chooseLabel="Choose outcomes"
+            dialogTitle="What will learners be able to do?"
+            dialogDescription="Tick the outcomes this course delivers, or add your own."
+            addPlaceholder="Write another outcome"
+            emptyText="No outcomes yet - choose what learners will achieve"
+          />
         </FormSection>
       </div>
       <CatalogPreview form={form} course={course} />

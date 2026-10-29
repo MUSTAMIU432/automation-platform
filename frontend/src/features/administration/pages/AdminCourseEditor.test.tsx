@@ -202,9 +202,15 @@ describe('AdminCourseEditorPage details', () => {
     expect(screen.queryByRole('button', { name: 'Save changes' })).not.toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Subtitle'), { target: { value: 'From zero' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add an outcome' }))
-    fireEvent.change(screen.getByLabelText('Outcome 1'), { target: { value: 'Write Python' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Add an audience' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose outcomes' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'What will learners be able to do?' }))
+    fireEvent.click(dialog.getByLabelText('Use version control with Git'))
+    fireEvent.change(dialog.getByLabelText('Add your own'), { target: { value: 'Write Python' } })
+    fireEvent.keyDown(dialog.getByLabelText('Add your own'), { key: 'Enter' })
+    expect(dialog.getByText('2 selected')).toBeInTheDocument()
+    fireEvent.click(dialog.getByRole('button', { name: 'Apply' }))
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(screen.getByText('Unsaved changes')).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Details •' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Save changes' }))
@@ -214,11 +220,38 @@ describe('AdminCourseEditorPage details', () => {
         '1',
         expect.objectContaining({
           subtitle: 'From zero',
-          outcomes: ['Write Python'],
+          outcomes: ['Use version control with Git', 'Write Python'],
           audience: [],
         }),
       ),
     )
+  })
+
+  it('picks an audience in a dialog: search, cancel, apply, and remove a chip', async () => {
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Details' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose audience' }))
+    let dialog = within(screen.getByRole('dialog', { name: 'Who is this course for?' }))
+    fireEvent.change(dialog.getByLabelText('Search the list'), { target: { value: 'beginners' } })
+    expect(dialog.getAllByRole('checkbox')).toHaveLength(1)
+    fireEvent.click(dialog.getByLabelText('Complete beginners with no programming experience'))
+    fireEvent.click(dialog.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose audience' }))
+    dialog = within(screen.getByRole('dialog', { name: 'Who is this course for?' }))
+    fireEvent.click(dialog.getByLabelText('Complete beginners with no programming experience'))
+    fireEvent.click(dialog.getByLabelText('Teams who need a shared technical foundation'))
+    fireEvent.click(dialog.getByRole('button', { name: 'Apply' }))
+
+    const chips = within(screen.getByRole('list', { name: 'Who it is for' }))
+    expect(chips.getAllByRole('listitem')).toHaveLength(2)
+    fireEvent.click(
+      chips.getByRole('button', { name: 'Remove “Teams who need a shared technical foundation”' }),
+    )
+    expect(chips.getAllByRole('listitem')).toHaveLength(1)
+    expect(api.updateCourseRequest).not.toHaveBeenCalled()
   })
 
   it('throws edits away on Discard', async () => {
