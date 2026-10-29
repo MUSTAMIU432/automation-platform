@@ -73,16 +73,16 @@ describe('authApi', () => {
     })
   })
 
-  it('never expects the refresh credential in a login response', async () => {
-    // The refresh credential is an HttpOnly cookie and must not be read back
-    // from the body: if a payload ever carried one, this would start storing
-    // it in memory, and it would be readable by any XSS payload.
+  it('reads both tokens from a login response', async () => {
+    // Authentication is token-based, with no cookie: the refresh token comes
+    // back in the body, for the client to keep and present to refreshToken.
     stubFetch({
       login: {
         success: true,
         message: 'ok',
         accessToken: 'a-token',
         accessTokenExpiresAt: '2099-01-01T00:00:00.000Z',
+        refreshToken: 'a-refresh-token',
         user: {
           id: '1',
           email: 'ada@example.com',
@@ -101,8 +101,10 @@ describe('authApi', () => {
     expect(Object.keys(result.session ?? {}).sort()).toEqual([
       'accessToken',
       'accessTokenExpiresAt',
+      'refreshToken',
       'user',
     ])
+    expect(result.session?.refreshToken).toBe('a-refresh-token')
   })
 
   it('reports a rejected login without a session', async () => {
@@ -146,7 +148,7 @@ describe('authApi', () => {
 
   // --- refreshToken --------------------------------------------------------
 
-  it('sends the refresh mutation with no arguments at all', async () => {
+  it("sends the refresh token as the refresh mutation's only argument", async () => {
     const fetchMock = stubFetch({
       refreshToken: {
         success: true,
@@ -165,29 +167,25 @@ describe('authApi', () => {
       },
     })
 
-    const result = await refreshTokenRequest()
+    const result = await refreshTokenRequest('stored-refresh')
 
     const [request] = sentRequests(fetchMock)
     expect(request.operationName).toBe('RefreshToken')
     expect(request.query).toContain('mutation RefreshToken')
-    expect(request.query).toContain('refreshToken')
-    // The credential is read from the httpOnly cookie by the browser, so a
-    // variable here would be a client-supplied value the backend has no
-    // business accepting.
-    expect(request.variables).toBeUndefined()
+    expect(request.variables).toEqual({ refreshToken: 'stored-refresh' })
     expect(result.session?.accessToken).toBe('renewed')
   })
 
   // --- logout --------------------------------------------------------------
 
-  it('sends the logout mutation with no arguments', async () => {
+  it('sends the refresh token to be revoked with the logout mutation', async () => {
     const fetchMock = stubFetch({ logout: { success: true } })
 
-    await logoutRequest()
+    await logoutRequest('stored-refresh')
 
     const [request] = sentRequests(fetchMock)
     expect(request.operationName).toBe('Logout')
-    expect(request.variables).toBeUndefined()
+    expect(request.variables).toEqual({ refreshToken: 'stored-refresh' })
   })
 
   // --- googleLogin ---------------------------------------------------------

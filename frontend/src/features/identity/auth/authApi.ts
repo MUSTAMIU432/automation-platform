@@ -7,7 +7,7 @@
  */
 
 import { graphqlClient } from '../../../graphql/client'
-import { getAccessToken } from '../../../graphql/tokenStore'
+import { getAccessToken, getRefreshToken } from '../../../graphql/tokenStore'
 import { env } from '../../../lib/env'
 
 export interface AuthUser {
@@ -25,6 +25,11 @@ export interface AuthUser {
 export interface AuthSession {
   accessToken: string
   accessTokenExpiresAt: string
+  /**
+   * The new refresh token to keep, or null when none was issued - a refresh in
+   * the server's rotation grace window, where the stored one is already current.
+   */
+  refreshToken?: string | null
   user: AuthUser
 }
 
@@ -56,6 +61,7 @@ interface RawAuthPayload {
   message: string
   accessToken: string | null
   accessTokenExpiresAt: string | null
+  refreshToken: string | null
   user: AuthUser | null
 }
 
@@ -77,26 +83,28 @@ const LOGIN_MUTATION = `
       message
       accessToken
       accessTokenExpiresAt
+      refreshToken
       user { ${USER_FIELDS} }
     }
   }
 `
 
 const REFRESH_TOKEN_MUTATION = `
-  mutation RefreshToken {
-    refreshToken {
+  mutation RefreshToken($refreshToken: String!) {
+    refreshToken(refreshToken: $refreshToken) {
       success
       message
       accessToken
       accessTokenExpiresAt
+      refreshToken
       user { ${USER_FIELDS} }
     }
   }
 `
 
 const LOGOUT_MUTATION = `
-  mutation Logout {
-    logout {
+  mutation Logout($refreshToken: String!) {
+    logout(refreshToken: $refreshToken) {
       success
     }
   }
@@ -109,6 +117,7 @@ const GOOGLE_LOGIN_MUTATION = `
       message
       accessToken
       accessTokenExpiresAt
+      refreshToken
       user { ${USER_FIELDS} }
     }
   }
@@ -128,6 +137,7 @@ function toAuthResult(payload: RawAuthPayload): AuthResult {
       session: {
         accessToken: payload.accessToken,
         accessTokenExpiresAt: payload.accessTokenExpiresAt,
+        refreshToken: payload.refreshToken ?? null,
         user: payload.user,
       },
     }
@@ -143,18 +153,24 @@ export async function loginRequest(email: string, password: string): Promise<Aut
 }
 
 /**
- * Exchanges the browser's httpOnly refresh cookie (if any) for a fresh
- * access token, rotating the refresh credential. Called on app start to
- * silently re-establish a session after a reload - the access token itself
- * never survives a reload (it's memory-only), only the cookie does.
+ * Exchanges a refresh token for a fresh access token, rotating the refresh
+ * token. Called on app start to silently re-establish a session after a
+ * reload - the access token never survives one (it is memory-only); the
+ * stored refresh token does.
  */
-export async function refreshTokenRequest(): Promise<AuthResult> {
-  const data = await graphqlClient.request<{ refreshToken: RawAuthPayload }>(REFRESH_TOKEN_MUTATION)
+export async function refreshTokenRequest(refreshToken: string): Promise<AuthResult> {
+  const data = await graphqlClient.request<{ refreshToken: RawAuthPayload }>(
+    REFRESH_TOKEN_MUTATION,
+    { refreshToken },
+  )
   return toAuthResult(data.refreshToken)
 }
 
-export async function logoutRequest(): Promise<void> {
-  await graphqlClient.request<{ logout: { success: boolean } }>(LOGOUT_MUTATION)
+/** Revokes `refreshToken` on the server, signing this device out. */
+export async function logoutRequest(refreshToken: string | null): Promise<void> {
+  await graphqlClient.request<{ logout: { success: boolean } }>(LOGOUT_MUTATION, {
+    refreshToken: refreshToken ?? '',
+  })
 }
 
 /**
@@ -411,7 +427,7 @@ export async function updateProfileRequest(input: {
 
 /**
  * Changes the signed-in user's password. The server signs every *other* device
- * out; this browser's session is untouched.
+ * out; this browser's session - named by its refresh token - is untouched.
  */
 export async function changePasswordRequest(
   currentPassword: string,
@@ -419,7 +435,7 @@ export async function changePasswordRequest(
 ): Promise<ActionResult> {
   const data = await graphqlClient.request<{ changePassword: ActionResult }>(
     CHANGE_PASSWORD_MUTATION,
-    { input: { currentPassword, newPassword } },
+    { input: { currentPassword, newPassword, refreshToken: getRefreshToken() } },
   )
   return data.changePassword
 }

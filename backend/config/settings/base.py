@@ -102,6 +102,12 @@ JWT_SIGNING_KEY = env('DJANGO_JWT_SIGNING_KEY')
 # exposure window, not the access token.
 ACCESS_TOKEN_LIFETIME = timedelta(minutes=env.int('ACCESS_TOKEN_LIFETIME_MINUTES', default=15))
 REFRESH_TOKEN_LIFETIME = timedelta(days=env.int('REFRESH_TOKEN_LIFETIME_DAYS', default=30))
+# How long a refresh credential that has just been rotated is still honoured - with a
+# new access token, but no new credential - while its replacement is live. Open tabs
+# that wake together (a laptop resuming) all refresh with the same cookie at once; the
+# first rotates it, and without this the rest would be refused and sign everyone out.
+# See `identity.authentication.refresh`.
+REFRESH_ROTATION_GRACE = timedelta(seconds=env.int('REFRESH_ROTATION_GRACE_SECONDS', default=30))
 
 # Google OAuth/OIDC ("Sign in with Google", S1-004). Optional: unset, the
 # `googleLogin` mutation always fails closed rather than accepting tokens

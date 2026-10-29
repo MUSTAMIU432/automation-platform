@@ -12,7 +12,9 @@ import {
 import {
   getAccessToken,
   getAccessTokenExpiresAtIso,
+  getRefreshToken,
   setAccessToken,
+  setRefreshToken,
 } from '../../../graphql/tokenStore'
 import {
   NETWORK_ERROR_MESSAGE,
@@ -72,9 +74,9 @@ interface ResolvedSession {
  *
  * Uses `refreshAccessToken` rather than `refreshTokenRequest` so this
  * mount-time attempt shares its one-in-flight promise with any proactive
- * refresh already running or about to: the refresh cookie is single-use, so
+ * refresh already running or about to: the refresh token is single-use, so
  * two overlapping refreshes would make the second one fail on an
- * already-revoked credential and sign the user out for no reason.
+ * already-revoked token and sign the user out for no reason.
  *
  * Used for the mount-time bootstrap below. `login`/`loginWithGoogle`
  * deliberately don't route through this - their own mutation's returned
@@ -144,7 +146,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setStatus('authenticated')
       // Keep the session alive before it lapses. `tokenRefresh` replaces any
       // pending schedule, so re-establishing a session cannot leave two
-      // timers running (and cannot double-rotate the single-use cookie).
+      // timers running (and cannot double-rotate the single-use refresh token).
       scheduleProactiveRefresh(session.accessTokenExpiresAt)
     } else {
       setAccessToken(null)
@@ -156,8 +158,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   useEffect(() => {
     // On first load (including a hard refresh) there's no access token in
-    // memory yet - only the httpOnly refresh cookie the browser already
-    // holds, if any - so resolveSession()'s own token check is normally a
+    // memory yet - only the refresh token kept in storage, if any - so
+    // resolveSession()'s own token check is normally a
     // no-op here and it goes straight to refresh; the check still exists
     // because this effect is the same bootstrap path a provider remount
     // within an already-running tab would take, and that case *can* have
@@ -207,6 +209,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         const result = await attempt()
         outcome = { success: result.success, message: result.message }
         session = result.success ? result.session : null
+        if (session?.refreshToken) setRefreshToken(session.refreshToken)
       } catch {
         outcome = { success: false, message: NETWORK_ERROR_MESSAGE }
         session = null
@@ -237,7 +240,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // (if any) is deliberately swallowed, not just ignored via `finally`:
     // callers can treat `logout()` as always succeeding locally, the same
     // way the backend's own logout mutation is designed to never fail.
-    const request = logoutRequest()
+    const request = logoutRequest(getRefreshToken())
+    // Removing it also signs out every other open tab (see tokenRefresh.ts).
+    setRefreshToken(null)
     applySession(null)
     try {
       await request

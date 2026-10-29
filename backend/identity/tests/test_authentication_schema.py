@@ -1,10 +1,12 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 import jwt
 import pytest
 from django.conf import settings
 from django.test import Client
+from django.utils import timezone
 
 from graphql_api.schema import schema as root_schema
 from identity.google_oauth import GoogleIdentity, GoogleTokenError
@@ -19,6 +21,8 @@ mutation Register($input: RegisterInput!) {
 LOGIN_MUTATION = """
 mutation Login($input: LoginInput!) {
   login(input: $input) {
+    refreshToken
+    refreshTokenExpiresAt
     success
     message
     accessToken
@@ -29,19 +33,20 @@ mutation Login($input: LoginInput!) {
 """
 
 REFRESH_MUTATION = """
-mutation Refresh {
-  refreshToken {
+mutation Refresh($token: String!) {
+  refreshToken(refreshToken: $token) {
     success
     message
     accessToken
+    refreshToken
     user { id email }
   }
 }
 """
 
 LOGOUT_MUTATION = """
-mutation Logout {
-  logout { success }
+mutation Logout($token: String!) {
+  logout(refreshToken: $token) { success }
 }
 """
 
@@ -50,6 +55,7 @@ mutation GoogleLogin($input: GoogleLoginInput!) {
   googleLogin(input: $input) {
     success
     message
+    refreshToken
     accessToken
     accessTokenExpiresAt
     user { id email isVerified }
@@ -104,6 +110,14 @@ def _register_and_login(gql, email=EMAIL, password=PASSWORD):
     return _login(gql, email, password)
 
 
+def _refresh_token_of(response, operation='login'):
+    return response.json()['data'][operation]['refreshToken']
+
+
+def _refresh(gql, token):
+    return gql(REFRESH_MUTATION, {'token': token}).json()['data']['refreshToken']
+
+
 # --- login -------------------------------------------------------------------------
 
 
@@ -121,14 +135,13 @@ def test_login_succeeds_for_a_registered_user(gql):
 
 
 @pytest.mark.django_db
-def test_login_sets_an_httponly_refresh_cookie(gql, client):
-    _register_and_login(gql)
+def test_login_returns_a_refresh_token_and_sets_no_cookie(gql, client):
+    response = _register_and_login(gql)
 
-    cookie = client.cookies.get('refresh_token')
-    assert cookie is not None
-    assert cookie.value
-    assert cookie['httponly'] is True
-    assert cookie['samesite'] == 'Lax'
+    payload = response.json()['data']['login']
+    assert payload['refreshToken']
+    assert payload['refreshTokenExpiresAt']
+    assert not client.cookies
 
 
 @pytest.mark.django_db
@@ -373,44 +386,59 @@ def test_me_schema_has_no_password_or_secret_fields():
 
 
 @pytest.mark.django_db
-def test_refresh_without_a_cookie_fails(gql):
-    response = gql(REFRESH_MUTATION)
-
-    assert response.json()['data']['refreshToken']['success'] is False
+def test_refresh_without_a_token_fails(gql):
+    assert _refresh(gql, '')['success'] is False
 
 
 @pytest.mark.django_db
-def test_refresh_token_rotates_and_returns_a_new_access_token(gql, client):
+def test_refresh_token_rotates_and_returns_a_new_access_token(gql):
     login_response = _register_and_login(gql)
     first_access_token = login_response.json()['data']['login']['accessToken']
-    first_cookie_value = client.cookies.get('refresh_token').value
+    first_refresh = _refresh_token_of(login_response)
 
-    refresh_response = gql(REFRESH_MUTATION)
+    payload = _refresh(gql, first_refresh)
 
-    payload = refresh_response.json()['data']['refreshToken']
     assert payload['success'] is True
     assert payload['accessToken'] != first_access_token
-    assert client.cookies.get('refresh_token').value != first_cookie_value
+    assert payload['refreshToken']
+    assert payload['refreshToken'] != first_refresh
 
 
 @pytest.mark.django_db
-def test_reusing_a_rotated_refresh_cookie_fails(gql, client):
-    _register_and_login(gql)
-    first_cookie_value = client.cookies.get('refresh_token').value
-    gql(REFRESH_MUTATION)  # rotates the credential
+def test_reusing_a_rotated_refresh_token_fails(gql):
+    first_refresh = _refresh_token_of(_register_and_login(gql))
+    _refresh(gql, first_refresh)  # rotates the credential
+    # Past the grace window a parallel tab gets for a credential rotated moments ago.
+    RefreshSession.objects.filter(revoked_at__isnull=False).update(
+        revoked_at=timezone.now() - timedelta(minutes=5)
+    )
 
-    # Simulate the old (now-revoked) cookie being replayed by the browser.
-    client.cookies['refresh_token'] = first_cookie_value
-    replay_response = gql(REFRESH_MUTATION)
+    assert _refresh(gql, first_refresh)['success'] is False
 
-    assert replay_response.json()['data']['refreshToken']['success'] is False
+
+@pytest.mark.django_db
+def test_tabs_refreshing_together_keep_the_session(gql):
+    """
+    Two tabs refresh with the same token at once. The first rotates it; the second,
+    arriving a moment later with the token just replaced, is renewed too - without a
+    new refresh token, since the first tab already stored the replacement.
+    """
+    shared = _refresh_token_of(_register_and_login(gql))
+    first = _refresh(gql, shared)
+
+    late = _refresh(gql, shared)
+
+    assert late['success'] is True
+    assert late['accessToken']
+    assert late['refreshToken'] is None
+    assert _refresh(gql, first['refreshToken'])['success'] is True
 
 
 @pytest.mark.django_db
 def test_refresh_token_response_never_exposes_password_or_hash(gql):
-    _register_and_login(gql)
+    token = _refresh_token_of(_register_and_login(gql))
 
-    response = gql(REFRESH_MUTATION)
+    response = gql(REFRESH_MUTATION, {'token': token})
 
     raw_body = response.content.decode()
     user = User.objects.get(email=EMAIL)
@@ -422,40 +450,27 @@ def test_refresh_token_response_never_exposes_password_or_hash(gql):
 
 @pytest.mark.django_db
 def test_logout_revokes_the_session_so_a_later_refresh_fails(gql):
-    _register_and_login(gql)
+    token = _refresh_token_of(_register_and_login(gql))
 
-    logout_response = gql(LOGOUT_MUTATION)
+    logout_response = gql(LOGOUT_MUTATION, {'token': token})
     assert logout_response.json()['data']['logout']['success'] is True
 
-    refresh_response = gql(REFRESH_MUTATION)
-    assert refresh_response.json()['data']['refreshToken']['success'] is False
-
-
-@pytest.mark.django_db
-def test_logout_clears_the_refresh_cookie(gql, client):
-    _register_and_login(gql)
-
-    gql(LOGOUT_MUTATION)
-
-    cookie = client.cookies.get('refresh_token')
-    # Django represents a cleared cookie as an empty value with epoch expiry,
-    # not the absence of the cookie key.
-    assert cookie is None or cookie.value == ''
+    assert _refresh(gql, token)['success'] is False
 
 
 @pytest.mark.django_db
 def test_logout_without_a_prior_login_still_succeeds(gql):
-    response = gql(LOGOUT_MUTATION)
+    response = gql(LOGOUT_MUTATION, {'token': ''})
 
     assert response.json()['data']['logout']['success'] is True
 
 
 @pytest.mark.django_db
 def test_refresh_session_row_reflects_revocation_after_logout(gql):
-    _register_and_login(gql)
+    token = _refresh_token_of(_register_and_login(gql))
     assert RefreshSession.objects.filter(revoked_at__isnull=True).count() == 1
 
-    gql(LOGOUT_MUTATION)
+    gql(LOGOUT_MUTATION, {'token': token})
 
     assert RefreshSession.objects.filter(revoked_at__isnull=True).count() == 0
 
@@ -500,7 +515,7 @@ def test_google_login_succeeds_for_a_new_user(gql):
 
 
 @pytest.mark.django_db
-def test_google_login_sets_an_httponly_refresh_cookie(gql, client):
+def test_google_login_returns_a_refresh_token_and_sets_no_cookie(gql, client):
     identity = GoogleIdentity(
         subject='google-subject-1',
         email='grace@example.com',
@@ -510,13 +525,10 @@ def test_google_login_sets_an_httponly_refresh_cookie(gql, client):
     )
 
     with _patched_google_identity(identity=identity):
-        _google_login(gql)
+        response = _google_login(gql)
 
-    cookie = client.cookies.get('refresh_token')
-    assert cookie is not None
-    assert cookie.value
-    assert cookie['httponly'] is True
-    assert cookie['samesite'] == 'Lax'
+    assert _refresh_token_of(response, 'googleLogin')
+    assert not client.cookies
 
 
 @pytest.mark.django_db

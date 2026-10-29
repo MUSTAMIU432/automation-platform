@@ -152,11 +152,16 @@ headers, with automated tests.
 
 Implemented (S1-002/S1-003): the `identity` app's `User` model (email as the
 login identifier, Django's own password hashing), email/password
-registration and login, short-lived JWT access tokens, and a persistent,
-rotating `RefreshSession` credential delivered as an HttpOnly cookie (never
-`localStorage`). `CORS_ALLOW_CREDENTIALS` is on for this reason, still
-scoped to an explicit, non-wildcard origin allow-list. See
-[`environments.md`](environments.md) for the cookie/CORS/CSRF reasoning and
+registration and login, and token-based authentication with no cookie:
+short-lived JWT access tokens, sent as `Authorization: Bearer` and held in
+memory only, and a persistent, rotating `RefreshSession` refresh token,
+returned in the response body, kept by the browser app in `localStorage`
+(shared by its tabs) and presented to `refreshToken`/`logout` as an argument.
+Tabs refresh one at a time (a Web Lock), and the server honours a token
+rotated moments ago (`REFRESH_ROTATION_GRACE_SECONDS`) so tabs waking
+together are not signed out. Because no credential travels on its own, the
+frontend and API can be served from different sites. See
+[`environments.md`](environments.md) for the CORS/CSRF reasoning and
 `backend/identity/` (`models.py`, `services.py`, `authentication.py`,
 `tokens.py`, `schema.py`) for the implementation.
 
@@ -311,7 +316,7 @@ operation because the threats differ: **login** is limited per account
 (credential guessing) *and* per client address (password spraying);
 **googleLogin** per client address (there is no account to key on before
 verification, and a replayed credential is already refused by the replay
-check); **refreshToken** per refresh credential (a stolen cookie being
+check); **refreshToken** per refresh credential (a stolen token being
 grounded against the server) *and* per client address (a loop, which
 rotation alone would not catch since every successful refresh hands the
 caller a fresh budget); **register** per client address. Counters are
@@ -368,7 +373,7 @@ than left to review:
   or belonging to the other flow. A message per case would tell whoever holds
   a stolen link exactly how far it got.
 - **A reset ends every session on the account**, the caller's own browser
-  included, and clears its refresh cookie. Without that step a password
+  included: its refresh token stops working. Without that step a password
   changed *because it may have been stolen* leaves the attacker's existing
   session signed in and working until it expires on its own schedule.
 - **Verification is not a login requirement.** `login` does not check
@@ -722,7 +727,7 @@ GraphQL and frontend seams.
 | ---- | ----------- | ---- |
 | Identity domain | `identity` app: `User` (email login, hashed passwords), `ExternalIdentity` foundation | S1-002 |
 | Registration | `register` GraphQL mutation, email normalization, password/phone validation | S1-002 |
-| Authentication | `login`/`refreshToken`/`logout` mutations, JWT access tokens, rotating `RefreshSession` refresh credential in an HttpOnly cookie, `me` query | S1-003 |
+| Authentication | `login`/`refreshToken`/`logout` mutations, JWT access tokens (Bearer), rotating `RefreshSession` refresh token returned in the body and sent back as an argument - no cookie, `me` query | S1-003 |
 | Frontend auth state | `AuthProvider`/`useAuth()`, in-memory access token, `/app` protected route | S1-003 |
 | Google/OAuth sign-in | `googleLogin` GraphQL mutation, Google ID-token (OIDC) verification, account provisioning/linking policy, `GoogleAuthButton` wired to Google Identity Services | S1-004 |
 | Current user | `me` query as the authoritative identity source, `RequireAuth` gating `/app`, `OrganizationSwitcher`/workspace | S1-005 |

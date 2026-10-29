@@ -31,7 +31,6 @@ from django.test import Client
 from django.utils import timezone
 
 from identity.models import EmailToken, User
-from identity.schema import REFRESH_TOKEN_COOKIE_NAME
 
 REQUEST_PASSWORD_RESET = """
 mutation RequestPasswordReset($input: RequestPasswordResetInput!) {
@@ -108,6 +107,11 @@ def make_user(email='ada@example.com', **overrides):
 LOGIN = """
 mutation Login($input: LoginInput!) {
   login(input: $input) { success accessToken }
+}
+"""
+LOGIN_WITH_REFRESH = """
+mutation Login($input: LoginInput!) {
+  login(input: $input) { success accessToken refreshToken }
 }
 """
 
@@ -266,14 +270,17 @@ class TestResetPasswordMutation:
         assert result['success'] is False
         assert result['field'] == 'password'
 
-    def test_a_successful_reset_clears_the_callers_own_refresh_cookie(self, gql, registered_user):
+    def test_a_successful_reset_signs_out_the_callers_own_session(self, gql, registered_user):
         """
-        The reset revoked every session for the account, including the one this
-        browser is holding, so the cookie it still has is dead. Clearing it
-        here means the next request cannot keep presenting a credential that
-        can never work again.
+        The reset revokes every session for the account, including the one this
+        browser holds: its refresh token stops working.
         """
-        _sign_in(gql, registered_user)
+        signed_in = run(
+            gql,
+            LOGIN_WITH_REFRESH,
+            'login',
+            {'input': {'email': registered_user.email, 'password': PASSWORD}},
+        )
         token = self._request(gql, registered_user.email)
 
         response = gql(
@@ -284,10 +291,13 @@ class TestResetPasswordMutation:
         body = response.json()
         assert 'errors' not in body, body
         assert body['data']['resetPassword']['success'] is True
-        # An immediate expiry is Django's way of deleting a cookie.
-        cleared = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
-        assert cleared.value == ''
-        assert cleared['max-age'] == 0
+        renewed = run(
+            gql,
+            'mutation($t: String!){ refreshToken(refreshToken: $t){ success } }',
+            'refreshToken',
+            {'t': signed_in['refreshToken']},
+        )
+        assert renewed['success'] is False
 
     def test_the_old_session_cannot_refresh_after_a_reset(self, gql, registered_user):
         """
@@ -376,7 +386,7 @@ class TestActivateAccountMutation:
         send_account_activation_email(registered_user)
         response = gql(ACTIVATE_ACCOUNT, {'input': {'token': token_from_last_email()}})
 
-        assert 'refresh' not in response.cookies
+        assert not response.cookies
         assert 'accessToken' not in response.json()['data']['activateAccount']
 
 

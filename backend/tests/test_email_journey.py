@@ -31,7 +31,6 @@ from django.test import Client
 from django.utils import timezone
 
 from identity.models import RefreshSession, User
-from identity.schema import REFRESH_TOKEN_COOKIE_NAME
 
 PASSWORD = 'a-strong-unique-pass-1'
 NEW_PASSWORD = 'an-even-stronger-pass-2'
@@ -44,13 +43,13 @@ mutation Register($input: RegisterInput!) {
 
 LOGIN = """
 mutation Login($input: LoginInput!) {
-  login(input: $input) { success message accessToken }
+  login(input: $input) { success message accessToken refreshToken }
 }
 """
 
 REFRESH = """
-mutation RefreshToken {
-  refreshToken { success message accessToken }
+mutation RefreshToken($token: String!) {
+  refreshToken(refreshToken: $token) { success message accessToken }
 }
 """
 
@@ -118,8 +117,8 @@ class Browser:
     def login(self, email='ada@example.com', password=PASSWORD):
         return self.field(LOGIN, {'input': {'email': email, 'password': password}}, 'login')
 
-    def refresh(self):
-        return self.field(REFRESH, None, 'refreshToken')
+    def refresh(self, token):
+        return self.field(REFRESH, {'token': token}, 'refreshToken')
 
     def request_reset(self, email='ada@example.com'):
         return self.field(
@@ -224,10 +223,8 @@ def test_the_whole_password_reset_journey_over_real_http(registered):
     assert registered.login(password=NEW_PASSWORD)['success'] is True
 
     # ...and every session that existed before the reset was revoked, so a
-    # stolen cookie cannot outlive the password change. Checked through the
-    # model rather than through `refreshToken` because this browser's own
-    # cookie was cleared by the response (a separate, tested behaviour); this
-    # is about the session somebody else is holding.
+    # stolen refresh token cannot outlive the password change. Checked through
+    # the model: this is about the session somebody else is holding.
     elsewhere.refresh_from_db()
     assert elsewhere.is_active is False
 
@@ -369,23 +366,20 @@ def test_a_bogus_link_is_a_payload_and_never_a_graphql_error(registered):
 
 
 @pytest.mark.django_db
-def test_a_reset_clears_the_browsers_own_dead_cookie(registered):
+def test_a_reset_signs_out_the_browsers_own_session(registered):
     """
-    The browser presented a live cookie; the reset revoked it server-side and
-    cleared it client-side in the same response, so the next request cannot
-    keep sending a credential that can never work.
+    The browser held a live refresh token; the reset revoked it server-side, so
+    it can never renew the session again.
     """
-    registered.login()
-    assert REFRESH_TOKEN_COOKIE_NAME in registered.client.cookies
+    refresh_token = registered.login()['refreshToken']
+    assert registered.refresh(refresh_token)['success'] is True
 
     registered.request_reset()
-    response, result = registered.call(
+    _, result = registered.call(
         RESET_PASSWORD,
         {'input': {'token': reset_token(), 'newPassword': NEW_PASSWORD}},
         'resetPassword',
     )
 
     assert result['success'] is True
-    cleared = response.cookies[REFRESH_TOKEN_COOKIE_NAME]
-    assert cleared.value == ''
-    assert cleared['max-age'] == 0
+    assert registered.refresh(refresh_token)['success'] is False

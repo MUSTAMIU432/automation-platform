@@ -90,6 +90,7 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `DJANGO_JWT_SIGNING_KEY`     | **yes**| **always**        | Signs JWT access tokens (Sprint 1). No default; must differ from `DJANGO_SECRET_KEY` when deployed |
 | `ACCESS_TOKEN_LIFETIME_MINUTES` |     | no (`15`)         | JWT access token lifetime |
 | `REFRESH_TOKEN_LIFETIME_DAYS` |       | no (`30`)         | Refresh session (`RefreshSession`) lifetime |
+| `REFRESH_ROTATION_GRACE_SECONDS` |    | no (`30`)         | How long a just-rotated refresh token is still honoured (a new access token, no new refresh token), so tabs refreshing together stay signed in |
 | `DJANGO_DEBUG`               |        | no                | Default `True` locally; rejected if true when deployed |
 | `DJANGO_ALLOWED_HOSTS`       |        | deployed          | Comma-separated hostnames |
 | `DATABASE_URL`               | **yes**| **always**        | PostgreSQL URL including the password. No default |
@@ -136,14 +137,16 @@ Notes:
   invisible at the API boundary by construction, and is otherwise found from
   a support ticket. A failed send is logged at `ERROR` with the user's
   primary key - never the token - so the logs are where to look.
-- CORS applies only to `/graphql/`. `CORS_ALLOW_CREDENTIALS` is `True`
-  (Sprint 1, S1-003): the refresh-token cookie needs credentialed
-  cross-origin requests, and this is safe only because
+- CORS applies only to `/graphql/` and the file endpoints. Authentication
+  is token-based, with no cookie: the access token is a JWT sent as
+  `Authorization: Bearer`, and the refresh token is returned in the response
+  body and sent back as a mutation argument. So nothing depends on the
+  browser keeping a cross-site cookie, and the frontend and API may live on
+  different sites (two `*.onrender.com` services, say).
   `CORS_ALLOWED_ORIGINS` stays an explicit, non-wildcard allow-list. The
-  GraphQL endpoint remains CSRF-exempt even with that cookie present - see
-  the comment in `backend/graphql_api/views.py` for the full reasoning
-  (JSON-only requests can't be triggered by a bare HTML form, and the
-  cookie's own `SameSite=Lax` blocks genuinely cross-site attachment).
+  GraphQL endpoint is CSRF-exempt - see `backend/graphql_api/views.py`: it
+  only accepts JSON, which a bare HTML form cannot send, and a cross-site
+  request carries no credential the browser would attach on its own.
   `CSRF_TRUSTED_ORIGINS` still affects only Django's own forms (e.g. admin).
 - The GraphiQL IDE is served only when `DEBUG` is on, so it is never
   exposed in deployed environments.

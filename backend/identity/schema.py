@@ -20,15 +20,11 @@ the services deliberately never see:
   a Google signature verification. The services stay usable from a
   management command or a future non-HTTP adapter without a request to
   throttle against.
-- The HttpOnly refresh-cookie lifecycle, which is a browser concern (its
-  Path/SameSite/Secure attributes) and meaningless anywhere else.
+- Handing the refresh credential to the client and taking it back: it travels
+  in the response body and as a mutation argument, never as a cookie.
 """
 
-from datetime import datetime
-
 import strawberry
-from django.conf import settings
-from django.http import HttpRequest, HttpResponse
 
 import identity.authentication as auth_service
 import identity.avatars as avatars
@@ -45,42 +41,12 @@ from identity.services import (
 )
 from identity.throttling import ThrottledError
 
-# The refresh credential travels only as an HttpOnly cookie, never as a
-# GraphQL argument or field - so no frontend JavaScript ever holds or
-# forwards its raw value, which is the entire point of using a cookie for
-# it instead of returning it in the response body like the access token.
-# (This is a cookie *name*, not a credential - ruff's hardcoded-password
-# heuristic just pattern-matches the word "token".)
-REFRESH_TOKEN_COOKIE_NAME = 'refresh_token'  # noqa: S105
-# Scoped to the GraphQL endpoint only: every operation that needs the
-# cookie (login, refreshToken, logout) is a request to this same path, and
-# there's no reason for the browser to attach it to /health/ or /admin/.
-REFRESH_TOKEN_COOKIE_PATH = '/graphql/'  # noqa: S105
-
-
-def _set_refresh_cookie(response: HttpResponse, raw_token: str, expires_at: datetime) -> None:
-    response.set_cookie(
-        REFRESH_TOKEN_COOKIE_NAME,
-        raw_token,
-        expires=expires_at,
-        path=REFRESH_TOKEN_COOKIE_PATH,
-        httponly=True,
-        # Same policy the project already applies to the session cookie
-        # (config/settings/production.py sets SESSION_COOKIE_SECURE=True in
-        # every deployed environment; local dev stays plain HTTP).
-        secure=settings.SESSION_COOKIE_SECURE,
-        samesite='Lax',
-    )
-
-
-def _clear_refresh_cookie(response: HttpResponse) -> None:
-    response.delete_cookie(
-        REFRESH_TOKEN_COOKIE_NAME, path=REFRESH_TOKEN_COOKIE_PATH, samesite='Lax'
-    )
-
-
-def _read_refresh_cookie(request: HttpRequest) -> str:
-    return request.COOKIES.get(REFRESH_TOKEN_COOKIE_NAME, '')
+# The refresh credential: a long-lived, single-use, server-revocable token that the
+# client keeps and sends back to `refreshToken` and `logout`. It is returned in the
+# response body and taken as a mutation argument - there is no cookie - so the browser
+# app works the same whether or not it is served from the API's own site. The access
+# token, a short-lived JWT, is what authenticates every other request
+# (`Authorization: Bearer`).
 
 
 @strawberry.type(description='A registered platform account (safe, public fields only).')
@@ -162,7 +128,28 @@ class AuthPayload:
     # a dedicated DateTime scalar yet, and the client only ever compares it
     # to `Date.now()` when deciding when to pre-emptively refresh.
     access_token_expires_at: str | None = None
+    # The new refresh credential, to keep and present to `refreshToken` once the access
+    # token is due. Null when none was issued - a failure, or a refresh inside the
+    # rotation grace window, where the client already holds the current one.
+    refresh_token: str | None = None
+    refresh_token_expires_at: str | None = None
     user: UserType | None = None
+
+
+def _signed_in(message: str, session: auth_service.AuthenticatedSession) -> AuthPayload:
+    return AuthPayload(
+        success=True,
+        message=message,
+        access_token=session.access_token,
+        access_token_expires_at=session.access_token_expires_at.isoformat(),
+        refresh_token=session.refresh_token,
+        refresh_token_expires_at=(
+            session.refresh_token_expires_at.isoformat()
+            if session.refresh_token_expires_at
+            else None
+        ),
+        user=UserType.from_model(session.user),
+    )
 
 
 @strawberry.type(description='Result of logging out.')
@@ -225,6 +212,9 @@ class UpdateProfileInput:
 class ChangePasswordInput:
     current_password: str
     new_password: str
+    # This device's refresh token, so it stays signed in while every other one is
+    # signed out. Without it, this device is signed out too at its next refresh.
+    refresh_token: str | None = None
 
 
 def _to_camel_case(snake_case_name: str) -> str:
@@ -306,7 +296,7 @@ class Mutation:
                 user,
                 input.current_password,
                 input.new_password,
-                keep_refresh_token=_read_refresh_cookie(info.context.request),
+                keep_refresh_token=input.refresh_token or '',
             )
         except ThrottledError as exc:
             return ActionPayload(success=False, message=str(exc))
@@ -386,24 +376,15 @@ class Mutation:
         # the spray limit and is left for its window to expire.
         throttling.clear_login_account(input.email)
 
-        _set_refresh_cookie(
-            info.context.response, session.refresh_token, session.refresh_token_expires_at
-        )
-        return AuthPayload(
-            success=True,
-            message='Signed in successfully.',
-            access_token=session.access_token,
-            access_token_expires_at=session.access_token_expires_at.isoformat(),
-            user=UserType.from_model(session.user),
-        )
+        return _signed_in('Signed in successfully.', session)
 
     @strawberry.mutation(
         description=(
             'Sign in (or provision a new account) using a verified Google '
             "identity. Accepts the ID token issued by Google Identity Services'"
             ' Sign In With Google flow, verifies it server-side, and on '
-            'success behaves exactly like `login`: sets the HttpOnly '
-            'refresh-session cookie and returns a short-lived access token.'
+            'success behaves exactly like `login`: returns a short-lived access '
+            'token and a refresh token.'
         )
     )
     def google_login(self, info: strawberry.Info, input: GoogleLoginInput) -> AuthPayload:
@@ -417,69 +398,41 @@ class Mutation:
         except (AuthenticationError, ThrottledError) as exc:
             return AuthPayload(success=False, message=str(exc))
 
-        _set_refresh_cookie(
-            info.context.response, session.refresh_token, session.refresh_token_expires_at
-        )
-        return AuthPayload(
-            success=True,
-            message='Signed in successfully.',
-            access_token=session.access_token,
-            access_token_expires_at=session.access_token_expires_at.isoformat(),
-            user=UserType.from_model(session.user),
-        )
+        return _signed_in('Signed in successfully.', session)
 
     @strawberry.mutation(
         description=(
-            'Exchange the current refresh-session cookie for a new access '
-            'token, rotating the refresh credential in the same operation. '
-            'Takes no arguments - the refresh credential is read from the '
-            'HttpOnly cookie, never from client-supplied input.'
+            'Exchange a refresh token for a new access token, rotating the refresh '
+            'token in the same operation: the one presented stops working and a new '
+            'one is returned. Inside the short rotation grace window - several tabs '
+            'refreshing at once - a just-rotated token gets a new access token and no '
+            'new refresh token.'
         )
     )
-    def refresh_token(self, info: strawberry.Info) -> AuthPayload:
-        raw_token = _read_refresh_cookie(info.context.request)
+    def refresh_token(self, info: strawberry.Info, refresh_token: str = '') -> AuthPayload:
+        raw_token = refresh_token.strip()
         try:
             throttling.guard_refresh(raw_token, info.context.request)
         except ThrottledError as exc:
-            # Deliberately does NOT clear the cookie, unlike a genuine refresh
-            # failure: this session is fine, it is the request rate that is
-            # not, and clearing it would sign a legitimate user out for being
-            # throttled. The frontend treats an unsuccessful refresh as "sign
-            # me out" (fail closed), which is the intended behaviour here too
-            # - their refresh session is untouched, so signing in again after
-            # the window works normally.
+            # The session itself is fine; it is the request rate that is not. The
+            # frontend treats an unsuccessful refresh as "sign me out" (fail closed),
+            # and signing in again after the window works normally.
             return AuthPayload(success=False, message=str(exc))
 
         try:
             session = auth_service.refresh(raw_token)
         except AuthenticationError as exc:
-            # The presented credential didn't work (missing, expired,
-            # revoked, or reused) - clear it rather than leave a dead
-            # cookie the browser keeps resending.
-            _clear_refresh_cookie(info.context.response)
             return AuthPayload(success=False, message=str(exc))
-
-        _set_refresh_cookie(
-            info.context.response, session.refresh_token, session.refresh_token_expires_at
-        )
-        return AuthPayload(
-            success=True,
-            message='Session renewed.',
-            access_token=session.access_token,
-            access_token_expires_at=session.access_token_expires_at.isoformat(),
-            user=UserType.from_model(session.user),
-        )
+        return _signed_in('Session renewed.', session)
 
     @strawberry.mutation(
         description=(
-            'Revoke the current refresh session and clear its cookie. Takes '
-            'no arguments, for the same reason refreshToken does.'
+            'Revoke a refresh token, signing that device out. Answers the same '
+            'whether or not the token was still valid.'
         )
     )
-    def logout(self, info: strawberry.Info) -> LogoutPayload:
-        raw_token = _read_refresh_cookie(info.context.request)
-        auth_service.logout(raw_token)
-        _clear_refresh_cookie(info.context.response)
+    def logout(self, info: strawberry.Info, refresh_token: str = '') -> LogoutPayload:
+        auth_service.logout(refresh_token.strip())
         return LogoutPayload(success=True)
 
     @strawberry.mutation(
@@ -531,12 +484,6 @@ class Mutation:
             return ActionPayload(success=False, message=str(exc))
         except EmailLinkError as exc:
             return _failed_action(exc)
-
-        # This browser's refresh session was among those `reset_password` just
-        # revoked, so the cookie it is still holding is dead. Clearing it here
-        # means the next request cannot keep resending a credential that can
-        # never work.
-        _clear_refresh_cookie(info.context.response)
 
         return ActionPayload(
             success=True,

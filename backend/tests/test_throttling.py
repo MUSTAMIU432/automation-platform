@@ -41,29 +41,39 @@ mutation Register($input: RegisterInput!) {
 
 LOGIN_MUTATION = """
 mutation Login($input: LoginInput!) {
-  login(input: $input) { success message accessToken }
+  login(input: $input) { success message accessToken refreshToken }
 }
 """
 
 REFRESH_MUTATION = """
-mutation RefreshToken {
-  refreshToken { success message accessToken }
+mutation RefreshToken($token: String!) {
+  refreshToken(refreshToken: $token) { success message accessToken refreshToken }
 }
 """
 
 GOOGLE_LOGIN_MUTATION = """
 mutation GoogleLogin($input: GoogleLoginInput!) {
-  googleLogin(input: $input) { success message accessToken }
+  googleLogin(input: $input) { success message accessToken refreshToken }
 }
 """
 
 
 class Api:
-    """A real HTTP GraphQL caller, optionally impersonating a client address."""
+    """
+    A real HTTP GraphQL caller, optionally impersonating a client address. Like
+    the frontend, it keeps the refresh token a sign-in gave it and replaces it
+    with each rotated one.
+    """
 
     def __init__(self, client: Client, remote_addr='203.0.113.10'):
         self.client = client
         self.remote_addr = remote_addr
+        self.refresh_token = ''
+
+    def _keep(self, payload):
+        if payload.get('refreshToken'):
+            self.refresh_token = payload['refreshToken']
+        return payload
 
     def post(self, query, variables=None, path='/graphql/'):
         payload = {'query': query}
@@ -99,16 +109,18 @@ class Api:
         )
 
     def login(self, email=EXISTING_EMAIL, password=PASSWORD):
-        return self.field(
-            LOGIN_MUTATION, 'login', {'input': {'email': email, 'password': password}}
+        return self._keep(
+            self.field(LOGIN_MUTATION, 'login', {'input': {'email': email, 'password': password}})
         )
 
     def refresh(self):
-        return self.field(REFRESH_MUTATION, 'refreshToken')
+        return self._keep(
+            self.field(REFRESH_MUTATION, 'refreshToken', {'token': self.refresh_token})
+        )
 
     def google_login(self, credential='a-credential'):
-        return self.field(
-            GOOGLE_LOGIN_MUTATION, 'googleLogin', {'input': {'credential': credential}}
+        return self._keep(
+            self.field(GOOGLE_LOGIN_MUTATION, 'googleLogin', {'input': {'credential': credential}})
         )
 
 
@@ -509,18 +521,18 @@ class TestRefreshThrottlingOverHttp:
     def test_replaying_one_stolen_credential_is_throttled(self, signed_in: Api):
         """
         The attack the per-credential limit exists for. Presenting the same
-        (already rotated away, therefore revoked) cookie over and over: every
+        (already rotated away, therefore revoked) token over and over: every
         attempt is refused on its own merits, and after enough of them the
         refusal becomes a throttle - which is also the signal a defender
         wants to see.
         """
-        stolen = signed_in.client.cookies['refresh_token'].value
+        stolen = signed_in.refresh_token
 
         for _ in range(throttling.REFRESH_PER_CREDENTIAL.limit):
-            signed_in.client.cookies['refresh_token'] = stolen
+            signed_in.refresh_token = stolen
             signed_in.refresh()
 
-        signed_in.client.cookies['refresh_token'] = stolen
+        signed_in.refresh_token = stolen
         throttled = signed_in.refresh()
 
         assert throttled['success'] is False
@@ -569,7 +581,7 @@ class TestRefreshThrottlingOverHttp:
     ):
         """
         Refusing a refresh must not have the side effect of ending the
-        session. Nothing about the cookie or the server-side session changes
+        session. Nothing about the token or the server-side session changes
         while throttled, so waiting out the window is all it takes.
         """
         _shrink(monkeypatch, 'REFRESH_PER_CLIENT', limit=4)
@@ -582,7 +594,7 @@ class TestRefreshThrottlingOverHttp:
 
         assert signed_in.refresh()['success'] is True
 
-    def test_a_missing_cookie_is_answered_generically_not_as_a_throttle(self, client: Client):
+    def test_a_missing_token_is_answered_generically_not_as_a_throttle(self, client: Client):
         anonymous = Api(client, remote_addr='198.51.100.60')
 
         response = anonymous.refresh()

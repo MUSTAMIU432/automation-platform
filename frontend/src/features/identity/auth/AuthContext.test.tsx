@@ -2,7 +2,12 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
+import {
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from '../../../graphql/tokenStore'
 import { AuthProvider, useAuth, type LoginOutcome } from './AuthContext'
 import {
   NETWORK_ERROR_MESSAGE,
@@ -126,6 +131,38 @@ describe('AuthContext', () => {
   afterEach(() => {
     vi.clearAllMocks()
     setAccessToken(null)
+    setRefreshToken(null)
+  })
+
+  it('keeps the refresh token a sign-in returns, and revokes it on logout', async () => {
+    mockedLogin.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      session: {
+        accessToken: 'login-token',
+        accessTokenExpiresAt: '2099-01-01',
+        refreshToken: 'login-refresh',
+        user: USER,
+      },
+    })
+    mockedLogout.mockResolvedValue(undefined)
+    render(
+      <AuthProvider>
+        <TestConsumer />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Login' }).click()
+    })
+    expect(getRefreshToken()).toBe('login-refresh')
+
+    await act(async () => {
+      screen.getByRole('button', { name: 'Logout' }).click()
+    })
+    expect(mockedLogout).toHaveBeenCalledWith('login-refresh')
+    expect(getRefreshToken()).toBeNull()
   })
 
   it('starts in the loading status while the initial refresh attempt is in flight', () => {

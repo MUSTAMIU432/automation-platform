@@ -615,11 +615,52 @@ class TestRefresh:
         _make_user()
         session = login('ada@example.com', VALID_PASSWORD)
         refresh(session.refresh_token)
+        # Past the grace window a parallel tab gets for a credential rotated moments ago.
+        RefreshSession.objects.filter(revoked_at__isnull=False).update(
+            revoked_at=timezone.now() - timedelta(minutes=5)
+        )
 
         with pytest.raises(AuthenticationError) as exc_info:
             refresh(session.refresh_token)
 
         assert str(exc_info.value) == GENERIC_REFRESH_ERROR
+
+    def test_a_tab_refreshing_with_the_credential_just_rotated_gets_an_access_token(self):
+        user = _make_user()
+        session = login('ada@example.com', VALID_PASSWORD)
+        first = refresh(session.refresh_token)
+
+        second = refresh(session.refresh_token)
+
+        assert second.user.pk == user.pk
+        assert second.access_token
+        # No new credential: the browser already holds the one the first tab got.
+        assert second.refresh_token is None
+        assert RefreshSession.objects.count() == 2
+        assert refresh(first.refresh_token).refresh_token
+
+    def test_a_logged_out_credential_gets_no_grace(self):
+        _make_user()
+        session = login('ada@example.com', VALID_PASSWORD)
+        renewed = refresh(session.refresh_token)
+        logout(renewed.refresh_token)
+
+        with pytest.raises(AuthenticationError):
+            refresh(session.refresh_token)
+        with pytest.raises(AuthenticationError):
+            refresh(renewed.refresh_token)
+
+    def test_grace_ends_when_the_replacement_is_revoked(self):
+        user = _make_user()
+        session = login('ada@example.com', VALID_PASSWORD)
+        refresh(session.refresh_token)
+        # A password change elsewhere revokes every live session.
+        RefreshSession.objects.filter(user=user, revoked_at__isnull=True).update(
+            revoked_at=timezone.now()
+        )
+
+        with pytest.raises(AuthenticationError):
+            refresh(session.refresh_token)
 
     def test_rotation_revokes_and_links_the_old_session_row(self):
         _make_user()

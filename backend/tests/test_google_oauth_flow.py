@@ -29,10 +29,12 @@ is asserted here to be indistinguishable from any other failure.
 
 import json
 import time
+from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
 from django.test import Client
+from django.utils import timezone
 from google.auth.exceptions import GoogleAuthError
 
 from identity.google_oauth import GoogleIdentity
@@ -45,6 +47,7 @@ mutation GoogleLogin($input: GoogleLoginInput!) {
     message
     accessToken
     accessTokenExpiresAt
+    refreshToken
     user { id email firstName lastName phoneNumber isActive isVerified }
   }
 }
@@ -236,10 +239,11 @@ def test_a_valid_google_credential_signs_a_new_user_all_the_way_in(api: Api):
     # Google's own profile claims were used, not an invented placeholder.
     assert (user.first_name, user.last_name) == ('Grace', 'Hopper')
 
-    # An authenticated session: a refresh session exists, and the credential
-    # is in the browser's HttpOnly cookie.
+    # An authenticated session: a refresh session exists, and its refresh token
+    # comes back in the body - with no cookie.
     assert RefreshSession.objects.filter(user=user, revoked_at__isnull=True).count() == 1
-    assert api.client.cookies['refresh_token']['httponly'] is True
+    assert payload['refreshToken']
+    assert not api.client.cookies
 
     # ...and that session reaches a protected query.
     assert api.data(ME_QUERY, bearer=payload['accessToken'])['me']['email'] == ('grace@example.com')
@@ -301,10 +305,11 @@ def test_an_invalid_credential_is_refused_generically(api: Api):
     assert response['accessToken'] is None
     assert response['user'] is None
     assert response['message'] == GENERIC_ERROR
-    # Nothing was created, and no cookie was set.
+    # Nothing was created, and no session was issued.
     assert User.objects.count() == 0
     assert ExternalIdentity.objects.count() == 0
-    assert 'refresh_token' not in api.client.cookies
+    assert response['refreshToken'] is None
+    assert RefreshSession.objects.count() == 0
 
 
 @pytest.mark.django_db
@@ -420,7 +425,6 @@ def test_an_existing_local_account_with_the_same_email_is_not_linked(api: Api):
     assert User.objects.filter(email='grace@example.com').count() == 1
     # ...including its ability to sign in the normal way, and the Google
     # attempt granted it no session of any kind.
-    assert 'refresh_token' not in api.client.cookies
     assert RefreshSession.objects.filter(user=local).count() == 0
 
 
@@ -444,7 +448,8 @@ def test_a_verified_google_sign_in_on_a_used_email_gets_an_actionable_message(ap
     assert response['accessToken'] is None
     assert ExternalIdentity.objects.count() == 0
     assert User.objects.filter(email='grace@example.com').count() == 1
-    assert 'refresh_token' not in api.client.cookies
+    assert response['refreshToken'] is None
+    assert RefreshSession.objects.count() == 0
 
 
 @pytest.mark.django_db
@@ -645,29 +650,33 @@ def test_a_google_session_rotates_and_revokes_like_any_other(api: Api):
     implementation to reason about.
     """
     with _google_verify(claims=_claims()):
-        access_token = api.google_login()['accessToken']
-    first_refresh = api.client.cookies['refresh_token'].value
+        signed_in = api.google_login()
+    access_token = signed_in['accessToken']
+    first_refresh = signed_in['refreshToken']
+    refresh = (
+        'mutation($t: String!) '
+        '{ refreshToken(refreshToken: $t) { success accessToken refreshToken } }'
+    )
 
-    refreshed = api.data('mutation RefreshToken { refreshToken { success accessToken } }')[
-        'refreshToken'
-    ]
+    refreshed = api.data(refresh, {'t': first_refresh})['refreshToken']
 
     assert refreshed['success'] is True
     assert refreshed['accessToken'] != access_token
-    assert api.client.cookies['refresh_token'].value != first_refresh
+    assert refreshed['refreshToken'] != first_refresh
 
-    # The original credential is dead, exactly as after an email/password
-    # sign-in.
-    api.client.cookies['refresh_token'] = first_refresh
-    replayed = api.data('mutation RefreshToken { refreshToken { success } }')['refreshToken']
-    assert replayed['success'] is False
+    # The original credential is dead once the grace window for a parallel tab
+    # is over, exactly as after an email/password sign-in.
+    RefreshSession.objects.filter(revoked_at__isnull=False).update(
+        revoked_at=timezone.now() - timedelta(minutes=5)
+    )
+    assert api.data(refresh, {'t': first_refresh})['refreshToken']['success'] is False
 
     # And logout ends it.
-    api.data('mutation Logout { logout { success } }')
-    assert (
-        api.data('mutation RefreshToken { refreshToken { success } }')['refreshToken']['success']
-        is False
+    api.data(
+        'mutation($t: String!) { logout(refreshToken: $t) { success } }',
+        {'t': refreshed['refreshToken']},
     )
+    assert api.data(refresh, {'t': refreshed['refreshToken']})['refreshToken']['success'] is False
 
 
 @pytest.mark.django_db

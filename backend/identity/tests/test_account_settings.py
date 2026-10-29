@@ -6,12 +6,11 @@ import pytest
 from django.test import Client
 
 from identity.models import RefreshSession, User
-from identity.schema import REFRESH_TOKEN_COOKIE_NAME
 
 PASSWORD = 'a-strong-unique-pass-1'
 NEW_PASSWORD = 'an-even-stronger-pass-2'
 
-LOGIN = 'mutation($i: LoginInput!){ login(input: $i){ success accessToken } }'
+LOGIN = 'mutation($i: LoginInput!){ login(input: $i){ success accessToken refreshToken } }'
 UPDATE_PROFILE = """
 mutation($i: UpdateProfileInput!){
   updateProfile(input: $i){ success message field user { firstName lastName phoneNumber } }
@@ -46,8 +45,10 @@ def post(client, query, variables, token=None):
     return body['data']
 
 
-def sign_in(client):
+def sign_in(client, with_refresh=False):
     data = post(client, LOGIN, {'i': {'email': 'ada@example.com', 'password': PASSWORD}})
+    if with_refresh:
+        return data['login']['accessToken'], data['login']['refreshToken']
     return data['login']['accessToken']
 
 
@@ -132,7 +133,7 @@ def test_change_password_applies_the_password_rules(user):
 
 def test_change_password_signs_out_other_devices_but_not_this_one(user):
     this_device = Client()
-    token = sign_in(this_device)
+    token, refresh = sign_in(this_device, with_refresh=True)
     other_device = Client()
     sign_in(other_device)
     assert RefreshSession.objects.filter(user=user, revoked_at__isnull=True).count() == 2
@@ -140,7 +141,7 @@ def test_change_password_signs_out_other_devices_but_not_this_one(user):
     data = post(
         this_device,
         CHANGE_PASSWORD,
-        {'i': {'currentPassword': PASSWORD, 'newPassword': NEW_PASSWORD}},
+        {'i': {'currentPassword': PASSWORD, 'newPassword': NEW_PASSWORD, 'refreshToken': refresh}},
         token,
     )['changePassword']
 
@@ -149,7 +150,12 @@ def test_change_password_signs_out_other_devices_but_not_this_one(user):
     assert user.check_password(NEW_PASSWORD)
     live = RefreshSession.objects.filter(user=user, revoked_at__isnull=True)
     assert live.count() == 1
-    assert REFRESH_TOKEN_COOKIE_NAME in this_device.cookies
+    refreshed = post(
+        this_device,
+        'mutation($t: String!){ refreshToken(refreshToken: $t){ success } }',
+        {'t': refresh},
+    )
+    assert refreshed['refreshToken']['success'] is True
 
 
 # --- profile photo ----------------------------------------------------------------

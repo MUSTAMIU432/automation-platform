@@ -20,20 +20,14 @@ class _AuthenticatedGraphQLView(GraphQLView):
         return AuthenticatedGraphQLContext(request=request, response=response)
 
 
-# CSRF-exempt, revisited for Sprint 1 (S1-003): a cookie now flows through
-# this endpoint (the HttpOnly refresh-token cookie - see identity/schema.py),
-# so it's no longer true that there's "no cookie-based auth". It stays
-# exempt anyway, deliberately: Django's CSRF middleware defends
-# cookie-authenticated *form* submissions, which don't apply to a JSON-only
-# GraphQL endpoint (a bare HTML <form> can't send `Content-Type:
-# application/json`, so the classic CSRF vector doesn't exist here). The
-# actual defenses against a cross-site request abusing the cookie are:
-# CORS_ALLOWED_ORIGINS (config/settings/base.py) rejecting any origin not
-# explicitly allow-listed - and, since the request body is JSON, the
-# browser must run a preflight the disallowed origin cannot pass - and the
-# refresh cookie's own `SameSite=Lax` (identity/schema.py), which keeps the
-# browser from attaching it to a genuinely cross-site POST at all,
-# independent of CORS. See docs/architecture.md for the full writeup.
+# CSRF-exempt, deliberately. Authentication here is token-based, with no
+# cookie: the access token is a JWT the page attaches as `Authorization:
+# Bearer`, and the refresh token is a mutation argument (identity/schema.py).
+# A cross-site request therefore carries no credential the browser would add
+# on its own - the precondition for CSRF does not exist. Independently, the
+# endpoint only accepts JSON, which a bare HTML <form> cannot send, and
+# CORS_ALLOWED_ORIGINS (config/settings/base.py) refuses the preflight a JSON
+# request from any other origin needs. tests/test_csrf.py asserts both.
 graphql_view = csrf_exempt(
     _AuthenticatedGraphQLView.as_view(
         schema=schema,

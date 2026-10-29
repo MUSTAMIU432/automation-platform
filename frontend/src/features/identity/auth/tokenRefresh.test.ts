@@ -1,7 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { getRequestGuard } from '../../../graphql/requestGuard'
-import { getAccessToken, setAccessToken } from '../../../graphql/tokenStore'
+import {
+  REFRESH_TOKEN_STORAGE_KEY,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from '../../../graphql/tokenStore'
 import { refreshTokenRequest, type AuthSession } from './authApi'
 import {
   MIN_REFRESH_INTERVAL_MS,
@@ -410,18 +416,84 @@ describe('tokenRefresh', () => {
 
   // --- the storage architecture is preserved ----------------------------------
 
-  it('never writes a token to browser storage', async () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+  it('never writes the access token to browser storage', async () => {
     mockedRefresh.mockResolvedValue(resolved(fakeSession('secret-token')))
     setAccessToken('current', expiresIn(900))
 
     await refreshAccessToken()
 
     expect(getAccessToken()).toBe('secret-token')
-    expect(setItemSpy).not.toHaveBeenCalled()
-    expect(localStorage.length).toBe(0)
+    expect(JSON.stringify({ ...localStorage })).not.toContain('secret-token')
     expect(sessionStorage.length).toBe(0)
-    setItemSpy.mockRestore()
+  })
+})
+
+describe('the stored refresh token', () => {
+  beforeEach(() => {
+    resetTokenRefreshState()
+    setAccessToken(null)
+    setRefreshToken(null)
+    mockedRefresh.mockReset()
+  })
+
+  afterEach(() => {
+    cancelProactiveRefresh()
+    setRefreshToken(null)
+  })
+
+  it('is what a refresh presents, and the rotated one replaces it', async () => {
+    setRefreshToken('stored-1')
+    mockedRefresh.mockResolvedValue(
+      resolved({ ...fakeSession('renewed'), refreshToken: 'stored-2' }),
+    )
+
+    await refreshAccessToken()
+
+    expect(mockedRefresh).toHaveBeenCalledWith('stored-1')
+    expect(getRefreshToken()).toBe('stored-2')
+    expect(localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY)).toBe('stored-2')
+  })
+
+  it('is kept when the server issues none (another tab already rotated it)', async () => {
+    setRefreshToken('current')
+    mockedRefresh.mockResolvedValue(resolved({ ...fakeSession('renewed'), refreshToken: null }))
+
+    await refreshAccessToken()
+
+    expect(getAccessToken()).toBe('renewed')
+    expect(getRefreshToken()).toBe('current')
+  })
+
+  it('is cleared when the server refuses it', async () => {
+    setRefreshToken('revoked')
+    mockedRefresh.mockResolvedValue({ success: false, message: 'expired', session: null })
+
+    await refreshAccessToken()
+
+    expect(getRefreshToken()).toBeNull()
+  })
+
+  it('survives a refresh that could not reach the server', async () => {
+    setRefreshToken('still-good')
+    mockedRefresh.mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await refreshAccessToken()
+
+    // Signed out in this tab, but a reload can restore the session.
+    expect(getRefreshToken()).toBe('still-good')
+  })
+
+  it('follows a sign-out in another tab', () => {
+    const signedOut = vi.fn()
+    setAuthenticationFailureHandler(signedOut)
+    setAccessToken('current', expiresIn(900))
+
+    window.dispatchEvent(
+      new StorageEvent('storage', { key: REFRESH_TOKEN_STORAGE_KEY, newValue: null }),
+    )
+
+    expect(getAccessToken()).toBeNull()
+    expect(signedOut).toHaveBeenCalledOnce()
   })
 })
 

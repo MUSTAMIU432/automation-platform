@@ -116,8 +116,10 @@ class AuthenticatedSession:
     user: User
     access_token: str
     access_token_expires_at: datetime
-    refresh_token: str
-    refresh_token_expires_at: datetime
+    # None when no new refresh credential was issued - a refresh inside the rotation
+    # grace window, where the browser already holds the replacement (see `refresh`).
+    refresh_token: str | None
+    refresh_token_expires_at: datetime | None
 
 
 def _hash_refresh_token(raw_token: str) -> str:
@@ -437,20 +439,54 @@ def refresh(raw_refresh_token: str) -> AuthenticatedSession:
     further and automatically revoke the rest of that user's sessions on
     detected reuse; it's flagged here as a natural next step, not silently
     treated as already handled.
+
+    One exception, for a credential rotated moments ago: several tabs of one
+    browser share the cookie, and when they wake together each refreshes with
+    it at once. The first rotates it; the others arrive with the credential it
+    just replaced. Inside `REFRESH_ROTATION_GRACE`, while that replacement is
+    still live, they get a new access token and no new credential - the browser
+    already holds the replacement, and handing out (or clearing) a cookie here
+    would undo it. A credential revoked by logout or a password change has no
+    live replacement, so it is never honoured.
     """
     if not raw_refresh_token:
         raise AuthenticationError(GENERIC_REFRESH_ERROR)
 
     token_hash = _hash_refresh_token(raw_refresh_token)
-    session = RefreshSession.objects.select_related('user').filter(token_hash=token_hash).first()
+    session = (
+        RefreshSession.objects.select_related('user', 'replaced_by')
+        .filter(token_hash=token_hash)
+        .first()
+    )
 
-    if session is None or not session.is_active or not session.user.is_active:
+    if session is None or not session.user.is_active:
+        raise AuthenticationError(GENERIC_REFRESH_ERROR)
+    if not session.is_active:
+        if _just_rotated(session):
+            access_token, access_expires_at = issue_access_token(session.user.pk)
+            return AuthenticatedSession(
+                user=session.user,
+                access_token=access_token,
+                access_token_expires_at=access_expires_at,
+                refresh_token=None,
+                refresh_token_expires_at=None,
+            )
         raise AuthenticationError(GENERIC_REFRESH_ERROR)
 
     session.last_used_at = timezone.now()
     session.save(update_fields=['last_used_at'])
 
     return _issue_authenticated_session(session.user, replaces=session)
+
+
+def _just_rotated(session: RefreshSession) -> bool:
+    """Whether `session` was rotated within the grace window and its replacement is live."""
+    if session.revoked_at is None or session.replaced_by is None:
+        return False
+    if session.expires_at <= timezone.now():
+        return False
+    within_grace = timezone.now() - session.revoked_at <= settings.REFRESH_ROTATION_GRACE
+    return within_grace and session.replaced_by.is_active
 
 
 def logout(raw_refresh_token: str) -> None:

@@ -1,22 +1,20 @@
 /**
- * Holds the current short-lived access token in memory only - never in
- * localStorage/sessionStorage (a stolen token there survives an XSS
- * payload's next page load; an in-memory value doesn't survive any reload
- * at all, which is exactly the point - the httpOnly refresh cookie is what
- * re-establishes a session after a reload, not this).
+ * The session's two tokens. Authentication is token-based, with no cookie.
  *
- * `graphql/client.ts` reads this to attach `Authorization: Bearer <token>`
- * to every request; `features/identity/auth/AuthContext.tsx` and
- * `tokenRefresh.ts` are the only writers, updating it on
- * login/refresh/logout. Nothing else should import the setter.
+ * - The **access token** - a short-lived JWT - is held in memory only and
+ *   attached to every request as `Authorization: Bearer` by
+ *   `graphql/client.ts`. Its expiry is stored alongside it: a client can only
+ *   refresh *proactively* if it knows when the token stops working, and
+ *   keeping the two together makes it impossible to hold one without the
+ *   other. `clearAccessToken()` resets both for the same reason.
+ * - The **refresh token** - single-use, rotated on every refresh and
+ *   revocable on the server - is kept in `localStorage`, so it survives a
+ *   reload and is shared by every tab; it is what re-establishes a session
+ *   after a reload. Where storage is unavailable (a private window that
+ *   refuses it) it falls back to memory: the session then lasts for this tab.
  *
- * The token's expiry is stored here, alongside it rather than in a second
- * place, for one reason: a client can only refresh *proactively* - before a
- * request fails - if it knows when the current token stops working, and
- * having the two in one place makes it impossible to hold a token without
- * also holding its deadline. `clearAccessToken()` resets both together for
- * the same reason: a stale deadline next to a cleared token would schedule a
- * refresh for a session that no longer exists.
+ * `features/identity/auth/AuthContext.tsx` and `tokenRefresh.ts` are the only
+ * writers. Nothing else should import the setters.
  */
 
 let accessToken: string | null = null
@@ -60,4 +58,27 @@ export function setAccessToken(token: string | null, expiresAt?: string | null):
 
 export function clearAccessToken(): void {
   setAccessToken(null)
+}
+
+/** Where the refresh token is kept; other tabs watch this key to follow a sign-out. */
+export const REFRESH_TOKEN_STORAGE_KEY = 'mustanet.refreshToken'
+
+let memoryRefreshToken: string | null = null
+
+export function getRefreshToken(): string | null {
+  try {
+    return window.localStorage.getItem(REFRESH_TOKEN_STORAGE_KEY) ?? memoryRefreshToken
+  } catch {
+    return memoryRefreshToken
+  }
+}
+
+export function setRefreshToken(token: string | null): void {
+  memoryRefreshToken = token
+  try {
+    if (token) window.localStorage.setItem(REFRESH_TOKEN_STORAGE_KEY, token)
+    else window.localStorage.removeItem(REFRESH_TOKEN_STORAGE_KEY)
+  } catch {
+    // Storage refused: the in-memory copy above carries this tab's session.
+  }
 }

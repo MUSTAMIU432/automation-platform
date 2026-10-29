@@ -277,21 +277,20 @@ def test_no_data_type_declares_a_sensitive_field(type_name, types_by_name):
         assert not any(fragment in lowered for fragment in forbidden), f'{type_name}.{name}'
 
 
-def test_the_auth_payload_carries_an_access_token_and_never_a_refresh_credential(
-    types_by_name,
-):
+def test_the_auth_payload_carries_the_access_and_refresh_tokens(types_by_name):
     """
     The one type where a token *is* the answer, so the rule above has to be
-    stated rather than assumed: the access token is delivered in the response
-    body (short-lived, held in memory only), and the refresh credential never
-    is - it travels solely as the HttpOnly cookie
-    (see identity/schema.py). A `refreshToken`/`refresh_token` field here
-    would move that credential into a place JavaScript can read.
+    stated rather than assumed. Authentication is token-based, with no cookie:
+    the access token (a short-lived JWT, sent as `Authorization: Bearer`) and
+    the refresh token (single-use, rotated, revocable on the server) are both
+    delivered here, and the client presents the refresh token back to
+    `refreshToken` and `logout` (see identity/schema.py).
     """
     declared = _field_names(types_by_name['AuthPayload'])
 
-    assert 'accessToken' in declared
-    assert not any('refresh' in name.lower() for name in declared), declared
+    assert {'accessToken', 'accessTokenExpiresAt', 'refreshToken', 'refreshTokenExpiresAt'} <= set(
+        declared
+    )
 
 
 def test_the_auth_payload_exposes_only_what_the_client_needs(types_by_name):
@@ -304,6 +303,8 @@ def test_the_auth_payload_exposes_only_what_the_client_needs(types_by_name):
         'message',
         'accessToken',
         'accessTokenExpiresAt',
+        'refreshToken',
+        'refreshTokenExpiresAt',
         'user',
     }
 

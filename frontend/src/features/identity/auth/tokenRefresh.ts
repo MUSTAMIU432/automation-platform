@@ -1,15 +1,13 @@
 /**
  * Keeping the access token alive (S1-009).
  *
- * The architecture is unchanged and deliberately so: the refresh
- * credential is an httpOnly cookie the browser attaches on its own, the
- * access token is a short-lived value held only in `graphql/tokenStore.ts`
- * (never in localStorage/sessionStorage), and `refreshToken` rotates the
- * credential server-side every time it is used. This module adds the
- * scheduling and the concurrency control that architecture was missing, and
- * nothing else - it introduces no new storage, no new credential, and no
- * second source of truth. The shared state lives in `tokenRefreshState.ts`;
- * this file is the policy that acts on it.
+ * Authentication is token-based, with no cookie: the access token is a
+ * short-lived JWT held only in memory (`graphql/tokenStore.ts`), and the
+ * refresh token - kept in `localStorage`, shared by every tab - is presented
+ * to `refreshToken`, which rotates it server-side every time it is used. This
+ * module is the scheduling and the concurrency control around that. The
+ * shared state lives in `tokenRefreshState.ts`; this file is the policy that
+ * acts on it.
  *
  * Three problems it solves:
  *
@@ -18,13 +16,14 @@
  *    backend already returns, instead of waiting for a request to come back
  *    unauthenticated. A user mid-click never sees the gap.
  *
- * 2. **One refresh at a time.** The refresh cookie is single-use: every
- *    `refreshToken` rotates it, and the old one is revoked immediately. So
- *    two overlapping refreshes are not merely wasteful - the second one
- *    presents an already-revoked credential and *fails*, logging the user
- *    out. Concurrent callers therefore share a single in-flight promise,
- *    and a scheduled refresh that lands while a request-triggered one is in
- *    flight waits for that one instead of starting a second.
+ * 2. **One refresh at a time.** The refresh token is single-use: every
+ *    `refreshToken` rotates it, and the old one is revoked. So two
+ *    overlapping refreshes are not merely wasteful - the second presents an
+ *    already-revoked token. Within a tab, concurrent callers share a single
+ *    in-flight promise; across tabs, a Web Lock makes them take turns, and
+ *    each reads the stored token only once it holds the lock, so it always
+ *    presents the newest one. (The server also honours a just-rotated token
+ *    for a few seconds, for a browser without Web Locks.)
  *
  * 3. **No retry loops.** A failed refresh is terminal for the session, not
  *    an event to retry: the failure handler signs the user out, the
@@ -42,10 +41,13 @@
  */
 
 import {
+  REFRESH_TOKEN_STORAGE_KEY,
   clearAccessToken,
   getAccessToken,
   getAccessTokenExpiresAt,
+  getRefreshToken,
   setAccessToken,
+  setRefreshToken,
 } from '../../../graphql/tokenStore'
 import { setRequestGuard } from '../../../graphql/requestGuard'
 import { refreshTokenRequest, type AuthSession } from './authApi'
@@ -78,6 +80,19 @@ export const MIN_REFRESH_INTERVAL_MS = 30_000
  * rather than becoming a busy loop.
  */
 const MAX_TIMEOUT_MS = 2_147_483_647
+
+/** The Web Lock every tab of this app refreshes under. */
+const REFRESH_LOCK = 'mustanet-auth-refresh'
+
+/**
+ * Runs `work` while holding the cross-tab refresh lock, so tabs refresh one
+ * after another; without Web Locks (an old browser, a test runner) it simply runs.
+ */
+function withRefreshLock<T>(work: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined
+  if (!locks?.request) return work()
+  return locks.request(REFRESH_LOCK, work) as Promise<T>
+}
 
 /**
  * Registers what should happen when a refresh fails. Called by AuthContext;
@@ -129,8 +144,21 @@ export function refreshAccessToken(): Promise<AuthSession | null> {
 
   const attempt = (async (): Promise<AuthSession | null> => {
     try {
-      const result = await refreshTokenRequest()
-      if (!result.success || !result.session) {
+      const result = await withRefreshLock(async () => {
+        // Read only now, holding the lock: another tab may have just rotated it.
+        // With none stored the server simply answers "not signed in", as for
+        // any signed-out visitor.
+        const presented = getRefreshToken() ?? ''
+        const answer = await refreshTokenRequest(presented)
+        if (answer.success && answer.session?.refreshToken) {
+          setRefreshToken(answer.session.refreshToken)
+        } else if (!answer.success && presented && getRefreshToken() === presented) {
+          // Refused by the server, not merely unreachable: the stored token is dead.
+          setRefreshToken(null)
+        }
+        return answer
+      })
+      if (!result?.success || !result.session) {
         throw new Error('refresh rejected')
       }
       if (isSuperseded()) {
@@ -245,6 +273,20 @@ export async function guardRequest(operationName: string | undefined): Promise<v
 }
 
 setRequestGuard(guardRequest)
+
+/**
+ * Signing out in one tab removes the shared refresh token; every other tab follows,
+ * rather than carrying on with an access token whose session has ended.
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (event) => {
+    if (event.key !== REFRESH_TOKEN_STORAGE_KEY || event.newValue !== null) return
+    if (getAccessToken() === null) return
+    clearAccessToken()
+    cancelProactiveRefresh()
+    state.onAuthenticationFailure?.()
+  })
+}
 
 /**
  * A tab coming back into view - a laptop waking, most often - may hold a token that

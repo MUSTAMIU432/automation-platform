@@ -22,16 +22,18 @@ settings side):
    `application/x-www-form-urlencoded`, `multipart/form-data` or
    `text/plain` - all CORS "simple" content types, sent with no preflight -
    and Strawberry's view refuses all three before parsing anything.
-2. **The refresh cookie is `SameSite=Lax`.** Even if such a request did
-   reach the resolver, the browser would not attach the credential to it.
+2. **Nothing rides along on its own.** Authentication is a bearer token the
+   page attaches itself (`Authorization: Bearer`), and the refresh token is
+   sent as a mutation argument; signing in sets no cookie at all. A
+   cross-site request therefore carries no credential the browser would add
+   for it - the precondition for CSRF does not exist.
 
 Two things these tests deliberately do *not* claim. First, that a simple
 cross-origin POST is stopped at the server: it is not, it reaches the view
 and gets refused there - which is a real, checkable property, asserted
 directly. Second, that CSRF exemption is free: the browser-side half of the
 defence (no CORS grant, no cookie) is asserted too, because asserting only
-the server half would leave a change to the cookie's `SameSite` attribute
-completely invisible here.
+the server half would leave a cookie quietly reintroduced invisible here.
 """
 
 import json
@@ -126,7 +128,6 @@ def victim(db) -> dict:
         content_type='application/json',
     )
     assert login.json()['data']['login']['success'] is True
-    assert client.cookies['refresh_token'].value
     return {
         'client': client,
         'access_token': login.json()['data']['login']['accessToken'],
@@ -214,26 +215,18 @@ def test_an_allow_listed_origin_is_the_only_one_that_gets_a_cors_grant(victim):
     assert response.json()['data']['me']['email'] == 'victim@example.com'
 
 
-# --- what the browser would do with the cookie ----------------------------------
+# --- no ambient credential for a cross-site request to carry --------------------
 
 
 @pytest.mark.django_db
-def test_the_refresh_cookie_is_lax_so_a_cross_site_post_never_carries_it(victim):
+def test_signing_in_sets_no_cookie_a_cross_site_post_could_carry(victim):
     """
-    `SameSite=Lax` is the defence that does not depend on CORS at all: the
-    browser will not attach this cookie to a cross-site POST, whatever the
-    content type and whatever the response headers end up being. That is why
-    a refused simple request still cannot do anything even if the content
-    type check were bypassed too.
+    The defence that does not depend on CORS at all: there is no cookie. The
+    access and refresh tokens come back in the response body and the page
+    attaches them itself, so a cross-site POST arrives with no credential,
+    whatever its content type and whatever the response headers end up being.
     """
-    cookie = victim['client'].cookies['refresh_token']
-
-    assert cookie['samesite'] == 'Lax'
-    # Explicitly not Strict, and not absent: Strict would break the
-    # cross-origin frontend/API pair this design depends on, and absent would
-    # be relying on a browser default rather than stating the policy.
-    assert cookie['samesite'] != 'Strict'
-    assert cookie['httponly'] is True
+    assert not victim['client'].cookies
 
 
 # --- the exemption is scoped, and intentional ------------------------------------
