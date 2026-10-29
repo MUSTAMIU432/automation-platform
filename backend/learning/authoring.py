@@ -150,7 +150,7 @@ def _apply_course(course: Course, data: CourseInput) -> None:
             continue
         key = slugify(option.get('key') or title)[:50] or 'project'
         if key in keys:
-            raise LearningError('Two capstone projects have the same name.', 'capstoneOptions')
+            raise LearningError('Two final project options have the same name.', 'capstoneOptions')
         keys.add(key)
         options.append(
             {'key': key, 'title': title, 'summary': (option.get('summary') or '').strip()}

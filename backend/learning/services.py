@@ -295,7 +295,7 @@ def submit_capstone(
 
     options = {option.get('key') for option in course.capstone.get('options', [])}
     if data.option not in options:
-        raise LearningError('Choose one of the capstone projects.', field='option')
+        raise LearningError('Choose one of the final project options.', field='option')
 
     submission, _ = CapstoneSubmission.objects.update_or_create(
         enrollment=enrollment,
@@ -328,7 +328,7 @@ def completion_gaps(enrollment: Enrollment) -> list[str]:
     if remaining_quizzes:
         gaps.append(f'{remaining_quizzes} quiz{"zes" if remaining_quizzes != 1 else ""} to pass')
     if progress.capstone is None:
-        gaps.append('the capstone project to submit')
+        gaps.append('the final project to submit')
     return gaps
 
 

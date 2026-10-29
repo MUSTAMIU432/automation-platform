@@ -241,7 +241,7 @@ class CapstoneOptionType:
     summary: str
 
 
-@strawberry.type(description='Your capstone project, as you submitted it.')
+@strawberry.type(description='Your final project, as you submitted it.')
 class CapstoneSubmissionType:
     option: str
     repository_url: str
@@ -872,7 +872,7 @@ class Mutation:
             ],
         )
 
-    @strawberry.mutation(description='Submit, or update, your capstone project.')
+    @strawberry.mutation(description='Submit, or update, your final project.')
     def submit_capstone(self, info: strawberry.Info, input: CapstoneInput) -> CoursePayload:
         try:
             submission = services.submit_capstone(
@@ -890,7 +890,7 @@ class Mutation:
             return CoursePayload(success=False, message=exc.message, field=exc.field)
         return CoursePayload(
             success=True,
-            message='Capstone submitted.',
+            message='Final project submitted.',
             course=_course_after_write(info, submission.enrollment.course_id),
         )
 

@@ -14,7 +14,7 @@ Start from your first `print()` and finish by designing, testing and deploying a
 real backend service. Twelve modules take you from variables and loops through
 data structures, functions and object-oriented design, to files, testing,
 databases and web APIs - each with lessons, runnable examples, coding exercises
-graded by hidden tests, and a quiz. The course ends with a capstone project you
+graded by hidden tests, and a quiz. The course ends with a final project you
 build, test and document yourself.
 '''
 audience = [

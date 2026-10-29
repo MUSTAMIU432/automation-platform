@@ -11,17 +11,20 @@ to Advanced**, loaded once as a starting draft that administrators then own.
 
 ## What learners get
 
+The course's closing project is called the **final project** everywhere people read
+it; the code, API and content files still name it `capstone`.
+
 | Page | Path | What it does |
 | ---- | ---- | ------------ |
 | My learning | `/app/learn` | Enrolled courses with progress, a "continue" shortcut, recent activity |
 | Catalog | `/app/learn/courses` | Published courses, searchable and filterable by level |
-| Course | `/app/learn/courses/:slug` | Introduction, outcomes, curriculum, progress, enrollment, capstone, completion |
+| Course | `/app/learn/courses/:slug` | Introduction, outcomes, curriculum, progress, enrollment, final project, completion |
 | Lesson | `…/lessons/:id` | Notes with highlighted, copyable code; lesson files; mark complete; previous/next |
 | Exercise | `…/exercises/:id` | Instructions, examples, code editor, Run, Submit, results, hints, previous attempts |
 | Quiz | `…/quizzes/:id` | Single- and multiple-answer questions, score, explanations, retries |
 
 A course is **complete** when every lesson is completed, every module quiz is
-passed, and the capstone (a repository link, how to run it, and the learner's
+passed, and the final project (a repository link, how to run it, and the learner's
 design decisions) is submitted. Exercises count toward progress but do not gate
 completion, so a platform without a code sandbox can still be finished. The rule
 is one function: `learning.services.completion_gaps`.
@@ -34,7 +37,7 @@ permission. Platform administrators (`manage.py grant_platform_admin`) have it;
 migration `learning.0002` gives it to administrators granted before Learning existed.
 
 1. **Courses → New course** creates a draft. Learners see nothing until it is published.
-2. On the course page: edit details (description, outcomes, audience, capstone),
+2. On the course page: edit details (description, outcomes, audience) and the final project,
    add and reorder **modules**, add and reorder **lessons**, add **exercises**
    and each module's **quiz**.
 3. **Lesson notes** are written in a small Markdown subset with a live preview
@@ -144,6 +147,6 @@ No new frontend variables are needed.
 ## Known limits
 
 - Exercise grading compares printed output; it does not run learners' own pytest files.
-- A capstone is recorded when submitted; there is no reviewer workflow for it yet.
+- A final project is recorded when submitted; there is no reviewer workflow for it yet.
 - Lesson files are downloaded through the backend, which is fine for notes and
   slides; very large files would be better served by short-lived signed links.

@@ -220,7 +220,7 @@ function CapstoneSection({ course, onSaved }: { course: Course; onSaved: () => v
     <section aria-labelledby="capstone" className={`${glassPanel} space-y-5 p-6`}>
       <div>
         <h2 id="capstone" className="text-xl font-bold tracking-tight text-slate-900">
-          Capstone project
+          Final project
         </h2>
         <p className="mt-2 text-sm text-slate-600">{course.capstone.brief}</p>
       </div>
@@ -235,7 +235,11 @@ function CapstoneSection({ course, onSaved }: { course: Course; onSaved: () => v
         </ul>
       )}
       {course.enrollment && (
-        <form onSubmit={(event) => void submit(event)} className="space-y-4" aria-label="Capstone">
+        <form
+          onSubmit={(event) => void submit(event)}
+          className="space-y-4"
+          aria-label="Final project"
+        >
           <fieldset>
             <legend className="text-sm font-semibold text-slate-700">Choose your project</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -303,7 +307,7 @@ function CapstoneSection({ course, onSaved }: { course: Course; onSaved: () => v
           </label>
           <Notice outcome={outcome} />
           <button type="submit" disabled={busy} className={primaryButton}>
-            {existing ? 'Update capstone' : 'Submit capstone'}
+            {existing ? 'Update final project' : 'Submit final project'}
           </button>
         </form>
       )}
@@ -478,7 +482,7 @@ export function CourseOverviewPage() {
               ) : (
                 <>
                   <p className="text-sm text-slate-600">
-                    Complete every lesson, pass every module quiz and submit the capstone.
+                    Complete every lesson, pass every module quiz and submit the final project.
                   </p>
                   {progress.completionGaps.length > 0 && (
                     <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600">

@@ -84,7 +84,7 @@ const PROGRESS = {
   capstoneSubmitted: false,
   percent: 25,
   nextLessonId: '12',
-  completionGaps: ['1 lesson to complete', '1 quiz to pass', 'the capstone project to submit'],
+  completionGaps: ['1 lesson to complete', '1 quiz to pass', 'the final project to submit'],
   completedAt: null,
   certificateCode: null,
 }

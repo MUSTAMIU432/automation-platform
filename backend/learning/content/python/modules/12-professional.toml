@@ -10,7 +10,7 @@ objectives = [
   "Containerise and deploy a Python service",
   "Apply core security principles, profile performance, and document a project",
 ]
-project = "Capstone: choose one of the five capstone projects and build it end to end - working code, tests, documentation and a short explanation of your design decisions."
+project = "Final project: choose one of the five project options and build it end to end - working code, tests, documentation and a short explanation of your design decisions."
 
 [[lessons]]
 slug = "architecture-environments-config"

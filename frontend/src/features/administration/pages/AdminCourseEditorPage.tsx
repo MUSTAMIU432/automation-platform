@@ -428,7 +428,7 @@ function CapstonePanel({ api }: { api: CourseFormApi }) {
         title="The brief"
         description="The final project that completes the course. Learners submit a repository, how to run it, and their design decisions."
       >
-        <Field label="Capstone brief">
+        <Field label="Brief">
           {(id) => (
             <textarea
               id={id}
@@ -1320,7 +1320,7 @@ export function AdminCourseEditorPage() {
             tabs={[
               { key: 'curriculum', label: 'Curriculum', count: lessons },
               { key: 'details', label: details.dirty ? 'Details •' : 'Details' },
-              { key: 'capstone', label: 'Capstone' },
+              { key: 'capstone', label: 'Final project' },
               { key: 'settings', label: 'Settings' },
             ]}
           />

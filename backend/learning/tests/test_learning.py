@@ -536,7 +536,7 @@ class TestCapstoneAndCompletion:
         assert result['success'] is False
         assert '2 lessons to complete' in result['message']
         assert '1 quiz to pass' in result['message']
-        assert 'capstone' in result['message']
+        assert 'the final project to submit' in result['message']
         assert not CourseCompletion.objects.exists()
 
     def test_a_finished_course_can_be_completed(self, gql, course, learner):
