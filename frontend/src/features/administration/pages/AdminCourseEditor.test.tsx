@@ -265,3 +265,71 @@ describe('AdminCourseEditorPage details', () => {
     expect(screen.queryByText('Unsaved changes')).not.toBeInTheDocument()
   })
 })
+
+describe('AdminCourseEditorPage PDF upload', () => {
+  const pdf = (name: string) => new File(['%PDF-1.7'], name, { type: 'application/pdf' })
+
+  function choose(files: File[]) {
+    fireEvent.change(screen.getByLabelText('Choose PDF files'), { target: { files } })
+  }
+
+  it('turns each PDF into a lesson in the chosen module', async () => {
+    api.createLessonRequest.mockResolvedValue({ ...OK, id: '55' })
+    api.uploadLessonMaterialRequest.mockResolvedValue({ success: true, message: 'Uploaded.' })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs to Functions' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
+    expect(dialog.getByLabelText('Module')).toHaveValue('B')
+    choose([pdf('03_return-values.pdf')])
+    expect(dialog.getByLabelText('Lesson title for 03_return-values.pdf')).toHaveValue(
+      '03 return values',
+    )
+    fireEvent.change(dialog.getByLabelText('Lesson title for 03_return-values.pdf'), {
+      target: { value: 'Return values' },
+    })
+    fireEvent.click(dialog.getByRole('button', { name: 'Upload 1 PDF' }))
+
+    expect(await dialog.findByText('1 lesson added.')).toBeInTheDocument()
+    expect(api.createLessonRequest).toHaveBeenCalledWith(
+      'B',
+      expect.objectContaining({ title: 'Return values' }),
+    )
+    expect(api.uploadLessonMaterialRequest).toHaveBeenCalledWith(
+      '55',
+      expect.any(File),
+      'Return values',
+    )
+    await waitFor(() => expect(api.adminCourseRequest).toHaveBeenCalledTimes(2))
+  })
+
+  it('removes the lesson again when the server refuses its file', async () => {
+    api.createLessonRequest.mockResolvedValue({ ...OK, id: '56' })
+    api.uploadLessonMaterialRequest.mockResolvedValue({
+      success: false,
+      message: 'This file is too large.',
+    })
+    api.deleteLessonRequest.mockResolvedValue(OK)
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
+    expect(dialog.getByLabelText('Module')).toHaveValue('A')
+    choose([pdf('big.pdf')])
+    fireEvent.click(dialog.getByRole('button', { name: 'Upload 1 PDF' }))
+
+    expect(await dialog.findByText('This file is too large.')).toBeInTheDocument()
+    expect(api.deleteLessonRequest).toHaveBeenCalledWith('56')
+  })
+
+  it('leaves out files that are not PDFs', async () => {
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs' }))
+    choose([pdf('notes.pdf'), new File(['x'], 'photo.png', { type: 'image/png' })])
+
+    const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
+    expect(dialog.getAllByRole('listitem')).toHaveLength(1)
+    expect(dialog.getByRole('alert')).toHaveTextContent('Only PDF files')
+  })
+})

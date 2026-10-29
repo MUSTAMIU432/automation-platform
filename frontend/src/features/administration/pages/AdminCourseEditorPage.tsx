@@ -57,6 +57,7 @@ import {
   quietButton,
 } from '../components/CourseEditorUi'
 import { AUDIENCE_SUGGESTIONS, OUTCOME_SUGGESTIONS } from '../components/courseSuggestions'
+import { PdfUploadDialog } from '../components/PdfUploadDialog'
 import { useAdminQuery } from '../hooks/useAdminQuery'
 
 const LEVELS = [
@@ -555,6 +556,7 @@ function ModuleEditor({
   nextModuleId,
   drag,
   onChanged,
+  onUploadPdf,
 }: {
   courseId: string
   module: AdminModule
@@ -564,6 +566,7 @@ function ModuleEditor({
   nextModuleId: string | null
   drag: CurriculumDrag
   onChanged: () => void
+  onUploadPdf: () => void
 }) {
   const navigate = useNavigate()
   const action = useRun(onChanged)
@@ -763,9 +766,19 @@ function ModuleEditor({
 
         <div className="grid gap-6 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
           <div>
-            <h3 className="mb-2 text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
-              Lessons
-            </h3>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-[11px] font-semibold tracking-[0.12em] text-slate-500 uppercase">
+                Lessons
+              </h3>
+              <button
+                type="button"
+                onClick={onUploadPdf}
+                aria-label={`Upload PDFs to ${module.title}`}
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+              >
+                <DocumentIcon className="h-3.5 w-3.5" /> Upload PDF
+              </button>
+            </div>
             <ul
               aria-label={`Lessons in ${module.title}`}
               className="space-y-0.5 rounded-xl border border-slate-200/80 bg-white/80 p-1.5"
@@ -1297,6 +1310,8 @@ export function AdminCourseEditorPage() {
   const details = useCourseForm(course.data, course.reload)
   const [newModule, setNewModule] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
+  // The PDF upload dialog: closed (false), or open with a module chosen (its id) or not (null).
+  const [uploadFor, setUploadFor] = useState<string | null | false>(false)
   const requested = params.get('tab') as TabKey | null
   const tab: TabKey = requested && TAB_KEYS.includes(requested) ? requested : 'curriculum'
 
@@ -1330,11 +1345,18 @@ export function AdminCourseEditorPage() {
               { key: 'settings', label: 'Settings' },
             ]}
           />
-          {tab === 'curriculum' && drag.modules.length > 1 && (
-            <p className="inline-flex items-center gap-1.5 text-xs text-slate-500">
-              <GripIcon className="h-3.5 w-3.5" /> Drag to reorder - a lesson can move to another
-              module.
-            </p>
+          {tab === 'curriculum' && (
+            <div className="flex flex-wrap items-center gap-3">
+              {drag.modules.length > 1 && (
+                <p className="hidden items-center gap-1.5 text-xs text-slate-500 xl:inline-flex">
+                  <GripIcon className="h-3.5 w-3.5" /> Drag to reorder - a lesson can move to
+                  another module.
+                </p>
+              )}
+              <button type="button" onClick={() => setUploadFor(null)} className={quietButton}>
+                <DocumentIcon className="h-4 w-4" /> Upload PDFs
+              </button>
+            </div>
           )}
         </div>
 
@@ -1366,6 +1388,7 @@ export function AdminCourseEditorPage() {
                 nextModuleId={drag.modules[index + 1]?.id ?? null}
                 drag={drag}
                 onChanged={course.reload}
+                onUploadPdf={() => setUploadFor(module.id)}
               />,
             ])}
             {drag.spot?.kind === 'module' && drag.spot.beforeId === null && <DropLine />}
@@ -1434,6 +1457,18 @@ export function AdminCourseEditorPage() {
         )}
       </div>
 
+      {uploadFor !== false && (
+        <PdfUploadDialog
+          modules={drag.modules.map((module, index) => ({
+            id: module.id,
+            title: module.title,
+            number: index + 1,
+          }))}
+          initialModuleId={uploadFor}
+          onUploaded={course.reload}
+          onClose={() => setUploadFor(false)}
+        />
+      )}
       {confirmDelete && (
         <ConfirmDialog
           title={`Delete “${data.title}”`}

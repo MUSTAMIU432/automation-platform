@@ -1,16 +1,12 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 
 import { CheckCircleIcon, CloseIcon, PlusIcon, SearchIcon } from '../../../components/AppIcons'
 import { brandButton, inputClasses, quietButton } from './CourseEditorUi'
+import { EditorModal } from './EditorModal'
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase()
 
-/**
- * Pick several answers from a list, or add your own, in a modal. Rendered on
- * `document.body`: the field sits inside the course form, and an Enter in the
- * dialog's own inputs must never submit that form.
- */
+/** Pick several answers from a list, or add your own, in a modal (`EditorModal`). */
 function ChoiceDialog({
   title,
   description,
@@ -28,7 +24,6 @@ function ChoiceDialog({
   onApply: (items: string[]) => void
   onClose: () => void
 }) {
-  const titleId = useId()
   const searchRef = useRef<HTMLInputElement>(null)
   const [chosen, setChosen] = useState(selected)
   const [search, setSearch] = useState('')
@@ -42,19 +37,7 @@ function ChoiceDialog({
   const all = [...options, ...extra]
   const visible = all.filter((option) => option.toLowerCase().includes(search.trim().toLowerCase()))
 
-  // The latest `onClose`, so Escape always calls the current one.
-  const close = useRef(onClose)
-  useEffect(() => {
-    close.current = onClose
-  }, [onClose])
-  useEffect(() => {
-    searchRef.current?.focus()
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') close.current()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [])
+  useEffect(() => searchRef.current?.focus(), [])
 
   function toggle(option: string) {
     setChosen((current) =>
@@ -71,131 +54,99 @@ function ChoiceDialog({
     setCustom('')
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 px-4 py-6 backdrop-blur-[2px] sm:items-center">
-      <button
-        type="button"
-        aria-label="Close"
-        tabIndex={-1}
-        onClick={onClose}
-        className="absolute inset-0 cursor-default"
-      />
-      <dialog
-        open
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="relative m-0 flex max-h-[min(40rem,calc(100dvh-3rem))] w-full max-w-xl flex-col overflow-hidden rounded-3xl bg-white p-0 text-left shadow-[0_30px_80px_-24px_rgba(15,23,42,0.45)] ring-1 ring-slate-900/5"
-      >
-        <header className="flex items-start justify-between gap-4 border-b border-slate-200/80 px-6 pt-5 pb-4">
-          <div>
-            <h2 id={titleId} className="text-lg font-semibold tracking-tight text-slate-900">
-              {title}
-            </h2>
-            <p className="mt-0.5 text-sm text-slate-500">{description}</p>
-          </div>
+  return (
+    <EditorModal title={title} description={description} onClose={onClose}>
+      <div className="px-6 pt-4">
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            ref={searchRef}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search"
+            aria-label="Search the list"
+            className={`${inputClasses} pl-10`}
+          />
+        </div>
+      </div>
+
+      <ul aria-label={title} className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-3">
+        {visible.map((option) => {
+          const checked = chosen.some((item) => same(item, option))
+          return (
+            <li key={option}>
+              <label
+                className={`flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-sm ring-1 motion-safe:transition-colors ${
+                  checked
+                    ? 'bg-brand-50/70 text-brand-900 ring-brand-200'
+                    : 'text-slate-700 ring-transparent hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => toggle(option)}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-brand-600"
+                />
+                <span className="min-w-0 flex-1">{option}</span>
+              </label>
+            </li>
+          )
+        })}
+        {visible.length === 0 && (
+          <li className="px-3 py-6 text-center text-sm text-slate-500">
+            Nothing matches. Add it as your own below.
+          </li>
+        )}
+      </ul>
+
+      <div className="border-t border-slate-200/80 px-6 py-4">
+        <div className="flex gap-2">
+          <input
+            value={custom}
+            onChange={(event) => setCustom(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                addCustom()
+              }
+            }}
+            placeholder={addPlaceholder}
+            aria-label="Add your own"
+            className={`${inputClasses} py-2`}
+          />
           <button
             type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+            onClick={addCustom}
+            disabled={!custom.trim()}
+            className={`${quietButton} shrink-0 py-2`}
           >
-            <CloseIcon className="h-4 w-4" />
+            <PlusIcon className="h-4 w-4" /> Add
           </button>
-        </header>
-
-        <div className="px-6 pt-4">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input
-              ref={searchRef}
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search"
-              aria-label="Search the list"
-              className={`${inputClasses} pl-10`}
-            />
-          </div>
         </div>
-
-        <ul aria-label={title} className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-3">
-          {visible.map((option) => {
-            const checked = chosen.some((item) => same(item, option))
-            return (
-              <li key={option}>
-                <label
-                  className={`flex cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-sm ring-1 motion-safe:transition-colors ${
-                    checked
-                      ? 'bg-brand-50/70 text-brand-900 ring-brand-200'
-                      : 'text-slate-700 ring-transparent hover:bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(option)}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 accent-brand-600"
-                  />
-                  <span className="min-w-0 flex-1">{option}</span>
-                </label>
-              </li>
-            )
-          })}
-          {visible.length === 0 && (
-            <li className="px-3 py-6 text-center text-sm text-slate-500">
-              Nothing matches. Add it as your own below.
-            </li>
-          )}
-        </ul>
-
-        <div className="border-t border-slate-200/80 px-6 py-4">
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="text-sm text-slate-500" aria-live="polite">
+            {chosen.length} selected
+          </span>
           <div className="flex gap-2">
-            <input
-              value={custom}
-              onChange={(event) => setCustom(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault()
-                  addCustom()
-                }
-              }}
-              placeholder={addPlaceholder}
-              aria-label="Add your own"
-              className={`${inputClasses} py-2`}
-            />
+            <button type="button" onClick={onClose} className={quietButton}>
+              Cancel
+            </button>
             <button
               type="button"
-              onClick={addCustom}
-              disabled={!custom.trim()}
-              className={`${quietButton} shrink-0 py-2`}
+              onClick={() => {
+                onApply(chosen)
+                onClose()
+              }}
+              className={brandButton}
             >
-              <PlusIcon className="h-4 w-4" /> Add
+              Apply
             </button>
           </div>
-          <div className="mt-4 flex items-center justify-between gap-3">
-            <span className="text-sm text-slate-500" aria-live="polite">
-              {chosen.length} selected
-            </span>
-            <div className="flex gap-2">
-              <button type="button" onClick={onClose} className={quietButton}>
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onApply(chosen)
-                  onClose()
-                }}
-                className={brandButton}
-              >
-                Apply
-              </button>
-            </div>
-          </div>
         </div>
-      </dialog>
-    </div>,
-    document.body,
+      </div>
+    </EditorModal>
   )
 }
 
