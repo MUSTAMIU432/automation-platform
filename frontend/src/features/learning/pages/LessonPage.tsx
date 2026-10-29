@@ -16,10 +16,10 @@ import {
   downloadLessonFile,
   formatFileSize,
   lessonRequest,
-  openLessonFile,
   type LessonFile,
 } from '../api/learningApi'
 import { ContentBlocks } from '../components/ContentBlocks'
+import { FilePreviewDialog } from '../components/FilePreviewDialog'
 import { Empty, ErrorNotice, Loading, Pill } from '../components/States'
 import { DIFFICULTY_CLASSES, glassPanel, primaryButton, secondaryButton } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
@@ -27,6 +27,7 @@ import { useLearnBase } from '../hooks/useLearnBase'
 
 function LessonFiles({ files }: { files: LessonFile[] }) {
   const [error, setError] = useState<string | null>(null)
+  const [previewAt, setPreviewAt] = useState<number | null>(null)
 
   async function run(action: () => Promise<void>) {
     setError(null)
@@ -43,7 +44,7 @@ function LessonFiles({ files }: { files: LessonFile[] }) {
         Lesson files
       </h2>
       <ul className="mt-3 space-y-2">
-        {files.map((file) => (
+        {files.map((file, index) => (
           <li
             key={file.id}
             className="flex flex-wrap items-center gap-3 rounded-2xl bg-white/70 px-3.5 py-2.5 ring-1 ring-slate-900/5"
@@ -60,10 +61,11 @@ function LessonFiles({ files }: { files: LessonFile[] }) {
             {canOpenInTab(file) && (
               <button
                 type="button"
-                onClick={() => void run(() => openLessonFile(file))}
-                className="rounded-full px-3 py-1 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                onClick={() => setPreviewAt(index)}
+                aria-label={`Preview ${file.title}`}
+                className="rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
               >
-                Open
+                Preview
               </button>
             )}
             <button
@@ -80,6 +82,13 @@ function LessonFiles({ files }: { files: LessonFile[] }) {
         <p role="alert" className="mt-3 text-sm text-red-700">
           {error}
         </p>
+      )}
+      {previewAt !== null && (
+        <FilePreviewDialog
+          files={files.map((file) => ({ saved: file }))}
+          initial={previewAt}
+          onClose={() => setPreviewAt(null)}
+        />
       )}
     </section>
   )

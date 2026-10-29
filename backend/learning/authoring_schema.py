@@ -61,6 +61,8 @@ class AdminLessonSummaryType:
     title: str
     estimated_minutes: int
     material_count: int
+    # The lesson's files, so the curriculum can preview and download them in place.
+    materials: list[MaterialType]
 
 
 @strawberry.type
@@ -129,6 +131,7 @@ class AdminCourseType:
         lessons = (
             Lesson.objects.filter(module__course=course)
             .annotate(material_count=Count('materials'))
+            .prefetch_related('materials')
             .order_by('position')
         )
         by_module: dict[int, list] = {}
@@ -157,6 +160,9 @@ class AdminCourseType:
                         title=lesson.title,
                         estimated_minutes=lesson.estimated_minutes,
                         material_count=lesson.material_count,
+                        materials=[
+                            MaterialType.from_model(material) for material in lesson.materials.all()
+                        ],
                     )
                     for lesson in by_module.get(module.pk, [])
                 ],

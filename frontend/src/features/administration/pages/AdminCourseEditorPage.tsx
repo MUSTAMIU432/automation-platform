@@ -59,6 +59,8 @@ import {
 import { AUDIENCE_SUGGESTIONS, OUTCOME_SUGGESTIONS } from '../components/courseSuggestions'
 import { PdfUploadDialog } from '../components/PdfUploadDialog'
 import { useAdminQuery } from '../hooks/useAdminQuery'
+import { downloadLessonFile } from '../../learning/api/learningApi'
+import { FilePreviewDialog } from '../../learning/components/FilePreviewDialog'
 
 const LEVELS = [
   { value: 'beginner', label: 'Beginner' },
@@ -578,6 +580,8 @@ function ModuleEditor({
     project: module.project,
   })
   const [newLesson, setNewLesson] = useState('')
+  const [previewing, setPreviewing] = useState<AdminModule['lessons'][number] | null>(null)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [confirm, setConfirm] = useState<null | {
     label: string
     act: () => Promise<AuthoringResult>
@@ -820,10 +824,35 @@ function ModuleEditor({
                     <ClockIcon className="h-3 w-3" />
                     {lesson.estimatedMinutes} min
                   </span>
-                  {lesson.materialCount > 0 && (
-                    <span className={`${chip} hidden sm:inline-flex`}>
-                      <PaperclipIcon className="h-3 w-3" />
-                      {lesson.materialCount}
+                  {lesson.materials.length > 0 && (
+                    <span className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewing(lesson)}
+                        aria-label={`Preview the file of ${lesson.title}`}
+                        title={
+                          lesson.materials.length === 1
+                            ? lesson.materials[0].filename
+                            : `${lesson.materials.length} files`
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                      >
+                        <EyeIcon className="h-3.5 w-3.5" /> Preview
+                        {lesson.materials.length > 1 && (
+                          <span className="tabular-nums">· {lesson.materials.length}</span>
+                        )}
+                      </button>
+                      <IconButton
+                        label={`Download the file of ${lesson.title}`}
+                        onClick={() => {
+                          setFileError(null)
+                          downloadLessonFile(lesson.materials[0]).catch(() =>
+                            setFileError('That file could not be downloaded. Please try again.'),
+                          )
+                        }}
+                      >
+                        <PaperclipIcon className="h-3.5 w-3.5" />
+                      </IconButton>
                     </span>
                   )}
                   <span className={rowTools}>
@@ -1029,6 +1058,17 @@ function ModuleEditor({
           <div className="border-t border-slate-200/70 px-4 py-3 sm:px-5">
             <Notice tone={action.result.tone}>{action.result.text}</Notice>
           </div>
+        )}
+        {fileError && (
+          <div className="border-t border-slate-200/70 px-4 py-3 sm:px-5">
+            <Notice tone="error">{fileError}</Notice>
+          </div>
+        )}
+        {previewing && (
+          <FilePreviewDialog
+            files={previewing.materials.map((material) => ({ saved: material }))}
+            onClose={() => setPreviewing(null)}
+          />
         )}
         {confirm && (
           <ConfirmDialog

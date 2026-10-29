@@ -488,6 +488,31 @@ class TestLessonFiles:
         assert served['Content-Disposition'].startswith('attachment;')
         assert LessonMaterial.objects.get().storage_key.startswith('learning/')
 
+    def test_the_course_editor_lists_each_lessons_files_to_preview(self, client, gql, manager):
+        ids = build_course(gql, manager)
+        material_id = upload(client, ids['lesson'], manager).json()['material']['id']
+
+        course = gql(
+            """query($id: ID!) { adminCourse(id: $id) { modules { lessons {
+                materialCount materials { id filename contentType downloadUrl }
+            } } } }""",
+            {'id': ids['course']},
+            manager,
+        )['adminCourse']
+
+        assert course['modules'][0]['lessons'][0] == {
+            'materialCount': 1,
+            'materials': [
+                {
+                    'id': material_id,
+                    'filename': 'notes.pdf',
+                    'contentType': 'application/pdf',
+                    'downloadUrl': f'/learning/materials/{material_id}/download/',
+                }
+            ],
+        }
+        assert download(client, material_id, manager).status_code == 200
+
     def test_signed_out_callers_get_nothing(self, client, gql, manager):
         ids = build_course(gql, manager)
         material_id = upload(client, ids['lesson'], manager).json()['material']['id']

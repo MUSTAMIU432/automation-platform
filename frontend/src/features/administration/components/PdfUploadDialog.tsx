@@ -1,12 +1,20 @@
 import { useEffect, useId, useRef, useState, type DragEvent } from 'react'
 
 import { CheckCircleIcon, DocumentIcon } from '../../../components/AppIcons'
+import { FilePreviewDialog } from '../../learning/components/FilePreviewDialog'
 import {
   createLessonRequest,
   deleteLessonRequest,
   uploadLessonMaterialRequest,
 } from '../api/courseAuthoringApi'
-import { IconButton, TrashIcon, brandButton, inputClasses, quietButton } from './CourseEditorUi'
+import {
+  EyeIcon,
+  IconButton,
+  TrashIcon,
+  brandButton,
+  inputClasses,
+  quietButton,
+} from './CourseEditorUi'
 import { EditorModal } from './EditorModal'
 
 /** What the notes say when a lesson is a PDF: the file is the content. */
@@ -65,6 +73,7 @@ export function PdfUploadDialog({
   const [busy, setBusy] = useState(false)
   const [refused, setRefused] = useState<string | null>(null)
   const [over, setOver] = useState(false)
+  const [previewing, setPreviewing] = useState<File | null>(null)
   const waiting = files.filter((file) => file.status === 'ready' || file.status === 'failed')
   const finished = files.length > 0 && files.every((file) => file.status === 'done')
 
@@ -235,6 +244,14 @@ export function PdfUploadDialog({
                       {item.file.name} · {size(item.file.size)}
                     </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewing(item.file)}
+                    aria-label={`Preview ${item.file.name}`}
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand-50 px-2.5 py-1.5 text-xs font-semibold text-brand-700 ring-1 ring-brand-100 hover:bg-brand-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                  >
+                    <EyeIcon className="h-3.5 w-3.5" /> Preview
+                  </button>
                   {item.status === 'done' ? (
                     <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
                       <CheckCircleIcon className="h-4 w-4" /> Added
@@ -305,6 +322,9 @@ export function PdfUploadDialog({
           )}
         </div>
       </footer>
+      {previewing && (
+        <FilePreviewDialog files={[{ local: previewing }]} onClose={() => setPreviewing(null)} />
+      )}
     </EditorModal>
   )
 }

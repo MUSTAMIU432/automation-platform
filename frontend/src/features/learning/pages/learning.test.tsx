@@ -26,6 +26,7 @@ vi.mock('../api/learningApi', async (importOriginal) => ({
   submitExerciseRequest: vi.fn(),
   submitQuizRequest: vi.fn(),
   downloadLessonFile: vi.fn(),
+  fetchLessonFileUrl: vi.fn(),
 }))
 
 // CodeMirror measures layout jsdom does not have; a textarea stands in for it here.
@@ -282,6 +283,36 @@ describe('a lesson', () => {
     fireEvent.click(screen.getByRole('button', { name: /Mark as completed/ }))
     await waitFor(() => expect(api.completeLessonRequest).toHaveBeenCalledWith('12'))
     expect(await screen.findByText('Completed')).toBeInTheDocument()
+  })
+
+  it('previews a PDF lesson file in the app, with its download', async () => {
+    URL.createObjectURL ??= () => ''
+    URL.revokeObjectURL ??= () => {}
+    const pdf = {
+      id: '42',
+      title: 'Week 1 notes',
+      filename: 'notes.pdf',
+      contentType: 'application/pdf',
+      size: 4096,
+      downloadUrl: '/learning/materials/42/download/',
+    }
+    api.lessonRequest.mockResolvedValue({ ...LESSON, materials: [pdf] })
+    api.fetchLessonFileUrl.mockResolvedValue('blob:week-1-notes')
+    renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Week 1 notes' }))
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'Week 1 notes' }))
+    expect(await dialog.findByLabelText('Preview of Week 1 notes')).toHaveAttribute(
+      'data',
+      'blob:week-1-notes',
+    )
+    expect(api.fetchLessonFileUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ downloadUrl: '/learning/materials/42/download/' }),
+    )
+    expect(dialog.getByRole('button', { name: 'Download' })).toBeEnabled()
+    fireEvent.click(dialog.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('copies a code example', async () => {

@@ -452,7 +452,13 @@ export async function completeCourseRequest(courseId: string): Promise<Outcome> 
 
 const BLOB_URL_LIFETIME_MS = 40_000
 
-async function fetchFile(file: Pick<LessonFile, 'downloadUrl' | 'contentType'>): Promise<string> {
+/**
+ * A lesson file, fetched with the reader's token, as an object URL. The caller revokes
+ * it when done - the in-app preview keeps it for as long as the preview is open.
+ */
+export async function fetchLessonFileUrl(
+  file: Pick<LessonFile, 'downloadUrl' | 'contentType'>,
+): Promise<string> {
   const token = getAccessToken()
   const response = await fetch(`${env.apiBaseUrl}${file.downloadUrl}`, {
     credentials: 'include',
@@ -460,7 +466,11 @@ async function fetchFile(file: Pick<LessonFile, 'downloadUrl' | 'contentType'>):
   })
   if (!response.ok) throw new Error('Could not download this file.')
   // Re-typed from the server's recorded type, never the response's.
-  const url = URL.createObjectURL(new Blob([await response.blob()], { type: file.contentType }))
+  return URL.createObjectURL(new Blob([await response.blob()], { type: file.contentType }))
+}
+
+async function fetchFile(file: Pick<LessonFile, 'downloadUrl' | 'contentType'>): Promise<string> {
+  const url = await fetchLessonFileUrl(file)
   setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS)
   return url
 }

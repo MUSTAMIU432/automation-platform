@@ -2,20 +2,27 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { renderAdminPage } from '../../../test/renderAdmin'
-import type { AdminCourse, AdminModule } from '../api/courseAuthoringApi'
+import type { AdminCourse, AdminModule, LessonMaterial } from '../api/courseAuthoringApi'
 import { AdminCourseEditorPage } from './AdminCourseEditorPage'
 
 vi.mock('../api/courseAuthoringApi')
 const api = vi.mocked(await import('../api/courseAuthoringApi'))
+vi.mock('../../learning/api/learningApi', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fetchLessonFileUrl: vi.fn(),
+  downloadLessonFile: vi.fn(),
+}))
+const fileApi = vi.mocked(await import('../../learning/api/learningApi'))
 
 const OK = { success: true, message: 'Reordered.', field: null, id: null }
 
-const lesson = (id: string, title: string, position: number) => ({
+const lesson = (id: string, title: string, position: number, materials: LessonMaterial[] = []) => ({
   id,
   title,
   position,
   estimatedMinutes: 10,
-  materialCount: 0,
+  materialCount: materials.length,
+  materials,
 })
 const exercise = (id: string, title: string) => ({
   id,
@@ -331,5 +338,60 @@ describe('AdminCourseEditorPage PDF upload', () => {
     const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
     expect(dialog.getAllByRole('listitem')).toHaveLength(1)
     expect(dialog.getByRole('alert')).toHaveTextContent('Only PDF files')
+  })
+})
+
+describe('AdminCourseEditorPage file preview', () => {
+  const NOTES = {
+    id: '61',
+    title: 'Week 1 notes',
+    filename: 'week-1.pdf',
+    contentType: 'application/pdf',
+    size: 2048,
+    createdAt: '2026-10-29T00:00:00Z',
+    downloadUrl: '/learning/materials/61/download/',
+  }
+
+  beforeEach(() => {
+    URL.createObjectURL ??= () => ''
+    URL.revokeObjectURL ??= () => {}
+    api.adminCourseRequest.mockResolvedValue({
+      ...COURSE,
+      modules: [module('A', 'Basics', 1, { lessons: [lesson('11', 'Variables', 1, [NOTES])] })],
+    })
+    fileApi.fetchLessonFileUrl.mockResolvedValue('blob:notes')
+    fileApi.downloadLessonFile.mockResolvedValue(undefined)
+  })
+
+  it("previews and downloads a lesson's PDF from the curriculum", async () => {
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview the file of Variables' }))
+
+    const dialog = within(await screen.findByRole('dialog', { name: 'Week 1 notes' }))
+    expect(await dialog.findByLabelText('Preview of Week 1 notes')).toHaveAttribute(
+      'data',
+      'blob:notes',
+    )
+    fireEvent.click(dialog.getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Download the file of Variables' }))
+    expect(fileApi.downloadLessonFile).toHaveBeenCalledWith(NOTES)
+  })
+
+  it('previews a picked PDF before it is uploaded; Escape closes only the preview', async () => {
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs' }))
+    fireEvent.change(screen.getByLabelText('Choose PDF files'), {
+      target: { files: [new File(['%PDF-1.7'], 'syllabus.pdf', { type: 'application/pdf' })] },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Preview syllabus.pdf' }))
+
+    expect(await screen.findByRole('dialog', { name: 'syllabus.pdf' })).toBeInTheDocument()
+    expect(fileApi.fetchLessonFileUrl).not.toHaveBeenCalled()
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    expect(screen.queryByRole('dialog', { name: 'syllabus.pdf' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' })).toBeInTheDocument()
   })
 })

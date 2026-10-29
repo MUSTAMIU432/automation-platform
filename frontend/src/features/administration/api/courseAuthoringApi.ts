@@ -50,6 +50,7 @@ export interface AdminModule {
     title: string
     estimatedMinutes: number
     materialCount: number
+    materials: LessonMaterial[]
   }>
   exercises: Array<{
     id: string
@@ -212,7 +213,10 @@ export async function adminCourseRequest(id: string): Promise<AdminCourse | null
          status publishedAt enrollmentCount
          modules {
            id position title summary objectives project
-           lessons { id position title estimatedMinutes materialCount }
+           lessons {
+             id position title estimatedMinutes materialCount
+             materials { id title filename contentType size createdAt downloadUrl }
+           }
            exercises { id title difficulty testCount hiddenTestCount }
            quiz { id title questionCount passPercentage }
          }
