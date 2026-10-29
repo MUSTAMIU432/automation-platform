@@ -21,6 +21,7 @@ import {
   secondaryButton,
 } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 /** A draft is a per-browser convenience; the server keeps only graded submissions. */
 function draftKey(exerciseId: string) {
@@ -248,6 +249,7 @@ function Workspace({ exercise, onGraded }: { exercise: Exercise; onGraded: () =>
 
 /** `/app/learn/courses/:courseSlug/exercises/:exerciseId`: the coding workspace. */
 export function ExercisePage() {
+  const learnBase = useLearnBase()
   const { courseSlug = '', exerciseId = '' } = useParams()
   const exercise = useLearningQuery(
     `exercise:${exerciseId}`,
@@ -263,7 +265,7 @@ export function ExercisePage() {
         title="This exercise is not available."
         description="Enroll in the course to practise its exercises."
         action={
-          <Link to={`/app/learn/courses/${courseSlug}`} className={secondaryButton}>
+          <Link to={`${learnBase}/courses/${courseSlug}`} className={secondaryButton}>
             Go to the course
           </Link>
         }
@@ -288,7 +290,7 @@ export function ExercisePage() {
             <p className="mt-2 text-sm text-slate-500">
               Practises{' '}
               <Link
-                to={`/app/learn/courses/${data.courseSlug}/lessons/${data.lessonId}`}
+                to={`${learnBase}/courses/${data.courseSlug}/lessons/${data.lessonId}`}
                 className="font-medium text-brand-700 underline decoration-brand-200 underline-offset-2"
               >
                 {data.lessonTitle}

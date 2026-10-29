@@ -514,7 +514,7 @@ function HeaderSearch() {
 
 function AppShell() {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const { user, logout } = useAuth()
   const { activeOrganization } = useOrganization()
   // Offered, not granted: the queue is authorized by the server.
@@ -707,9 +707,11 @@ function AppShell() {
         <main className="min-w-0 flex-1 pt-2">
           {/* The way back sits with the page it leaves, just above its title. */}
           <BackButton />
-          {/* An administrator's home is the console. */}
+          {/* An administrator's home is the console, and so is their e-learning. */}
           {isAdmin && pathname.replace(/\/+$/, '') === '/app' ? (
             <Navigate to="/app/admin" replace />
+          ) : isAdmin && /^\/app\/learn(\/|$)/.test(pathname) ? (
+            <Navigate to={pathname.replace(/^\/app\/learn/, '/app/admin/learn') + search} replace />
           ) : (
             <Outlet />
           )}

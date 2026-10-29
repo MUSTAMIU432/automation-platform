@@ -80,6 +80,8 @@ function renderAt(path = '/app') {
           { path: 'teams', element: <p>Teams content</p> },
           { path: 'messages', element: <p>Messages content</p> },
           { path: 'admin', element: <p>Console content</p> },
+          { path: 'admin/learn/courses/:slug', element: <p>Console course</p> },
+          { path: 'learn/courses/:slug', element: <p>Member course</p> },
           { path: 'automation', element: <p>Automation content</p> },
           { path: 'automation/projects', element: <p>Projects content</p> },
         ],
@@ -145,6 +147,25 @@ describe('AppLayout', () => {
     const main = within(screen.getByRole('navigation', { name: 'Main' }))
     expect(main.getAllByRole('link').map((link) => link.textContent)).toEqual(['Admin'])
     expect(main.getByRole('link', { name: 'Admin' })).toHaveAttribute('href', '/app/admin')
+  })
+
+  it("keeps an administrator's e-learning inside the console", async () => {
+    vi.mocked(useAdminCapabilities).mockReturnValue({
+      status: 'ready',
+      capabilities: { ...NO_ADMIN_CAPABILITIES, canAccessConsole: true },
+      reload: vi.fn(),
+    })
+    const router = renderAt('/app/learn/courses/python?tab=x')
+
+    expect(await screen.findByText('Console course')).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/app/admin/learn/courses/python')
+    expect(router.state.location.search).toBe('?tab=x')
+  })
+
+  it('leaves a member in their own learning area', async () => {
+    renderAt('/app/learn/courses/python')
+
+    expect(await screen.findByText('Member course')).toBeInTheDocument()
   })
 
   it('says how many conversations are unread, and asks the server for it once', async () => {

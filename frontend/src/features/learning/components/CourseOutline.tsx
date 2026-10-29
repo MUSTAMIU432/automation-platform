@@ -10,6 +10,7 @@ import {
 import { enrollRequest, type Course } from '../api/learningApi'
 import { ProgressBar } from './States'
 import { glassPanel, primaryButton } from './ui'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 const itemClasses = (current: boolean) =>
   `flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
@@ -41,9 +42,10 @@ export function CourseOutline({
   pathname: string
   onEnrolled: () => void
 }) {
+  const learnBase = useLearnBase()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const base = `/app/learn/courses/${course.summary.slug}`
+  const base = `${learnBase}/courses/${course.summary.slug}`
   const isCurrent = (path: string) => pathname === path
 
   async function enroll() {

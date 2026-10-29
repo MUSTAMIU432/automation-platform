@@ -5,9 +5,10 @@ import { AdminCapabilitiesContext } from '../../administration/context/AdminCapa
 import { courseRequest } from '../api/learningApi'
 import { CourseOutline } from '../components/CourseOutline'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 /** A lesson, exercise or quiz page: the course's contents go beside it. */
-const IN_A_COURSE = /^\/app\/learn\/courses\/([^/]+)\/(?:lessons|exercises|quizzes)\//
+const IN_A_COURSE = /^\/app\/(?:admin\/)?learn\/courses\/([^/]+)\/(?:lessons|exercises|quizzes)\//
 
 const tabClasses = ({ isActive }: { isActive: boolean }) =>
   `rounded-full px-4 py-1.5 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-safe:transition-colors ${
@@ -50,11 +51,13 @@ function InCourse({ courseSlug, pathname }: { courseSlug: string; pathname: stri
 }
 
 /**
- * Every learning page (`/app/learn/*`): the learning menu - your courses, the
+ * Every learning page (`/app/learn/*`, and `/app/admin/learn/*` inside the console):
+ * the learning menu - your courses, the
  * catalog to enroll from and, for course managers, the authoring console - and,
  * inside a course, its modules and lessons.
  */
 export function LearningLayout() {
+  const learnBase = useLearnBase()
   const { pathname } = useLocation()
   const canManage = useContext(AdminCapabilitiesContext)?.capabilities.canManageCourses ?? false
   const inCourse = IN_A_COURSE.exec(pathname)
@@ -62,10 +65,10 @@ export function LearningLayout() {
   return (
     <div className="space-y-6">
       <nav aria-label="Learning" className="flex flex-wrap items-center gap-1">
-        <NavLink to="/app/learn" end className={tabClasses}>
+        <NavLink to={learnBase} end className={tabClasses}>
           My learning
         </NavLink>
-        <NavLink to="/app/learn/courses" className={tabClasses}>
+        <NavLink to={`${learnBase}/courses`} className={tabClasses}>
           Course catalog
         </NavLink>
         {canManage && (

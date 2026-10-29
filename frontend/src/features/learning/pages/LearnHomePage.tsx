@@ -12,6 +12,7 @@ import {
 import { Empty, ErrorNotice, Loading, ProgressBar } from '../components/States'
 import { glassPanel, primaryButton, secondaryButton } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 const ACTIVITY_LABELS: Record<Activity['kind'], string> = {
   lesson: 'Lesson',
@@ -28,6 +29,7 @@ function when(iso: string): string {
  * button to enroll - registration right where a new learner lands.
  */
 function AvailableCourses({ first }: { first: boolean }) {
+  const learnBase = useLearnBase()
   const navigate = useNavigate()
   const catalog = useLearningQuery(
     'catalog',
@@ -43,7 +45,7 @@ function AvailableCourses({ first }: { first: boolean }) {
     setError(null)
     try {
       const result = await enrollRequest(course.id)
-      if (result.success) navigate(`/app/learn/courses/${course.slug}`)
+      if (result.success) navigate(`${learnBase}/courses/${course.slug}`)
       else setError(result.message)
     } catch {
       setError('We could not reach the server. Please try again.')
@@ -105,7 +107,7 @@ function AvailableCourses({ first }: { first: boolean }) {
               >
                 {enrolling === course.id ? 'Enrolling…' : 'Enroll for free'}
               </button>
-              <Link to={`/app/learn/courses/${course.slug}`} className={secondaryButton}>
+              <Link to={`${learnBase}/courses/${course.slug}`} className={secondaryButton}>
                 See modules and lessons
               </Link>
             </div>
@@ -121,6 +123,7 @@ function AvailableCourses({ first }: { first: boolean }) {
  * taking with its progress, and what they did most recently.
  */
 export function LearnHomePage() {
+  const learnBase = useLearnBase()
   const mine = useLearningQuery('my-learning', myLearningRequest, 'We could not load your courses.')
   const courses = mine.data?.courses ?? []
   const current = courses.find((entry) => !entry.enrollment.progress.completedAt) ?? courses[0]
@@ -135,7 +138,7 @@ export function LearnHomePage() {
             Pick up where you left off, see how far you have come, and find a new course.
           </p>
         </div>
-        <Link to="/app/learn/courses" className={secondaryButton}>
+        <Link to={`${learnBase}/courses`} className={secondaryButton}>
           Browse courses
         </Link>
       </header>
@@ -163,14 +166,14 @@ export function LearnHomePage() {
           <div className="mt-6 flex flex-wrap gap-3">
             {current.enrollment.progress.nextLessonId ? (
               <Link
-                to={`/app/learn/courses/${current.course.slug}/lessons/${current.enrollment.progress.nextLessonId}`}
+                to={`${learnBase}/courses/${current.course.slug}/lessons/${current.enrollment.progress.nextLessonId}`}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-forest hover:bg-mint/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint"
               >
                 Next lesson <ArrowRightIcon className="h-4 w-4" />
               </Link>
             ) : null}
             <Link
-              to={`/app/learn/courses/${current.course.slug}`}
+              to={`${learnBase}/courses/${current.course.slug}`}
               className="inline-flex items-center gap-2 rounded-full border border-white/30 px-5 py-2.5 text-sm font-semibold text-white hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint"
             >
               Course overview
@@ -190,7 +193,7 @@ export function LearnHomePage() {
               return (
                 <Link
                   key={course.id}
-                  to={`/app/learn/courses/${course.slug}`}
+                  to={`${learnBase}/courses/${course.slug}`}
                   className={`${glassPanel} block p-5 hover:-translate-y-0.5 hover:shadow-[0_26px_50px_-34px_rgba(8,75,56,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-safe:transition`}
                 >
                   <div className="flex items-start gap-4">

@@ -1,4 +1,4 @@
-import { useId, useState, type ComponentType } from 'react'
+import { useEffect, useId, useRef, useState, type ComponentType } from 'react'
 import { Link, matchPath, useLocation } from 'react-router-dom'
 
 import {
@@ -95,8 +95,8 @@ const GROUPS: Array<{ label: string; sections: Section[] }> = [
     label: 'Learning',
     sections: [
       { to: '/app/admin/courses', label: 'Courses', icon: CourseIcon },
-      // Leaves the console: the catalog, enrollment and lessons as a learner sees them.
-      { to: '/app/learn', label: 'Learner view', icon: LearnerIcon },
+      // Taking courses, inside the console: the catalog, enrolling, modules and lessons.
+      { to: '/app/admin/learn', label: 'E-learning', icon: LearnerIcon },
     ],
   },
   {
@@ -161,6 +161,15 @@ export function AdminSidebar() {
   const [collapsed, setCollapsed] = useState(readCollapsed)
   const [menuOpen, setMenuOpen] = useState(false)
   const current = currentSection(pathname)
+  const nav = useRef<HTMLElement>(null)
+
+  // The list scrolls without a scrollbar, so bring the current section into view:
+  // one low in the list (Learning, Communication) would otherwise sit below the fold.
+  useEffect(() => {
+    nav.current?.querySelector('[aria-current="page"]')?.scrollIntoView?.({ block: 'nearest' })
+    // Re-run on every navigation: the current link is found in the DOM, not read from `pathname`.
+    // oxlint-disable-next-line react/exhaustive-effect-dependencies
+  }, [pathname])
 
   function toggleCollapsed() {
     const next = !collapsed
@@ -200,6 +209,7 @@ export function AdminSidebar() {
       </h2>
 
       <nav
+        ref={nav}
         id={navId}
         aria-label="Administration"
         className={`mt-1 overflow-y-auto [scrollbar-width:none] lg:block lg:min-h-0 lg:flex-1 [&::-webkit-scrollbar]:hidden ${

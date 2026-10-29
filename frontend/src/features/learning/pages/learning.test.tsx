@@ -552,6 +552,30 @@ describe('the learning menu and course contents', () => {
     expect(screen.getByText('Catalog')).toBeInTheDocument()
   })
 
+  it('keeps every link inside the console when the pages are mounted there', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    render(
+      <MemoryRouter initialEntries={['/app/admin/learn/courses/python/lessons/12']}>
+        <Routes>
+          <Route path="/app/admin/learn" element={<LearningLayout />}>
+            <Route path="courses/:courseSlug/lessons/:lessonId" element={<p>Lesson body</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const menu = within(screen.getByRole('navigation', { name: 'Learning' }))
+    expect(menu.getByRole('link', { name: 'My learning' })).toHaveAttribute(
+      'href',
+      '/app/admin/learn',
+    )
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    expect(within(contents).getByRole('link', { name: 'Calculator' })).toHaveAttribute(
+      'href',
+      '/app/admin/learn/courses/python/exercises/21',
+    )
+  })
+
   it('lists the modules, lessons, exercises and quiz beside a lesson', async () => {
     api.courseRequest.mockResolvedValue(course(true))
     renderLearning('/app/learn/courses/python/lessons/12')

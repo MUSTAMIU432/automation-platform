@@ -27,6 +27,7 @@ import {
   secondaryButton,
 } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 function Notice({ outcome }: { outcome: Outcome | null }) {
   if (!outcome) return null
@@ -49,8 +50,9 @@ function ModuleCard({
   slug: string
   enrolled: boolean
 }) {
+  const learnBase = useLearnBase()
   const done = module.lessons.filter((lesson) => lesson.completed).length
-  const base = `/app/learn/courses/${slug}`
+  const base = `${learnBase}/courses/${slug}`
   return (
     <details className={`${glassPanel} group p-0 [&_summary::-webkit-details-marker]:hidden`}>
       <summary className="flex cursor-pointer list-none items-start gap-4 rounded-3xl p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
@@ -311,6 +313,7 @@ function CapstoneSection({ course, onSaved }: { course: Course; onSaved: () => v
 
 /** `/app/learn/courses/:courseSlug`: what the course teaches, its curriculum and your progress. */
 export function CourseOverviewPage() {
+  const learnBase = useLearnBase()
   const { courseSlug = '' } = useParams()
   const course = useLearningQuery(
     `course:${courseSlug}`,
@@ -342,7 +345,7 @@ export function CourseOverviewPage() {
         title="This course is not available."
         description="It may have been unpublished, or the link may be wrong."
         action={
-          <Link to="/app/learn/courses" className={secondaryButton}>
+          <Link to={`${learnBase}/courses`} className={secondaryButton}>
             Browse courses
           </Link>
         }
@@ -390,7 +393,7 @@ export function CourseOverviewPage() {
           {data.enrollment ? (
             nextLesson && (
               <Link
-                to={`/app/learn/courses/${courseSlug}/lessons/${nextLesson}`}
+                to={`${learnBase}/courses/${courseSlug}/lessons/${nextLesson}`}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-forest hover:bg-mint/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint"
               >
                 {progress?.completedLessons ? 'Continue learning' : 'Start the first lesson'}

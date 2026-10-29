@@ -23,6 +23,7 @@ import { ContentBlocks } from '../components/ContentBlocks'
 import { Empty, ErrorNotice, Loading, Pill } from '../components/States'
 import { DIFFICULTY_CLASSES, glassPanel, primaryButton, secondaryButton } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 function LessonFiles({ files }: { files: LessonFile[] }) {
   const [error, setError] = useState<string | null>(null)
@@ -86,6 +87,7 @@ function LessonFiles({ files }: { files: LessonFile[] }) {
 
 /** `/app/learn/courses/:courseSlug/lessons/:lessonId`: one lesson to read and complete. */
 export function LessonPage() {
+  const learnBase = useLearnBase()
   const { courseSlug = '', lessonId = '' } = useParams()
   const lesson = useLearningQuery(
     `lesson:${lessonId}`,
@@ -117,7 +119,7 @@ export function LessonPage() {
         title="This lesson is not available."
         description="Enroll in the course to read its lessons."
         action={
-          <Link to={`/app/learn/courses/${courseSlug}`} className={secondaryButton}>
+          <Link to={`${learnBase}/courses/${courseSlug}`} className={secondaryButton}>
             Go to the course
           </Link>
         }
@@ -126,7 +128,7 @@ export function LessonPage() {
   }
 
   const data = lesson.data
-  const base = `/app/learn/courses/${data.courseSlug}`
+  const base = `${learnBase}/courses/${data.courseSlug}`
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem]">

@@ -111,6 +111,21 @@ function adminTabs(name: 'ReviewTabsLayout') {
   })
 }
 
+/**
+ * The learning pages under a `learn` route: members' at `/app/learn`, and the same
+ * pages inside the console at `/app/admin/learn`, so administrators keep its sidebar.
+ */
+function learningRoutes() {
+  return [
+    { index: true, lazy: learnPage('LearnHomePage') },
+    { path: 'courses', lazy: learnPage('CourseCatalogPage') },
+    { path: 'courses/:courseSlug', lazy: learnPage('CourseOverviewPage') },
+    { path: 'courses/:courseSlug/lessons/:lessonId', lazy: learnPage('LessonPage') },
+    { path: 'courses/:courseSlug/exercises/:exerciseId', lazy: learnPage('ExercisePage') },
+    { path: 'courses/:courseSlug/quizzes/:quizId', lazy: learnPage('QuizPage') },
+  ]
+}
+
 export const router = createBrowserRouter([
   { path: '/', element: <LandingPage /> },
   {
@@ -214,17 +229,7 @@ export const router = createBrowserRouter([
                 // One layout for every learning page: the learning menu, and a course's contents.
                 path: 'learn',
                 lazy: learnPage('LearningLayout'),
-                children: [
-                  { index: true, lazy: learnPage('LearnHomePage') },
-                  { path: 'courses', lazy: learnPage('CourseCatalogPage') },
-                  { path: 'courses/:courseSlug', lazy: learnPage('CourseOverviewPage') },
-                  { path: 'courses/:courseSlug/lessons/:lessonId', lazy: learnPage('LessonPage') },
-                  {
-                    path: 'courses/:courseSlug/exercises/:exerciseId',
-                    lazy: learnPage('ExercisePage'),
-                  },
-                  { path: 'courses/:courseSlug/quizzes/:quizId', lazy: learnPage('QuizPage') },
-                ],
+                children: learningRoutes(),
               },
               {
                 path: 'admin',
@@ -267,6 +272,12 @@ export const router = createBrowserRouter([
                   { path: 'reviewers', lazy: adminPage('AdminReviewersPage') },
                   { path: 'roles', lazy: adminPage('AdminPlatformRolesPage') },
                   { path: 'courses', lazy: adminPage('AdminCoursesPage') },
+                  {
+                    // E-learning inside the console: an administrator takes courses here.
+                    path: 'learn',
+                    lazy: learnPage('LearningLayout'),
+                    children: learningRoutes(),
+                  },
                   { path: 'courses/:courseId', lazy: adminPage('AdminCourseEditorPage') },
                   {
                     path: 'courses/:courseId/lessons/:lessonId',

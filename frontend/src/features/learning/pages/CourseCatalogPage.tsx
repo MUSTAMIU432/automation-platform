@@ -6,6 +6,7 @@ import { coursesRequest } from '../api/learningApi'
 import { Empty, ErrorNotice, Loading, Pill } from '../components/States'
 import { fieldClasses, glassPanel } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 const LEVELS = [
   { value: '', label: 'All levels' },
@@ -17,6 +18,7 @@ const LEVELS = [
 
 /** `/app/learn/courses`: every published course, searchable and filterable by level. */
 export function CourseCatalogPage() {
+  const learnBase = useLearnBase()
   const [search, setSearch] = useState('')
   const [level, setLevel] = useState('')
   const term = search.trim()
@@ -80,7 +82,7 @@ export function CourseCatalogPage() {
           {courses.data.map((course) => (
             <li key={course.id}>
               <Link
-                to={`/app/learn/courses/${course.slug}`}
+                to={`${learnBase}/courses/${course.slug}`}
                 className={`${glassPanel} flex h-full flex-col p-5 hover:-translate-y-0.5 hover:shadow-[0_26px_50px_-34px_rgba(8,75,56,0.6)] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 motion-safe:transition`}
               >
                 <div className="flex items-start justify-between gap-3">

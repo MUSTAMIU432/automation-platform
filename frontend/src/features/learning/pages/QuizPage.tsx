@@ -12,9 +12,11 @@ import { RichText } from '../components/RichText'
 import { Empty, ErrorNotice, Loading } from '../components/States'
 import { glassPanel, primaryButton, secondaryButton } from '../components/ui'
 import { useLearningQuery } from '../hooks/useLearningQuery'
+import { useLearnBase } from '../hooks/useLearnBase'
 
 /** `/app/learn/courses/:courseSlug/quizzes/:quizId`: a module's quiz. */
 export function QuizPage() {
+  const learnBase = useLearnBase()
   const { courseSlug = '', quizId = '' } = useParams()
   const quiz = useLearningQuery(
     `quiz:${quizId}`,
@@ -74,7 +76,7 @@ export function QuizPage() {
         title="This quiz is not available."
         description="Enroll in the course to take its quizzes."
         action={
-          <Link to={`/app/learn/courses/${courseSlug}`} className={secondaryButton}>
+          <Link to={`${learnBase}/courses/${courseSlug}`} className={secondaryButton}>
             Go to the course
           </Link>
         }
@@ -170,7 +172,7 @@ export function QuizPage() {
           <button type="submit" disabled={busy} className={primaryButton}>
             {outcome ? 'Submit again' : 'Submit answers'}
           </button>
-          <Link to={`/app/learn/courses/${data.courseSlug}`} className={secondaryButton}>
+          <Link to={`${learnBase}/courses/${data.courseSlug}`} className={secondaryButton}>
             Back to the course
           </Link>
         </div>

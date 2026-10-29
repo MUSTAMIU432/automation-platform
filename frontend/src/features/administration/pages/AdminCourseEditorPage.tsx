@@ -870,7 +870,7 @@ export function AdminCourseEditorPage() {
                 Return to draft
               </button>
             )}
-            <Link to={`/app/learn/courses/${data.slug}`} className={secondaryButtonClasses}>
+            <Link to={`/app/admin/learn/courses/${data.slug}`} className={secondaryButtonClasses}>
               View as learner
             </Link>
           </>
