@@ -224,13 +224,7 @@ describe('AppLayout', () => {
     renderAt('/app')
 
     const nav = within(screen.getByRole('navigation', { name: 'Main' }))
-    for (const section of [
-      '1 · Start',
-      '2 · Your people',
-      '3 · Idea to solution',
-      '4 · Market',
-      '5 · Learn',
-    ]) {
+    for (const section of ['Start', 'Your people', 'Idea to solution', 'Explore', 'Learn']) {
       expect(nav.getByText(section)).toBeInTheDocument()
     }
     const order = nav.getAllByRole('link').map((link) => link.textContent)

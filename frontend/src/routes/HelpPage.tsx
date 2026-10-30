@@ -46,8 +46,8 @@ const JOURNEY: Array<{
   },
   {
     step: '4',
-    title: 'Market',
-    text: 'Unlock the documentation behind ideas the platform has published, ready to build.',
+    title: 'Explore',
+    text: 'Browse the ideas the platform has published, and unlock the documentation behind them, ready to build.',
     to: '/app/marketplace',
     action: 'Visit the marketplace',
     Icon: StoreIcon,

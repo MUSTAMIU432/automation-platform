@@ -313,12 +313,12 @@ const FOOTER_LINKS = [
 ]
 
 function sidebarLinkClass(active: boolean, collapsed: boolean): string {
-  return `group relative flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50 ${
-    collapsed ? 'lg:justify-center lg:px-0 lg:py-3' : ''
+  return `group relative flex items-center gap-3 rounded-xl px-3 py-[var(--nav-item-py)] text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/60 ${
+    collapsed ? 'lg:justify-center lg:px-0 lg:py-[calc(var(--nav-item-py)+0.25rem)]' : ''
   } ${
     active
-      ? 'bg-gradient-to-r from-mint/45 to-mint/15 font-semibold text-forest shadow-[inset_0_0_0_1px_rgba(11,143,101,0.15)]'
-      : 'text-ink/75 hover:bg-white/80 hover:text-forest'
+      ? 'bg-gradient-to-r from-mint/30 to-mint/10 font-semibold text-white shadow-[inset_0_0_0_1px_rgba(85,230,176,0.3)] [&>svg]:text-mint'
+      : 'text-white/75 hover:bg-white/10 hover:text-white'
   }`
 }
 
@@ -355,19 +355,19 @@ function Sidebar({
       data-collapsed={collapsed}
       className={`${
         open
-          ? 'fixed inset-y-0 left-0 z-50 flex w-72 overflow-y-auto bg-white p-4 shadow-2xl'
+          ? 'fixed inset-y-0 left-0 z-50 flex w-72 overflow-y-auto bg-gradient-to-b from-pine to-forest p-4 shadow-2xl'
           : 'hidden'
-      } flex-col lg:sticky lg:top-[calc(var(--app-chrome-height)+1rem)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--app-chrome-height)-2rem)] lg:shrink-0 lg:overflow-x-hidden lg:overflow-y-auto lg:rounded-3xl lg:border lg:border-white lg:bg-white/70 lg:p-3 lg:shadow-[0_20px_50px_-30px_rgba(8,75,56,0.45)] lg:backdrop-blur-xl motion-safe:lg:transition-[width] motion-safe:lg:duration-300 ${
+      } flex-col lg:sticky lg:top-[calc(var(--app-chrome-height)+1rem)] lg:z-auto lg:flex lg:h-[calc(100dvh-var(--app-chrome-height)-2rem)] lg:shrink-0 lg:overflow-x-hidden lg:overflow-y-auto lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden lg:border lg:border-white/10 lg:bg-gradient-to-b lg:from-pine lg:to-forest lg:p-3 lg:shadow-[0_24px_50px_-28px_rgba(6,47,37,0.7)] motion-safe:lg:transition-[width] motion-safe:lg:duration-300 ${
         collapsed ? 'lg:w-[4.75rem]' : 'lg:w-64'
       }`}
     >
       <div
-        className={`mb-2 hidden items-center justify-between gap-2 border-b border-jade/10 pb-2 lg:flex ${whenCollapsed(
+        className={`mb-[var(--nav-gap)] hidden items-center justify-between gap-2 border-b border-white/10 pb-[var(--nav-gap)] lg:flex ${whenCollapsed(
           'lg:justify-center',
         )}`}
       >
         <span
-          className={`px-3 text-xs font-semibold whitespace-nowrap text-ink/70 ${whenCollapsed('lg:hidden')}`}
+          className={`px-3 text-xs font-semibold whitespace-nowrap text-white/70 ${whenCollapsed('lg:hidden')}`}
         >
           Menu
         </span>
@@ -378,7 +378,7 @@ function Sidebar({
           aria-controls="app-sidebar"
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-jade/15 bg-white/80 text-forest shadow-sm transition-colors hover:border-jade/30 hover:bg-mint/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-jade/50"
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white transition-colors hover:border-white/25 hover:bg-white/15 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint/60"
         >
           {collapsed ? (
             <PanelExpandIcon className="h-6 w-6" />
@@ -390,15 +390,20 @@ function Sidebar({
 
       <nav aria-label="Main" className="flex-1">
         {sections.map((section, index) => (
-          <div key={section.title} className={index > 0 ? 'mt-2 border-t border-jade/10 pt-2' : ''}>
+          <div
+            key={section.title}
+            className={
+              index > 0 ? 'mt-[var(--nav-gap)] border-t border-white/10 pt-[var(--nav-gap)]' : ''
+            }
+          >
             <p
-              className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-sage ${whenCollapsed(
+              className={`px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] whitespace-nowrap text-mint/70 ${whenCollapsed(
                 'lg:sr-only',
               )}`}
             >
               {section.title}
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-[var(--nav-list-gap)]">
               {section.items.map(({ to, label, Icon, end, isActive, badge, ariaLabel }) => (
                 <li key={to}>
                   <NavLink
@@ -419,7 +424,7 @@ function Sidebar({
                       <span
                         aria-hidden="true"
                         className={`min-w-[1.25rem] rounded-full bg-amber-400 px-1.5 text-center text-[11px] font-bold text-amber-950 tabular-nums ${whenCollapsed(
-                          'lg:absolute lg:top-1.5 lg:right-3 lg:h-2.5 lg:w-2.5 lg:min-w-0 lg:p-0 lg:text-[0px] lg:ring-2 lg:ring-white',
+                          'lg:absolute lg:top-1.5 lg:right-3 lg:h-2.5 lg:w-2.5 lg:min-w-0 lg:p-0 lg:text-[0px] lg:ring-2 lg:ring-pine',
                         )}`}
                       >
                         {badge > 99 ? '99+' : badge}
@@ -434,8 +439,11 @@ function Sidebar({
       </nav>
 
       {/* Your account and help: always at the foot, apart from the journey above. */}
-      <nav aria-label="Settings and help" className="mt-2 border-t border-jade/10 pt-2">
-        <ul className="space-y-1">
+      <nav
+        aria-label="Settings and help"
+        className="mt-[var(--nav-gap)] border-t border-white/10 pt-[var(--nav-gap)]"
+      >
+        <ul className="space-y-[var(--nav-list-gap)]">
           {FOOTER_LINKS.map(({ to, label, Icon }) => (
             <li key={to}>
               <NavLink
@@ -556,16 +564,16 @@ function AppShell() {
     The menu reads as the journey, top to bottom: start at the dashboard, set up
     the people you work with (a team or organization is chosen when filing), then
     follow an idea through - shared, reviewed, turned into an automation, built -
-    and end at the market, where finished ideas are sold. Numbered so where to
-    begin and where it ends are plain.
+    and end by exploring the marketplace, where finished ideas are sold. The order
+    alone says where to begin and where it ends.
   */
   const sections: SidebarSection[] = [
     {
-      title: '1 · Start',
+      title: 'Start',
       items: [{ to: '/app', label: 'Dashboard', Icon: GridIcon, end: true }],
     },
     {
-      title: '2 · Your people',
+      title: 'Your people',
       items: [
         { to: '/app/organizations', label: 'Organizations', Icon: BuildingIcon },
         { to: '/app/teams', label: 'Teams', Icon: UsersIcon },
@@ -579,7 +587,7 @@ function AppShell() {
       ],
     },
     {
-      title: '3 · Idea to solution',
+      title: 'Idea to solution',
       items: [
         { to: '/app/ideas', label: 'Ideas', Icon: BulbIcon },
         ...(canReview || adminCapabilities.canReviewPlatformSubmissions
@@ -597,14 +605,14 @@ function AppShell() {
       ],
     },
     {
-      // The end of the journey, and a section of its own: buying ideas the platform
-      // publishes is not part of the reader's own workspace.
-      title: '4 · Market',
+      // The end of the journey, and a section of its own: browsing and buying ideas
+      // the platform publishes is not part of the reader's own workspace.
+      title: 'Explore',
       items: [{ to: '/app/marketplace', label: 'Marketplace', Icon: StoreIcon }],
     },
     {
       // Beside the journey rather than a step in it: building the skills to take part.
-      title: '5 · Learn',
+      title: 'Learn',
       items: [
         { to: '/app/learn', label: 'My learning', Icon: CapIcon, end: true },
         { to: '/app/learn/courses', label: 'Course catalog', Icon: ListIcon },
@@ -639,7 +647,7 @@ function AppShell() {
         className="sticky top-0 z-30 bg-slate-50/80 px-3 py-3 backdrop-blur-xl sm:px-4 lg:px-6"
       >
         <header
-          className={`mx-auto flex ${widthClass} items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-forest via-pine to-jade px-3 py-2.5 shadow-[0_18px_40px_-20px_rgba(6,47,37,0.8)] ring-1 ring-white/10 sm:gap-4 sm:px-5`}
+          className={`mx-auto flex ${widthClass} items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-pine via-brand-500 to-jade px-3 py-2.5 shadow-[0_18px_40px_-24px_rgba(6,47,37,0.6)] ring-1 ring-white/10 sm:gap-4 sm:px-5`}
         >
           <div className="flex shrink-0 items-center gap-2">
             {showSidebar && (
