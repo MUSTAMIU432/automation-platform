@@ -409,7 +409,7 @@ describe('route tree', () => {
       expect(within(main).queryByRole('link', { name: 'Admin' })).not.toBeInTheDocument()
     })
 
-    it('shows a normal user who types /app/admin a forbidden state, and loads nothing', async () => {
+    it('sends a normal user who lands on /app/admin to their dashboard, and loads nothing', async () => {
       signIn()
 
       renderRoutes(router.routes, '/app/admin/users')
@@ -417,10 +417,11 @@ describe('route tree', () => {
       expect(
         await screen.findByRole(
           'heading',
-          { name: 'Not authorized' },
+          { level: 1, name: 'Ideas & opportunities' },
           { timeout: LAZY_ROUTE_TIMEOUT },
         ),
       ).toBeInTheDocument()
+      expect(screen.queryByText('Not authorized')).not.toBeInTheDocument()
       expect(mockedOverview).not.toHaveBeenCalled()
     })
 

@@ -1,7 +1,10 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { NO_ADMIN_CAPABILITIES } from '../api/administrationApi'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
+
+import { AdminCapabilitiesContext } from '../context/AdminCapabilitiesContext'
 import { FULL_ADMIN, renderAdminPage } from '../../../test/renderAdmin'
 import { AdminLayout } from './AdminLayout'
 
@@ -14,20 +17,27 @@ const { adminOverviewRequest } = await import('../api/administrationApi')
 
 /**
  * The console's presentational gate. The server is the security boundary -
- * these tests pin that a non-administrator is shown a forbidden state and the
+ * these tests pin that a non-administrator is sent to their dashboard and the
  * console's pages are never mounted (so never ask for data), not that this
  * component keeps anyone out of the API.
  */
 describe('AdminLayout', () => {
-  it('shows a forbidden state to a user who is not a platform administrator', () => {
-    renderAdminPage(<AdminLayout />, { capabilities: NO_ADMIN_CAPABILITIES })
-
-    expect(screen.getByRole('heading', { name: 'Not authorized' })).toBeInTheDocument()
-    expect(screen.getByText(/owner or reviewer of an organization does not grant/i)).toBeVisible()
-    expect(screen.getByRole('link', { name: 'Back to your workspace' })).toHaveAttribute(
-      'href',
-      '/app',
+  it('sends a user who is not a platform administrator to their dashboard', () => {
+    render(
+      <AdminCapabilitiesContext.Provider
+        value={{ status: 'ready', capabilities: NO_ADMIN_CAPABILITIES, reload: () => {} }}
+      >
+        <MemoryRouter initialEntries={['/app/admin/users']}>
+          <Routes>
+            <Route path="/app/admin/*" element={<AdminLayout />} />
+            <Route path="/app" element={<p>Dashboard</p>} />
+          </Routes>
+        </MemoryRouter>
+      </AdminCapabilitiesContext.Provider>,
     )
+
+    expect(screen.getByText('Dashboard')).toBeInTheDocument()
+    expect(screen.queryByText('Not authorized')).not.toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: 'Administration' })).not.toBeInTheDocument()
     expect(adminOverviewRequest).not.toHaveBeenCalled()
   })
