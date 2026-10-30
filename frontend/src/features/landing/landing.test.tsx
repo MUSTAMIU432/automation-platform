@@ -147,29 +147,22 @@ describe('LandingPage', () => {
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument()
   })
 
-  it("shows the platform's real figures, not invented ones", async () => {
+  it('ends the hero with four ways into the platform, not a figures bar', async () => {
     renderWithProviders(<LandingPage />)
 
-    const figures = within(
-      screen.getByRole('heading', { name: 'MUSTANET in numbers' }).parentElement!,
-    )
-    expect(await figures.findByText('12')).toBeInTheDocument()
-    expect(figures.getByText('Ideas Submitted')).toBeInTheDocument()
-    expect(figures.getByText('57')).toBeInTheDocument()
-    expect(figures.getByText('3')).toBeInTheDocument()
-    expect(figures.getByText('4')).toBeInTheDocument()
-    expect(screen.queryByText(/\d+\+/)).not.toBeInTheDocument()
-  })
-
-  it('shows a dash rather than a number when the figures cannot be fetched', async () => {
-    mockedStats.mockRejectedValue(new TypeError('Failed to fetch'))
-    renderWithProviders(<LandingPage />)
-
-    const figures = within(
-      screen.getByRole('heading', { name: 'MUSTANET in numbers' }).parentElement!,
-    )
+    const begin = within(screen.getByRole('navigation', { name: 'Where to begin' }))
+    for (const [name, href] of [
+      [/Share a problem/, '/app/ideas/new'],
+      [/Follow the build/, '/app/automation/projects'],
+      [/Unlock ready ideas/, '/app/marketplace'],
+      [/Learn for free/, '/app/learn/courses'],
+    ] as const) {
+      expect(begin.getByRole('link', { name })).toHaveAttribute('href', href)
+    }
+    // The figures still feed the dashboard drawn in the hero, which is decorative.
     await waitFor(() => expect(mockedStats).toHaveBeenCalled())
-    expect(figures.getAllByText('—')).toHaveLength(4)
+    expect(screen.queryByRole('heading', { name: 'MUSTANET in numbers' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Ideas Submitted')).not.toBeInTheDocument()
   })
 
   describe('contact form', () => {

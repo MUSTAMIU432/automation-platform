@@ -3,91 +3,84 @@ import { Link } from 'react-router-dom'
 
 import { GlassBackdrop } from '../../../components/GlassScene'
 import { useAuth } from '../../identity/auth/AuthContext'
-import type { PlatformStats } from '../api/statsApi'
-import { useCountUp } from '../hooks/useCountUp'
 import { useParallax } from '../hooks/useParallax'
 import { usePlatformStats } from '../hooks/usePlatformStats'
 import { useReveal } from '../hooks/useReveal'
 import { SIGN_UP_PATH } from '../sections'
-import {
-  BuildingGlyph,
-  BulbGlyph,
-  LayersGlyph,
-  RisingBars,
-  UsersGlyph,
-} from '../../../components/glyphs'
+import { BulbGlyph, DocumentGlyph, GearGlyph, LayersGlyph } from '../../../components/glyphs'
 import { HeroVisual } from './HeroVisual'
 import { ArrowRightIcon } from './icons'
 
-const STATS: Array<{
-  label: string
-  key: keyof PlatformStats
+/*
+  Four things a visitor can do on the platform today, each one a link into it.
+  The app's pages ask a signed-out visitor to sign in first and then take them on
+  to the page they chose, so every link works for everyone.
+*/
+const STARTING_POINTS: Array<{
+  title: string
+  detail: string
+  to: string
   Glyph: ComponentType<{ className?: string }>
 }> = [
-  { label: 'Ideas Submitted', key: 'ideasSubmitted', Glyph: BulbGlyph },
-  { label: 'Organizations', key: 'organizations', Glyph: BuildingGlyph },
-  { label: 'Projects', key: 'projects', Glyph: LayersGlyph },
-  { label: 'Active Users', key: 'activeUsers', Glyph: UsersGlyph },
+  {
+    title: 'Share a problem',
+    detail: 'Start a draft with just a name',
+    to: '/app/ideas/new',
+    Glyph: BulbGlyph,
+  },
+  {
+    title: 'Follow the build',
+    detail: 'See each project, stage by stage',
+    to: '/app/automation/projects',
+    Glyph: GearGlyph,
+  },
+  {
+    title: 'Unlock ready ideas',
+    detail: 'Documented solutions to build',
+    to: '/app/marketplace',
+    Glyph: DocumentGlyph,
+  },
+  {
+    title: 'Learn for free',
+    detail: 'Courses from first steps to APIs',
+    to: '/app/learn/courses',
+    Glyph: LayersGlyph,
+  },
 ]
 
-function Stat({
-  label,
-  value,
-  Glyph,
-  index,
-}: {
-  label: string
-  value: number | null
-  Glyph: ComponentType<{ className?: string }>
-  index: number
-}) {
-  const [countRef, count] = useCountUp<HTMLSpanElement>(value)
+/** Where to begin: the hero's last row, a glass bar of four ways into the platform. */
+function StartingPoints() {
+  const ref = useReveal<HTMLElement>()
 
   return (
-    <li className="flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
-      <span
-        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),rgb(var(--lp-mint)/0.12))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.5)] motion-safe:animate-[pulse-glow_3.5s_ease-in-out_infinite] sm:h-14 sm:w-14"
-        style={{ animationDelay: `${index * 0.7}s` }}
-      >
-        <Glyph className="h-6 w-6 drop-shadow-[0_0_8px_rgb(var(--lp-mint)/0.9)] sm:h-7 sm:w-7" />
-      </span>
-      <span className="min-w-0">
-        <span className="block text-xs font-medium text-white/75 sm:text-sm">{label}</span>
-        <span
-          ref={countRef}
-          className="block text-2xl font-bold tabular-nums text-white sm:text-3xl"
-        >
-          {count === null ? '—' : count.toLocaleString()}
-        </span>
-      </span>
-      <RisingBars className="ml-auto hidden h-7 w-11 shrink-0 text-mint xl:block" />
-    </li>
-  )
-}
-
-/** The platform's real figures, counted up the first time they come into view. */
-function StatsBar({ stats }: { stats: PlatformStats | null }) {
-  const ref = useReveal<HTMLDivElement>()
-
-  return (
-    <div ref={ref}>
-      <h2 className="sr-only">MUSTANET in numbers</h2>
-      <ul className="grid grid-cols-2 divide-white/10 overflow-hidden rounded-[1.6rem] border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_30px_60px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl lg:grid-cols-4 lg:divide-x [&>li:nth-child(-n+2)]:border-b [&>li:nth-child(-n+2)]:border-white/10 lg:[&>li:nth-child(-n+2)]:border-b-0">
-        {STATS.map((stat, index) => (
-          <Stat
-            key={stat.key}
-            label={stat.label}
-            value={stats ? stats[stat.key] : null}
-            Glyph={stat.Glyph}
-            index={index}
-          />
+    <nav ref={ref} aria-label="Where to begin">
+      <ul className="grid grid-cols-1 divide-y divide-white/10 overflow-hidden rounded-[1.6rem] border border-white/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.04))] shadow-[inset_0_1px_0_rgba(255,255,255,0.15),0_30px_60px_-30px_rgba(0,0,0,0.9)] backdrop-blur-xl sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4 lg:divide-x [&>li]:border-white/10 sm:[&>li:nth-child(-n+2)]:border-b lg:[&>li:nth-child(-n+2)]:border-b-0">
+        {STARTING_POINTS.map(({ title, detail, to, Glyph }, index) => (
+          <li key={to}>
+            <Link
+              to={to}
+              className="group flex h-full items-center gap-3 px-4 py-4 hover:bg-white/[0.06] focus:outline-none focus-visible:bg-white/[0.08] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-mint sm:gap-4 sm:px-6 sm:py-5 motion-safe:transition-colors"
+            >
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.22),rgb(var(--lp-mint)/0.12))] text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.5)] motion-safe:animate-[pulse-glow_3.5s_ease-in-out_infinite] sm:h-14 sm:w-14"
+                style={{ animationDelay: `${index * 0.7}s` }}
+              >
+                <Glyph className="h-6 w-6 drop-shadow-[0_0_8px_rgb(var(--lp-mint)/0.9)] sm:h-7 sm:w-7" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-base font-semibold text-white sm:text-lg">{title}</span>
+                <span className="block text-sm text-white/70">{detail}</span>
+              </span>
+              <ArrowRightIcon className="h-5 w-5 shrink-0 text-mint opacity-60 group-hover:translate-x-0.5 group-hover:opacity-100 motion-safe:transition-[transform,opacity]" />
+            </Link>
+          </li>
         ))}
       </ul>
-    </div>
+    </nav>
   )
 }
 
-/** The first screen: what MUSTANET is, the two ways forward, and the platform in numbers. */
+/** The first screen: what MUSTANET is, the two ways forward, and where to begin. */
 export function Hero() {
   const { status } = useAuth()
   const getStartedPath = status === 'authenticated' ? '/app' : SIGN_UP_PATH
@@ -149,7 +142,7 @@ export function Hero() {
           </div>
 
           <div className="mt-6 lg:mt-2">
-            <StatsBar stats={stats} />
+            <StartingPoints />
           </div>
         </div>
       </div>
