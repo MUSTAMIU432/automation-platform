@@ -275,7 +275,9 @@ export function ExercisePage() {
 
   const data = exercise.data
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    // The instructions take the larger share: they are read in full, while the
+    // editor only needs room for a line of code.
+    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
       <section className="space-y-5">
         <header className={`${glassPanel} p-6`}>
           <p className="text-sm font-medium text-brand-700">{data.moduleTitle}</p>

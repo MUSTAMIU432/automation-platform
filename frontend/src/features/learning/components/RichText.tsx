@@ -1,11 +1,12 @@
 import { Fragment } from 'react'
 
 /**
- * The inline markup lessons may use: `code` and **bold**. Everything else is
- * plain text, rendered as text - never as HTML.
+ * The inline markup lessons may use: `code`, **bold** and *italic*. Everything
+ * else is plain text, rendered as text - never as HTML. Italic needs a letter
+ * against each asterisk, so arithmetic such as `2 * 3 * 4` stays as written.
  */
 export function RichText({ text }: { text: string }) {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g)
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*\s](?:[^*]*[^*\s])?\*)/g)
   return (
     <>
       {parts.map((part, index) => {
@@ -25,6 +26,9 @@ export function RichText({ text }: { text: string }) {
               {part.slice(2, -2)}
             </strong>
           )
+        }
+        if (part.length > 2 && /^\*[^*\s](?:[^*]*[^*\s])?\*$/.test(part)) {
+          return <em key={index}>{part.slice(1, -1)}</em>
         }
         return <Fragment key={index}>{part}</Fragment>
       })}

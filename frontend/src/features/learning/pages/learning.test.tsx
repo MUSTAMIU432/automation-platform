@@ -11,6 +11,7 @@ import { LearnHomePage } from './LearnHomePage'
 import { LearningLayout } from './LearningLayout'
 import { LessonPage } from './LessonPage'
 import { QuizPage } from './QuizPage'
+import { RichText } from '../components/RichText'
 
 vi.mock('../api/learningApi', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -262,6 +263,21 @@ const LESSON: Lesson = {
   ],
 }
 
+describe('lesson text', () => {
+  it('sets *italic*, **bold** and `code`, and leaves arithmetic alone', () => {
+    const { container } = render(
+      <p>
+        <RichText text="*General-purpose* is **key**: `x = 1`, and 2 * 3 * 4 is 24." />
+      </p>,
+    )
+
+    expect(screen.getByText('General-purpose').tagName).toBe('EM')
+    expect(screen.getByText('key').tagName).toBe('STRONG')
+    expect(screen.getByText('x = 1').tagName).toBe('CODE')
+    expect(container).toHaveTextContent('2 * 3 * 4 is 24.')
+  })
+})
+
 describe('a lesson', () => {
   it('renders its notes, code and files, and can be completed', async () => {
     api.lessonRequest
@@ -272,12 +288,17 @@ describe('a lesson', () => {
 
     expect(await screen.findByText('name = value')).toHaveProperty('tagName', 'CODE')
     expect(screen.getByText('print')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Previous/ })).toHaveAttribute(
-      'href',
-      '/app/learn/courses/python/lessons/11',
+    for (const name of ['Previous', 'Previous lesson']) {
+      expect(screen.getByRole('link', { name })).toHaveAttribute(
+        'href',
+        '/app/learn/courses/python/lessons/11',
+      )
+    }
+    expect(screen.getByRole('heading', { level: 2, name: 'Variables' })).toHaveTextContent(
+      '1Variables',
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'Download' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Download Week 1 slides' }))
     expect(api.downloadLessonFile).toHaveBeenCalledWith(LESSON.materials[0])
 
     fireEvent.click(screen.getByRole('button', { name: /Mark as completed/ }))
@@ -313,6 +334,65 @@ describe('a lesson', () => {
     expect(dialog.getByRole('button', { name: 'Download' })).toBeEnabled()
     fireEvent.click(dialog.getByRole('button', { name: 'Close' }))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows its place in the course, and the way to the lesson after it', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    api.lessonRequest.mockImplementation(async (id) =>
+      id === '11'
+        ? {
+            ...LESSON,
+            id: '11',
+            title: 'What is Python',
+            previousLessonId: null,
+            nextLessonId: '12',
+          }
+        : LESSON,
+    )
+    api.completeLessonRequest.mockResolvedValue(OK)
+    render(
+      <MemoryRouter initialEntries={['/app/learn/courses/python/lessons/11']}>
+        <Routes>
+          <Route path="/app/learn" element={<LearningLayout />}>
+            <Route path="courses/:courseSlug/lessons/:lessonId" element={<LessonPage />} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Lesson 1 of 2')).toBeInTheDocument()
+    expect(screen.getByText('Beginner to advanced')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Next lesson' })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python/lessons/12',
+    )
+    expect(screen.queryByRole('link', { name: 'Course overview' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Mark as completed/ }))
+    await waitFor(() => expect(api.completeLessonRequest).toHaveBeenCalledWith('11'))
+    // The contents and the progress across the top are asked for again, to show it done.
+    await waitFor(() => expect(api.courseRequest).toHaveBeenCalledTimes(2))
+  })
+
+  it('keeps its exercises and quiz under a Practice tab', async () => {
+    api.lessonRequest.mockResolvedValue(LESSON)
+    renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: 'Practice (2)' }))
+
+    expect(screen.getByRole('tab', { name: 'Practice (2)' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+    expect(screen.getByRole('link', { name: /Calculator/ })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python/exercises/21',
+    )
+    expect(screen.getByRole('link', { name: /Module quiz/ })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python/quizzes/31',
+    )
+    expect(screen.queryByText('name = value')).not.toBeInTheDocument()
   })
 
   it('copies a code example', async () => {
@@ -480,6 +560,12 @@ describe('a quiz', () => {
     renderAt('/q/31', '/q/:quizId', <QuizPage />)
 
     fireEvent.click(await screen.findByRole('radio', { name: 'a' }))
+    expect(screen.getByText('1 of 2 answered')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Question 1, answered' })).toHaveAttribute(
+      'href',
+      '#quiz-question-1',
+    )
+    expect(screen.getByRole('link', { name: 'Question 2, not answered' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('checkbox', { name: 'x' }))
     fireEvent.click(screen.getByRole('button', { name: 'Submit answers' }))
 
@@ -491,6 +577,8 @@ describe('a quiz', () => {
     )
     expect(await screen.findByText(/You scored 50%/)).toBeInTheDocument()
     expect(screen.getByText('Both x and y.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Question 1, correct' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Question 2, not correct' })).toBeInTheDocument()
   })
 })
 
@@ -595,16 +683,35 @@ describe('the learning menu and course contents', () => {
       </MemoryRouter>,
     )
 
-    const menu = within(screen.getByRole('navigation', { name: 'Learning' }))
-    expect(menu.getByRole('link', { name: 'My learning' })).toHaveAttribute(
-      'href',
-      '/app/admin/learn',
-    )
     const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
-    expect(within(contents).getByRole('link', { name: 'Calculator' })).toHaveAttribute(
+    expect(within(contents).getByRole('link', { name: /^Calculator/ })).toHaveAttribute(
       'href',
       '/app/admin/learn/courses/python/exercises/21',
     )
+  })
+
+  it('shows the course progress in place of the learning menu inside a course', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    renderLearning('/app/learn/courses/python/lessons/12')
+
+    const progress = within(await screen.findByRole('region', { name: 'Course progress' }))
+    expect(progress.getByRole('progressbar', { name: 'Your progress' })).toHaveAttribute(
+      'value',
+      '25',
+    )
+    expect(progress.getByText('25% complete')).toBeInTheDocument()
+    expect(progress.getByText('1 of 2 lessons')).toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Learning' })).not.toBeInTheDocument()
+    // Only once: the contents beside the page no longer repeat it.
+    expect(screen.getAllByRole('progressbar', { name: 'Your progress' })).toHaveLength(1)
+  })
+
+  it('shows no progress to a learner who has not enrolled', async () => {
+    api.courseRequest.mockResolvedValue(course(false))
+    renderLearning('/app/learn/courses/python/lessons/12')
+
+    await screen.findAllByRole('navigation', { name: 'Course contents' })
+    expect(screen.queryByRole('region', { name: 'Course progress' })).not.toBeInTheDocument()
   })
 
   it('lists the modules, lessons, exercises and quiz beside a lesson', async () => {
@@ -614,11 +721,59 @@ describe('the learning menu and course contents', () => {
     const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
     const menu = within(contents)
     expect(menu.getByText('Introduction')).toBeInTheDocument()
-    expect(menu.getByRole('link', { name: 'Variables' })).toHaveAttribute('aria-current', 'page')
+    expect(menu.getByRole('link', { name: /^Variables/ })).toHaveAttribute('aria-current', 'page')
     expect(menu.getByRole('link', { name: /What is Python/ })).toHaveTextContent('(done)')
-    expect(menu.getByRole('link', { name: 'Calculator' })).toBeInTheDocument()
-    expect(menu.getByRole('link', { name: 'Module quiz' })).toBeInTheDocument()
+    expect(menu.getByRole('link', { name: /^Variables/ })).toHaveTextContent('25 min')
+    expect(menu.getByRole('link', { name: /^Calculator/ })).toHaveTextContent('Easy · exercise')
+    expect(menu.getByRole('link', { name: /^Module quiz/ })).toHaveTextContent('2 questions')
     expect(screen.getByText('Lesson body')).toBeInTheDocument()
+  })
+
+  it('folds the contents to a rail of modules, and remembers it', async () => {
+    window.localStorage.clear()
+    api.courseRequest.mockResolvedValue(course(true))
+    const { unmount } = renderLearning('/app/learn/courses/python/lessons/12')
+
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    fireEvent.click(within(contents).getByRole('button', { name: 'Collapse course contents' }))
+
+    const [rail] = screen.getAllByRole('navigation', { name: 'Course contents' })
+    const railMenu = within(rail)
+    expect(railMenu.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(railMenu.getByRole('link', { name: 'Module 1: Introduction' })).toHaveAttribute(
+      'aria-current',
+      'true',
+    )
+    expect(railMenu.getByText('25%')).toBeInTheDocument()
+    unmount()
+
+    renderLearning('/app/learn/courses/python/lessons/12')
+    const [again] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    fireEvent.click(within(again).getByRole('button', { name: 'Expand course contents' }))
+    expect(
+      within(screen.getAllByRole('navigation', { name: 'Course contents' })[0]).getByRole(
+        'searchbox',
+        { name: 'Search lessons' },
+      ),
+    ).toBeInTheDocument()
+  })
+
+  it('finds a lesson by name from the contents', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    renderLearning('/app/learn/courses/python/lessons/12')
+
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    const menu = within(contents)
+    fireEvent.change(menu.getByRole('searchbox', { name: 'Search lessons' }), {
+      target: { value: 'what' },
+    })
+    expect(menu.getByRole('link', { name: /What is Python/ })).toBeInTheDocument()
+    expect(menu.queryByRole('link', { name: /^Variables/ })).not.toBeInTheDocument()
+
+    fireEvent.change(menu.getByRole('searchbox', { name: 'Search lessons' }), {
+      target: { value: 'loops' },
+    })
+    expect(menu.getByText('No lesson matches “loops”.')).toBeInTheDocument()
   })
 
   it('lets a learner who has not enrolled do it from the contents', async () => {
