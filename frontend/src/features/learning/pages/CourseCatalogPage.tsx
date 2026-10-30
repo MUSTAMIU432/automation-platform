@@ -90,9 +90,10 @@ export function CourseCatalogPage() {
                     <CapIcon className="h-5 w-5" />
                   </span>
                   <div className="flex flex-wrap justify-end gap-1.5">
+                    {/* Only a course manager is shown these; learners see published courses. */}
                     {course.status !== 'published' && (
                       <Pill className="bg-amber-50 text-amber-800 ring-amber-200">
-                        {course.status === 'draft' ? 'Draft' : 'Archived'}
+                        {course.status === 'draft' ? 'Draft · hidden from learners' : 'Archived'}
                       </Pill>
                     )}
                     {course.enrolled && (

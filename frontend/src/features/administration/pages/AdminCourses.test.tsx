@@ -55,6 +55,9 @@ describe('AdminCoursesPage', () => {
     expect(await screen.findByText('Python Programming')).toBeInTheDocument()
     expect(screen.getByText('Draft')).toBeInTheDocument()
     expect(screen.getByText(/12 modules · 28 lessons/)).toBeInTheDocument()
+    // A draft is out of the catalog; the list says so, so none is left there unnoticed.
+    expect(screen.getByText(/1 course is a draft: learners cannot see it/)).toBeInTheDocument()
+    expect(screen.getByText('Hidden from learners until published')).toBeInTheDocument()
   })
 
   it('creates a course as a draft', async () => {

@@ -179,6 +179,17 @@ describe('the catalog', () => {
     await waitFor(() => expect(api.coursesRequest).toHaveBeenLastCalledWith('apis', ''))
   })
 
+  it('filters by level, and says so when no course has it', async () => {
+    api.coursesRequest.mockResolvedValueOnce([SUMMARY]).mockResolvedValue([])
+    renderAt('/c', '/c', <CourseCatalogPage />)
+
+    await screen.findByRole('heading', { name: 'Python Programming' })
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'advanced' } })
+
+    await waitFor(() => expect(api.coursesRequest).toHaveBeenLastCalledWith('', 'advanced'))
+    expect(await screen.findByText('No course matches.')).toBeInTheDocument()
+  })
+
   it('says when nothing matches', async () => {
     api.coursesRequest.mockResolvedValue([])
     renderAt('/c', '/c', <CourseCatalogPage />)

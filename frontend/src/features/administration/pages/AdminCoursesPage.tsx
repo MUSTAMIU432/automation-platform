@@ -105,6 +105,17 @@ export function AdminCoursesPage() {
         {courses.data && courses.data.length === 0 && (
           <EmptyState title="No courses yet." description="Create the first one above." />
         )}
+        {/* A draft is invisible in the catalog; say how many, so none is left there by accident. */}
+        {courses.data && courses.data.some((course) => course.status === 'draft') && (
+          <p className="rounded-xl bg-amber-50/80 px-4 py-2.5 text-sm text-amber-900 ring-1 ring-amber-200/70">
+            {(() => {
+              const drafts = courses.data.filter((course) => course.status === 'draft').length
+              return drafts === 1
+                ? '1 course is a draft: learners cannot see it until you open it and publish it.'
+                : `${drafts} courses are drafts: learners cannot see them until you open each one and publish it.`
+            })()}
+          </p>
+        )}
         {courses.data && courses.data.length > 0 && (
           <ul className="grid gap-4 md:grid-cols-2">
             {courses.data.map((course) => (
@@ -121,6 +132,11 @@ export function AdminCoursesPage() {
                     {course.levelLabel} · {course.moduleCount} modules · {course.lessonCount}{' '}
                     lessons · {course.enrollmentCount} learners
                   </p>
+                  {course.status === 'draft' && (
+                    <p className="mt-2 text-xs font-semibold text-amber-800">
+                      Hidden from learners until published
+                    </p>
+                  )}
                   <p className="mt-1 text-xs text-slate-400">
                     Updated {new Date(course.updatedAt).toLocaleString()}
                   </p>

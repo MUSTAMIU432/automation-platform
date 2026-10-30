@@ -149,6 +149,13 @@ class TestWhoSeesWhichCourse:
         assert gql(COURSES, {'search': 'nothing like it'}, learner)['courses'] == []
         assert len(gql(COURSES, {'search': 'MINI'}, learner)['courses']) == 1
 
+    def test_level_filters_the_catalog(self, gql, course, learner):
+        by_level = 'query($level: String!) { courses(search: "", level: $level) { slug } }'
+
+        assert gql(by_level, {'level': 'beginner'}, learner)['courses'] == [{'slug': 'mini'}]
+        assert gql(by_level, {'level': 'advanced'}, learner)['courses'] == []
+        assert gql(by_level, {'level': ''}, learner)['courses'] == [{'slug': 'mini'}]
+
     def test_signed_out_callers_see_nothing(self, gql, course):
         assert gql(COURSES, {'search': ''})['courses'] == []
         assert gql(COURSE, {'slug': 'mini'})['course'] is None
