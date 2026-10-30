@@ -155,15 +155,11 @@ Until this is set up and tested, code execution is off; nothing pretends otherwi
 
 1. Deploy as usual: `migrate` runs on start (see `backend/gunicorn.conf.py`) and
    creates the `learning` tables.
-2. Load the Python course, either way:
-   - set `SEED_PYTHON_COURSE=true` on the backend service and restart it - the
-     start hook (`backend/gunicorn.conf.py`) runs `seed_python_course --publish`
-     after `migrate` (for a plan with no shell); or
-   - `python manage.py seed_python_course --publish` once, from a Render shell.
-
-   Either is safe to repeat: once the course exists the command changes
-   nothing, so administrators' edits (and an unpublished status) are kept. The
-   variable can stay set; unset it to stop the check on each start.
+2. Nothing to do for the Python course: the start hook (`backend/gunicorn.conf.py`)
+   runs `seed_python_course --publish` after `migrate`, so a new deployment has it
+   loaded and published, as a local setup does. Once the course exists the
+   command changes nothing, so administrators' edits (and an unpublished status)
+   are kept. `SEED_PYTHON_COURSE=false` skips it.
 3. Optional: set up the sandbox above and its variables.
 4. Lesson files need the R2 variables (already required in production).
 

@@ -6,8 +6,10 @@ Gunicorn loads ./gunicorn.conf.py on its own, so the plain start command
 flag. It does not set `bind`: Gunicorn's default already listens on $PORT,
 which is what the host (Render) provides.
 
-Set `SEED_PYTHON_COURSE=true` to load and publish the Python course on start,
-for a deployment with no shell to run `seed_python_course --publish` from.
+On every start, the Python course is loaded and published if it is not loaded
+yet (`seed_python_course --publish`), so a new deployment has the course a
+local setup has without anyone running a command. Once loaded it is never
+changed. Set `SEED_PYTHON_COURSE=false` to skip it.
 
 On every start, lessons that have a PDF but no notes get notes made from it
 (`write_pdf_lesson_notes`), alongside the server rather than before it. Set
@@ -38,10 +40,15 @@ def on_starting(server):
         [sys.executable, str(_MANAGE_PY), 'migrate', '--noinput'], check=True
     )
 
-    if os.environ.get('SEED_PYTHON_COURSE', '').strip().lower() in {'1', 'true', 'yes'}:
+    if _switched_on('SEED_PYTHON_COURSE'):
         _seed_python_course(server)
-    if os.environ.get('WRITE_PDF_LESSON_NOTES', '').strip().lower() not in {'0', 'false', 'no'}:
+    if _switched_on('WRITE_PDF_LESSON_NOTES'):
         _write_pdf_lesson_notes(server)
+
+
+def _switched_on(name: str) -> bool:
+    """A start-up step that runs unless its variable says `false` (or `0`, `no`)."""
+    return os.environ.get(name, '').strip().lower() not in {'0', 'false', 'no', 'off'}
 
 
 def _write_pdf_lesson_notes(server):

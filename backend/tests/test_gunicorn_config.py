@@ -1,4 +1,4 @@
-"""The Gunicorn start hook: migrations, PDF lesson notes by default, the course when asked."""
+"""The Gunicorn start hook: migrations, then the Python course and PDF lesson notes."""
 
 import importlib.util
 import subprocess
@@ -34,8 +34,9 @@ def background(monkeypatch):
     return popen
 
 
-def test_migrates_and_does_not_seed_by_default(monkeypatch):
-    monkeypatch.delenv('SEED_PYTHON_COURSE', raising=False)
+@pytest.mark.parametrize('value', ['false', 'FALSE', '0', 'no', 'off'])
+def test_seeding_can_be_switched_off(monkeypatch, value):
+    monkeypatch.setenv('SEED_PYTHON_COURSE', value)
     conf = _load_conf()
     with mock.patch.object(subprocess, 'run') as run:
         conf.on_starting(_server())
@@ -43,9 +44,12 @@ def test_migrates_and_does_not_seed_by_default(monkeypatch):
     assert _commands(run) == [['migrate', '--noinput']]
 
 
-@pytest.mark.parametrize('value', ['true', 'TRUE', '1', 'yes'])
-def test_seeds_and_publishes_the_course_when_asked(monkeypatch, value):
-    monkeypatch.setenv('SEED_PYTHON_COURSE', value)
+@pytest.mark.parametrize('value', [None, '', 'true', '1'])
+def test_migrates_then_seeds_and_publishes_the_course_by_default(monkeypatch, value):
+    if value is None:
+        monkeypatch.delenv('SEED_PYTHON_COURSE', raising=False)
+    else:
+        monkeypatch.setenv('SEED_PYTHON_COURSE', value)
     conf = _load_conf()
     with mock.patch.object(
         subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)
