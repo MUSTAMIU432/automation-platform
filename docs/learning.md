@@ -50,6 +50,23 @@ migration `learning.0002` gives it to administrators granted before Learning exi
    enrolled learners and course managers can download them, through an
    authorized endpoint. Uploads get the same checks as idea attachments: an
    allow-listed extension, a size limit, and the file's own leading bytes.
+
+   **A PDF becomes the lesson's notes.** When a PDF is uploaded to a lesson with
+   no notes (or only the stand-in that "Upload PDFs" writes), the server reads it
+   (`learning/pdf_import.py`, with `pdfminer.six`) and writes the notes itself, so
+   learners read the lesson in the app rather than only downloading a file:
+   larger or short bold lines become headings, bulleted or numbered lines lists,
+   monospaced runs code (Python when it looks like Python), and the rest
+   paragraphs. Running headers, footers and page numbers are dropped, the file's
+   own title (the lesson shows it already) is left out, an "objectives" heading
+   with a list becomes the lesson's objectives, the summary is the first
+   sentence, and the reading time follows the length. The PDF stays attached.
+   Notes somebody wrote are never replaced. A scanned PDF has no text to read and
+   keeps the stand-in and the file. The upload dialog says which happened
+   ("notes written" or "file only"), and the notes can be edited like any others.
+   PDF lessons uploaded before this were filled by `write_pdf_lesson_notes`, which
+   the backend runs in the background on every start (it skips lessons with
+   notes, so it soon has nothing to do; `WRITE_PDF_LESSON_NOTES=false` turns it off).
 5. **Exercises** have instructions, starter code, a reference solution (never
    sent to learners), hints, and tests. Each needs at least one visible test
    (shown as an example) and one hidden test.
@@ -138,7 +155,15 @@ Until this is set up and tested, code execution is off; nothing pretends otherwi
 
 1. Deploy as usual: `migrate` runs on start (see `backend/gunicorn.conf.py`) and
    creates the `learning` tables.
-2. `python manage.py seed_python_course --publish` once, from a Render shell.
+2. Load the Python course, either way:
+   - set `SEED_PYTHON_COURSE=true` on the backend service and restart it - the
+     start hook (`backend/gunicorn.conf.py`) runs `seed_python_course --publish`
+     after `migrate` (for a plan with no shell); or
+   - `python manage.py seed_python_course --publish` once, from a Render shell.
+
+   Either is safe to repeat: once the course exists the command changes
+   nothing, so administrators' edits (and an unpublished status) are kept. The
+   variable can stay set; unset it to stop the check on each start.
 3. Optional: set up the sandbox above and its variables.
 4. Lesson files need the R2 variables (already required in production).
 

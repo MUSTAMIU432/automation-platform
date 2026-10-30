@@ -425,7 +425,13 @@ export async function uploadLessonMaterialRequest(
   lessonId: string,
   file: File,
   title: string,
-): Promise<{ success: boolean; message: string; material?: LessonMaterial }> {
+): Promise<{
+  success: boolean
+  message: string
+  material?: LessonMaterial
+  /** A PDF on a lesson with no notes: its notes were written from the file. */
+  notesWritten?: boolean
+}> {
   const body = new FormData()
   body.append('file', file)
   body.append('title', title)
@@ -441,6 +447,7 @@ export async function uploadLessonMaterialRequest(
       success: boolean
       message: string
       material?: LessonMaterial
+      notesWritten?: boolean
     }
     return payload
   } catch {

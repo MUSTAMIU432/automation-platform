@@ -16,6 +16,7 @@ its completions with it). A course with learners cannot be deleted - it is
 archived instead, which keeps it open to them.
 """
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -28,7 +29,7 @@ from django.utils.text import slugify
 from ideas import attachments as file_rules
 from ideas import storage
 from identity.models import User
-from learning import selectors
+from learning import pdf_import, selectors
 from learning.content import ContentError, blocks_from, check_exercise, check_question
 from learning.models import (
     AnswerOption,
@@ -43,6 +44,8 @@ from learning.models import (
     Quiz,
 )
 from learning.services import LearningError
+
+logger = logging.getLogger(__name__)
 
 TITLE_MAX_LENGTH = 200
 
@@ -629,9 +632,56 @@ def authorize_material_upload(user: User | None, lesson_id: object) -> Lesson:
     return _get(Lesson, lesson_id, 'lesson')
 
 
+# What the console's "Upload PDFs" writes into each lesson it creates
+# (frontend PdfUploadDialog.tsx): a stand-in until the PDF's own notes replace it.
+PDF_PLACEHOLDER_BODY = (
+    'The notes for this lesson are in the attached PDF. Open or download it below.'
+)
+
+
+def lesson_has_notes(lesson: Lesson) -> bool:
+    """Whether the lesson has notes someone wrote (the PDF stand-in does not count)."""
+    body = lesson.body.strip()
+    if body == PDF_PLACEHOLDER_BODY:
+        return False
+    return bool(body) or lesson.blocks.exists()
+
+
+def write_notes_from_pdf(lesson: Lesson, data: bytes) -> bool:
+    """Give a lesson with no notes the notes in a PDF (`learning.pdf_import`).
+
+    True when notes were written. A lesson that has notes is never touched - an
+    administrator's writing always wins - and a PDF with no readable text (a
+    scan) leaves the lesson as it was. Details the lesson already has (summary,
+    objectives) are kept; the reading time follows the new text.
+    """
+    if lesson_has_notes(lesson):
+        return False
+    imported = pdf_import.lesson_from_pdf(data, title=lesson.title)
+    if imported is None:
+        return False
+    try:
+        _write_lesson(
+            lesson,
+            LessonInput(
+                title=lesson.title,
+                body=imported.body,
+                summary=lesson.summary or imported.summary,
+                objectives=lesson.objectives or imported.objectives,
+                estimated_minutes=imported.estimated_minutes,
+            ),
+        )
+    except LearningError:
+        logger.warning('PDF notes for lesson %s could not be saved', lesson.pk, exc_info=True)
+        return False
+    return True
+
+
 def upload_material(
     user: User | None, lesson_id: object, uploaded, title: str = ''
 ) -> LessonMaterial:
+    """Attach a file to a lesson. A PDF on a lesson with no notes also writes its notes:
+    `material.notes_written` says whether it did."""
     user = _require_manager(user)
     lesson = _get(Lesson, lesson_id, 'lesson')
 
@@ -652,6 +702,12 @@ def upload_material(
     except file_rules.AttachmentValidationError as exc:
         raise LearningError(exc.message, field='file') from exc
 
+    # Read before the file goes to storage, which may consume it.
+    pdf_bytes = None
+    if extension == '.pdf' and not lesson_has_notes(lesson):
+        pdf_bytes = uploaded.read()
+        uploaded.seek(0)
+
     key = f'learning/{lesson.module.course_id}/{uuid.uuid4().hex}{extension}'
     try:
         saved_key = storage.save_object(key, uploaded)
@@ -660,7 +716,7 @@ def upload_material(
             'The file could not be stored. Please try again.', reason='storage_unavailable'
         ) from exc
     try:
-        return LessonMaterial.objects.create(
+        material = LessonMaterial.objects.create(
             lesson=lesson,
             title=(title or '').strip()[:TITLE_MAX_LENGTH] or PurePosixPath(filename).stem,
             filename=filename,
@@ -672,6 +728,8 @@ def upload_material(
     except DatabaseError:
         storage.delete_object(saved_key)
         raise
+    material.notes_written = pdf_bytes is not None and write_notes_from_pdf(lesson, pdf_bytes)
+    return material
 
 
 def _delete_material_file(material: LessonMaterial) -> None:

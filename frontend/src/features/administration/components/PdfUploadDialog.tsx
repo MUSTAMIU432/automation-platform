@@ -17,7 +17,11 @@ import {
 } from './CourseEditorUi'
 import { EditorModal } from './EditorModal'
 
-/** What the notes say when a lesson is a PDF: the file is the content. */
+/**
+ * A new PDF lesson's stand-in notes. The server replaces them with notes read from
+ * the PDF (learning/pdf_import.py); they stay only when the file has no readable
+ * text, such as a scan. Must match `PDF_PLACEHOLDER_BODY` in learning/authoring.py.
+ */
 const PDF_LESSON_BODY =
   'The notes for this lesson are in the attached PDF. Open or download it below.'
 
@@ -29,6 +33,8 @@ interface Pending {
   title: string
   status: Status
   error?: string
+  /** Done: whether the lesson's notes were made from the PDF. */
+  notesWritten?: boolean
 }
 
 /** A lesson title from a file name: `02-data_types.pdf` reads "02 data types". */
@@ -121,7 +127,7 @@ export function PdfUploadDialog({
         }
         const attached = await uploadLessonMaterialRequest(created.id, item.file, item.title)
         if (attached.success) {
-          patch(item.key, { status: 'done' })
+          patch(item.key, { status: 'done', notesWritten: attached.notesWritten === true })
         } else {
           await deleteLessonRequest(created.id).catch(() => null)
           patch(item.key, { status: 'failed', error: attached.message })
@@ -147,7 +153,7 @@ export function PdfUploadDialog({
   return (
     <EditorModal
       title="Upload PDFs as lessons"
-      description="Each PDF becomes a lesson in the module you choose, with the file attached for learners."
+      description="Each PDF becomes a lesson in the module you choose: its notes are written from the PDF, and the file stays attached for learners."
       onClose={closeIfIdle}
       wide
     >
@@ -253,8 +259,16 @@ export function PdfUploadDialog({
                     <EyeIcon className="h-3.5 w-3.5" /> Preview
                   </button>
                   {item.status === 'done' ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
-                      <CheckCircleIcon className="h-4 w-4" /> Added
+                    <span
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"
+                      title={
+                        item.notesWritten
+                          ? 'The lesson notes were written from the PDF.'
+                          : 'The PDF has no readable text (a scan?), so the lesson offers the file.'
+                      }
+                    >
+                      <CheckCircleIcon className="h-4 w-4" />
+                      {item.notesWritten ? 'Added, notes written' : 'Added, file only'}
                     </span>
                   ) : item.status === 'uploading' ? (
                     <span className="inline-flex items-center gap-2 text-xs font-medium text-slate-500">

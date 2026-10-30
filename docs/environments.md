@@ -119,6 +119,8 @@ Template: [`backend/.env.example`](../backend/.env.example).
 | `R2_BUCKET_NAME`             |        | **deployed**       | The private bucket holding uploaded files, e.g. `mustanet-automation` |
 | `R2_ENDPOINT_URL`            |        | **deployed**       | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, with no bucket name or path after it |
 | `ATTACHMENTS_STORAGE_BACKEND` |       | no                 | Django storage class for uploaded files. Defaults to the R2 (S3) backend when the four `R2_*` variables are set, otherwise to the filesystem under `backend/media/attachments/`. Deployed environments must use R2 |
+| `SEED_PYTHON_COURSE`         |        | no (off)           | `true` loads and publishes the Python course on start if it is not loaded yet (`seed_python_course --publish`, from `backend/gunicorn.conf.py`), for a host with no shell. Changes nothing once the course exists. See [learning.md](learning.md#deployment-checklist) |
+| `WRITE_PDF_LESSON_NOTES`     |        | no (on)            | `false` stops the backend writing notes, on start and in the background, for PDF lessons that have none (`write_pdf_lesson_notes`). Lessons with notes are never touched. See [learning.md](learning.md#how-administrators-manage-content) |
 | `CODE_EXECUTION_URL`         |        | no (off)           | The sandbox that runs learners' Python code (Piston-compatible). Unset turns Run and Submit off. Learner code never runs in Django. See [learning.md](learning.md#running-learner-code-safely) |
 | `CODE_EXECUTION_TOKEN`       | **yes**| no                 | **Secret.** Bearer token for the sandbox's authenticating proxy |
 | `CODE_EXECUTION_PYTHON_VERSION` |     | no (`3.12.0`)      | Python version installed in the sandbox |

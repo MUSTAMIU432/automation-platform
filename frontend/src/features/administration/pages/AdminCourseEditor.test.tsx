@@ -282,7 +282,11 @@ describe('AdminCourseEditorPage PDF upload', () => {
 
   it('turns each PDF into a lesson in the chosen module', async () => {
     api.createLessonRequest.mockResolvedValue({ ...OK, id: '55' })
-    api.uploadLessonMaterialRequest.mockResolvedValue({ success: true, message: 'Uploaded.' })
+    api.uploadLessonMaterialRequest.mockResolvedValue({
+      success: true,
+      message: 'Uploaded.',
+      notesWritten: true,
+    })
     renderEditor()
 
     fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs to Functions' }))
@@ -298,6 +302,7 @@ describe('AdminCourseEditorPage PDF upload', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Upload 1 PDF' }))
 
     expect(await dialog.findByText('1 lesson added.')).toBeInTheDocument()
+    expect(dialog.getByText('Added, notes written')).toBeInTheDocument()
     expect(api.createLessonRequest).toHaveBeenCalledWith(
       'B',
       expect.objectContaining({ title: 'Return values' }),
@@ -308,6 +313,23 @@ describe('AdminCourseEditorPage PDF upload', () => {
       'Return values',
     )
     await waitFor(() => expect(api.adminCourseRequest).toHaveBeenCalledTimes(2))
+  })
+
+  it('says when a PDF has no text to make notes from', async () => {
+    api.createLessonRequest.mockResolvedValue({ ...OK, id: '57' })
+    api.uploadLessonMaterialRequest.mockResolvedValue({
+      success: true,
+      message: 'Uploaded.',
+      notesWritten: false,
+    })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
+    choose([pdf('scan.pdf')])
+    fireEvent.click(dialog.getByRole('button', { name: 'Upload 1 PDF' }))
+
+    expect(await dialog.findByText('Added, file only')).toBeInTheDocument()
   })
 
   it('removes the lesson again when the server refuses its file', async () => {

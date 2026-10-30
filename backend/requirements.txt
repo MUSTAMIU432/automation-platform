@@ -27,6 +27,10 @@ requests==2.34.2
 # The platform admin's proposal PDF (reviews/proposal_pdf.py): pure Python, no system
 # libraries, so it installs the same everywhere.
 reportlab==4.5.1
+# Reading uploaded lesson PDFs into lesson notes (learning/pdf_import.py): pure Python,
+# and it reports each character's font and size, which is how headings, lists and
+# code are told apart.
+pdfminer.six==20260107
 # The client Django's built-in Redis cache backend imports when CACHE_URL is redis://
 # (required in deployed environments, see config/settings/production.py). Without it
 # the first cache access - every sign-in, through identity/throttling.py - fails.

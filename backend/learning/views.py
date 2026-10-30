@@ -72,6 +72,8 @@ def upload_material_view(request: HttpRequest, lesson_id: int) -> HttpResponse:
             'message': 'File uploaded.',
             'field': None,
             'material': material_json(material),
+            # A PDF on a lesson with no notes: the lesson's notes were made from it.
+            'notesWritten': material.notes_written,
         },
         status=201,
     )
