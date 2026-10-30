@@ -56,14 +56,24 @@ migration `learning.0002` gives it to administrators granted before Learning exi
    (`learning/pdf_import.py`, with `pdfminer.six`) and writes the notes itself, so
    learners read the lesson in the app rather than only downloading a file:
    larger or short bold lines become headings, bulleted or numbered lines lists,
-   monospaced runs code (Python when it looks like Python), and the rest
-   paragraphs. Running headers, footers and page numbers are dropped, the file's
-   own title (the lesson shows it already) is left out, an "objectives" heading
-   with a list becomes the lesson's objectives, the summary is the first
-   sentence, and the reading time follows the length. The PDF stays attached.
+   monospaced runs code (Python or shell when it reads like either), columns of
+   short cells a table (one row per list item), and the rest paragraphs.
+   Running headers, footers and page numbers are dropped, the file's own title
+   (the lesson shows it already) is left out, an "objectives" heading with a
+   list becomes the lesson's objectives, the summary is the first sentence, and
+   the reading time follows the length. The PDF stays attached.
+
+   **A whole course guide becomes lessons.** When the headings come in two
+   levels - "WEEK 1 - ..." over "Lesson 1.1: ..." - each top-level part becomes
+   a lesson of its own, right after the one uploaded to, in the same module, so
+   the outline lists them and each opens when clicked; the lower headings are
+   the numbered sections inside. A cover page (no body text) opens the first
+   lesson: its title is left out and its "Label: value" lines become a list. A
+   PDF with one level of headings stays one lesson.
    Notes somebody wrote are never replaced. A scanned PDF has no text to read and
    keeps the stand-in and the file. The upload dialog says which happened
-   ("notes written" or "file only"), and the notes can be edited like any others.
+   ("notes written", "added as 16 lessons" or "file only"), and the notes can be
+   edited like any others.
    PDF lessons uploaded before this were filled by `write_pdf_lesson_notes`, which
    the backend runs in the background on every start (it skips lessons with
    notes, so it soon has nothing to do; `WRITE_PDF_LESSON_NOTES=false` turns it off).

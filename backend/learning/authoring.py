@@ -647,41 +647,74 @@ def lesson_has_notes(lesson: Lesson) -> bool:
     return bool(body) or lesson.blocks.exists()
 
 
-def write_notes_from_pdf(lesson: Lesson, data: bytes) -> bool:
+def write_notes_from_pdf(lesson: Lesson, data: bytes) -> int:
     """Give a lesson with no notes the notes in a PDF (`learning.pdf_import`).
 
-    True when notes were written. A lesson that has notes is never touched - an
-    administrator's writing always wins - and a PDF with no readable text (a
-    scan) leaves the lesson as it was. Details the lesson already has (summary,
-    objectives) are kept; the reading time follows the new text.
+    Returns how many lessons were written: 0, 1, or more when the PDF is a whole
+    course guide - its first part goes into this lesson, and each further part
+    ("Week 1 - ...") becomes a lesson of its own right after it, in the same
+    module, so the outline lists them and each opens on its own.
+
+    A lesson that has notes is never touched - an administrator's writing always
+    wins - and a PDF with no readable text (a scan) leaves the lesson as it was.
+    Details the lesson already has (title, summary, objectives) are kept.
     """
     if lesson_has_notes(lesson):
-        return False
-    imported = pdf_import.lesson_from_pdf(data, title=lesson.title)
-    if imported is None:
-        return False
+        return 0
+    parts = pdf_import.lessons_from_pdf(data, title=lesson.title)
+    if not parts:
+        return 0
+    first, *more = parts
     try:
-        _write_lesson(
-            lesson,
-            LessonInput(
-                title=lesson.title,
-                body=imported.body,
-                summary=lesson.summary or imported.summary,
-                objectives=lesson.objectives or imported.objectives,
-                estimated_minutes=imported.estimated_minutes,
-            ),
-        )
+        with transaction.atomic():
+            _write_lesson(
+                lesson,
+                LessonInput(
+                    title=lesson.title,
+                    body=first.body,
+                    summary=lesson.summary or first.summary,
+                    objectives=lesson.objectives or first.objectives,
+                    estimated_minutes=first.estimated_minutes,
+                ),
+            )
+            _make_room_after(lesson, len(more))
+            for offset, part in enumerate(more, start=1):
+                _write_lesson(
+                    Lesson(
+                        module=lesson.module,
+                        position=lesson.position + offset,
+                        slug=_unique_slug(
+                            part.title, lambda s: lesson.module.lessons.filter(slug=s).exists()
+                        ),
+                    ),
+                    LessonInput(
+                        title=part.title,
+                        body=part.body,
+                        summary=part.summary,
+                        objectives=part.objectives,
+                        estimated_minutes=part.estimated_minutes,
+                    ),
+                )
     except LearningError:
         logger.warning('PDF notes for lesson %s could not be saved', lesson.pk, exc_info=True)
-        return False
-    return True
+        return 0
+    return len(parts)
+
+
+def _make_room_after(lesson: Lesson, count: int) -> None:
+    """Move the lessons after `lesson` down by `count` places, last first (positions are unique)."""
+    if not count:
+        return
+    for later in lesson.module.lessons.filter(position__gt=lesson.position).order_by('-position'):
+        later.position += count
+        later.save(update_fields=['position'])
 
 
 def upload_material(
     user: User | None, lesson_id: object, uploaded, title: str = ''
 ) -> LessonMaterial:
     """Attach a file to a lesson. A PDF on a lesson with no notes also writes its notes:
-    `material.notes_written` says whether it did."""
+    `material.lessons_written` says into how many lessons (0 when it did not)."""
     user = _require_manager(user)
     lesson = _get(Lesson, lesson_id, 'lesson')
 
@@ -728,7 +761,7 @@ def upload_material(
     except DatabaseError:
         storage.delete_object(saved_key)
         raise
-    material.notes_written = pdf_bytes is not None and write_notes_from_pdf(lesson, pdf_bytes)
+    material.lessons_written = write_notes_from_pdf(lesson, pdf_bytes) if pdf_bytes else 0
     return material
 
 

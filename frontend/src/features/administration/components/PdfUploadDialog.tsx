@@ -33,8 +33,8 @@ interface Pending {
   title: string
   status: Status
   error?: string
-  /** Done: whether the lesson's notes were made from the PDF. */
-  notesWritten?: boolean
+  /** Done: how many lessons were written from the PDF (0: the file only). */
+  lessonsWritten?: number
 }
 
 /** A lesson title from a file name: `02-data_types.pdf` reads "02 data types". */
@@ -127,7 +127,7 @@ export function PdfUploadDialog({
         }
         const attached = await uploadLessonMaterialRequest(created.id, item.file, item.title)
         if (attached.success) {
-          patch(item.key, { status: 'done', notesWritten: attached.notesWritten === true })
+          patch(item.key, { status: 'done', lessonsWritten: attached.lessonsWritten ?? 0 })
         } else {
           await deleteLessonRequest(created.id).catch(() => null)
           patch(item.key, { status: 'failed', error: attached.message })
@@ -153,7 +153,7 @@ export function PdfUploadDialog({
   return (
     <EditorModal
       title="Upload PDFs as lessons"
-      description="Each PDF becomes a lesson in the module you choose: its notes are written from the PDF, and the file stays attached for learners."
+      description="Each PDF becomes a lesson in the module you choose, its notes written from the PDF - a whole course guide becomes one lesson per part. The file stays attached for learners."
       onClose={closeIfIdle}
       wide
     >
@@ -262,13 +262,17 @@ export function PdfUploadDialog({
                     <span
                       className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"
                       title={
-                        item.notesWritten
+                        item.lessonsWritten
                           ? 'The lesson notes were written from the PDF.'
                           : 'The PDF has no readable text (a scan?), so the lesson offers the file.'
                       }
                     >
                       <CheckCircleIcon className="h-4 w-4" />
-                      {item.notesWritten ? 'Added, notes written' : 'Added, file only'}
+                      {!item.lessonsWritten
+                        ? 'Added, file only'
+                        : item.lessonsWritten > 1
+                          ? `Added as ${item.lessonsWritten} lessons`
+                          : 'Added, notes written'}
                     </span>
                   ) : item.status === 'uploading' ? (
                     <span className="inline-flex items-center gap-2 text-xs font-medium text-slate-500">

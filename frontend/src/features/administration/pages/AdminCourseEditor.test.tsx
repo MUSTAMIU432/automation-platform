@@ -286,6 +286,7 @@ describe('AdminCourseEditorPage PDF upload', () => {
       success: true,
       message: 'Uploaded.',
       notesWritten: true,
+      lessonsWritten: 1,
     })
     renderEditor()
 
@@ -315,12 +316,31 @@ describe('AdminCourseEditorPage PDF upload', () => {
     await waitFor(() => expect(api.adminCourseRequest).toHaveBeenCalledTimes(2))
   })
 
+  it('says when a course guide became several lessons', async () => {
+    api.createLessonRequest.mockResolvedValue({ ...OK, id: '58' })
+    api.uploadLessonMaterialRequest.mockResolvedValue({
+      success: true,
+      message: 'Uploaded.',
+      notesWritten: true,
+      lessonsWritten: 16,
+    })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Upload PDFs' }))
+    const dialog = within(screen.getByRole('dialog', { name: 'Upload PDFs as lessons' }))
+    choose([pdf('course_guide.pdf')])
+    fireEvent.click(dialog.getByRole('button', { name: 'Upload 1 PDF' }))
+
+    expect(await dialog.findByText('Added as 16 lessons')).toBeInTheDocument()
+  })
+
   it('says when a PDF has no text to make notes from', async () => {
     api.createLessonRequest.mockResolvedValue({ ...OK, id: '57' })
     api.uploadLessonMaterialRequest.mockResolvedValue({
       success: true,
       message: 'Uploaded.',
       notesWritten: false,
+      lessonsWritten: 0,
     })
     renderEditor()
 

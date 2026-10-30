@@ -30,8 +30,11 @@ class Command(BaseCommand):
                 self.stdout.write(f'Skipped "{lesson.title}": its PDF could not be read ({exc}).')
                 skipped += 1
                 continue
-            if write_notes_from_pdf(lesson, data):
-                self.stdout.write(f'Wrote notes for "{lesson.title}" from {material.filename}.')
+            if count := write_notes_from_pdf(lesson, data):
+                self.stdout.write(
+                    f'Wrote notes for "{lesson.title}" from {material.filename}'
+                    + (f', and {count - 1} lessons after it.' if count > 1 else '.')
+                )
                 written += 1
             else:
                 self.stdout.write(

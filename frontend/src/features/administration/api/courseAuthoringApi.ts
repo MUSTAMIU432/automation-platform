@@ -431,6 +431,8 @@ export async function uploadLessonMaterialRequest(
   material?: LessonMaterial
   /** A PDF on a lesson with no notes: its notes were written from the file. */
   notesWritten?: boolean
+  /** How many lessons those notes went into: more than one for a whole course guide. */
+  lessonsWritten?: number
 }> {
   const body = new FormData()
   body.append('file', file)
@@ -448,6 +450,7 @@ export async function uploadLessonMaterialRequest(
       message: string
       material?: LessonMaterial
       notesWritten?: boolean
+      lessonsWritten?: number
     }
     return payload
   } catch {
