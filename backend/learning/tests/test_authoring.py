@@ -341,6 +341,50 @@ class TestAuthoringACourse:
         assert 'Archive' in result['message']
         assert Course.objects.exists()
 
+    def test_a_course_with_learners_can_be_deleted_for_good_by_typing_its_title(
+        self, client, gql, manager, learner, django_capture_on_commit_callbacks
+    ):
+        ids = build_course(gql, manager)
+        material_id = upload(client, ids['lesson'], manager).json()['material']['id']
+        key = LessonMaterial.objects.get(pk=material_id).storage_key
+        gql(PUBLISH, {'id': ids['course']}, manager)
+        gql(
+            'mutation($id: ID!) { enrollInCourse(courseId: $id) { success } }',
+            {'id': ids['course']},
+            learner,
+        )
+        gql(
+            'mutation($id: ID!) { completeLesson(lessonId: $id) { success } }',
+            {'id': ids['lesson']},
+            learner,
+        )
+        force = (
+            'mutation($id: ID!, $title: String!) { deleteCourse(id: $id, force: true, '
+            'confirmTitle: $title) { success message field } }'
+        )
+
+        wrong = gql(force, {'id': ids['course'], 'title': 'Data'}, manager)['deleteCourse']
+        assert (wrong['success'], wrong['field']) == (False, 'confirmTitle')
+        assert Course.objects.exists()
+        # Forcing is a course manager's call only.
+        refused = gql(force, {'id': ids['course'], 'title': 'Data with Python'}, learner)
+        assert refused['deleteCourse']['success'] is False
+
+        with django_capture_on_commit_callbacks(execute=True):
+            done = gql(force, {'id': ids['course'], 'title': 'Data with Python'}, manager)
+        assert done['deleteCourse'] == {
+            'success': True,
+            'message': "Course deleted, with 1 learner' enrollments and progress.",
+            'field': None,
+        }
+        assert not Course.objects.exists()
+        assert not Enrollment.objects.exists()
+        assert not LessonProgress.objects.exists()
+        from ideas import storage  # its file is gone from storage too
+
+        with pytest.raises(FileNotFoundError):
+            storage.open_object(key)
+
     def test_an_unused_course_can_be_deleted(self, gql, manager):
         ids = build_course(gql, manager)
 

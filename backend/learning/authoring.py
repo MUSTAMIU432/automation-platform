@@ -199,18 +199,38 @@ def set_course_status(user: User | None, course_id: object, status: str) -> Cour
     return course
 
 
-def delete_course(user: User | None, course_id: object) -> None:
+def delete_course(
+    user: User | None, course_id: object, *, force: bool = False, confirm_title: str = ''
+) -> int:
+    """Delete a course; returns how many learners' enrollments went with it.
+
+    A course learners are enrolled in is refused unless `force` - and then only
+    when `confirm_title` is the course's title, typed out: forcing deletes every
+    learner's enrollment and, with it, their progress, submissions, quiz
+    attempts, final project and certificate. Archiving is the gentle way.
+    """
     _require_manager(user)
     course = _get(Course, course_id, 'course')
-    if course.enrollments.exists():
+    enrolled = course.enrollments.count()
+    if enrolled and not force:
         raise LearningError(
             'Learners are enrolled in this course, so it cannot be deleted. Archive it instead: '
-            'it leaves the catalog and stays open to them.',
+            'it leaves the catalog and stays open to them. Or delete it for good, with their '
+            'progress, by typing its title to confirm.',
             reason='conflict',
         )
-    for material in LessonMaterial.objects.filter(lesson__module__course=course):
-        _delete_material_file(material)
-    course.delete()
+    if enrolled and (confirm_title or '').strip() != course.title.strip():
+        raise LearningError(
+            'Type the course title exactly to delete it with its learners.',
+            field='confirmTitle',
+        )
+    with transaction.atomic():
+        for material in LessonMaterial.objects.filter(lesson__module__course=course):
+            _delete_material_file(material)
+        # Enrollments protect their course; with them go every learner record.
+        course.enrollments.all().delete()
+        course.delete()
+    return enrolled
 
 
 # --- modules and lessons --------------------------------------------------------------

@@ -13,6 +13,11 @@ interface ConfirmDialogProps {
   withReason?: boolean
   busy?: boolean
   error?: string | null
+  /**
+   * For what cannot be undone and reaches other people's data: the confirm button
+   * stays off until this exact text (a course's title, say) is typed.
+   */
+  confirmText?: string
   onConfirm: (reason: string) => void
   onCancel: () => void
 }
@@ -34,11 +39,15 @@ export function ConfirmDialog({
   withReason = false,
   busy = false,
   error = null,
+  confirmText,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
   const titleId = useId()
   const reasonId = useId()
+  const typedId = useId()
+  const [typed, setTyped] = useState('')
+  const typedMatches = confirmText === undefined || typed.trim() === confirmText.trim()
   const cancelRef = useRef<HTMLButtonElement>(null)
   const [reason, setReason] = useState('')
 
@@ -85,6 +94,20 @@ export function ConfirmDialog({
             />
           </div>
         )}
+        {confirmText !== undefined && (
+          <div className="mt-4">
+            <label htmlFor={typedId} className="block text-xs font-semibold text-slate-700">
+              Type <span className="font-bold text-slate-900">{confirmText}</span> to confirm
+            </label>
+            <input
+              id={typedId}
+              value={typed}
+              onChange={(event) => setTyped(event.target.value)}
+              autoComplete="off"
+              className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-slate-500 focus:ring-2 focus:ring-slate-200 focus:outline-none"
+            />
+          </div>
+        )}
         {error && (
           <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
             {error}
@@ -103,7 +126,7 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={() => onConfirm(reason.trim())}
-            disabled={busy}
+            disabled={busy || !typedMatches}
             className={danger ? dangerButtonClasses : primaryButtonClasses}
           >
             {busy ? 'Working…' : confirmLabel}

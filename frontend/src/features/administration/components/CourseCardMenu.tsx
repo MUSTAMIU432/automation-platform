@@ -18,8 +18,9 @@ const itemClass =
 /**
  * A course card's ⋮ menu in the console: open it to edit or to read as a learner,
  * move it between draft, published and archived, or delete it. Only the status
- * changes that apply are offered, and deleting asks first - the server refuses a
- * course learners are enrolled in, and says so.
+ * changes that apply are offered, and deleting asks first. A course learners are
+ * enrolled in can still be deleted, for good: its title must be typed, and their
+ * enrollments and progress go with it (archiving is the way to keep them).
  */
 export function CourseCardMenu({
   course,
@@ -32,7 +33,9 @@ export function CourseCardMenu({
   const [open, setOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
+  const learners = course.enrollmentCount
 
   useEffect(() => {
     if (!open) return
@@ -68,6 +71,28 @@ export function CourseCardMenu({
     } finally {
       setBusy(false)
       setDeleting(false)
+    }
+  }
+
+  /** Delete - forced, with the title typed, when learners are enrolled. A refusal stays in the dialog. */
+  async function remove() {
+    setBusy(true)
+    setDeleteError(null)
+    try {
+      const result = await deleteCourseRequest(
+        course.id,
+        learners ? { force: true, confirmTitle: course.title } : {},
+      )
+      if (result.success) {
+        setDeleting(false)
+        onDone(result)
+      } else {
+        setDeleteError(result.message)
+      }
+    } catch {
+      setDeleteError('We could not reach the server. Please try again.')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -147,16 +172,29 @@ export function CourseCardMenu({
       )}
       {deleting && (
         <ConfirmDialog
-          title="Delete this course"
-          confirmLabel="Delete course"
+          title={learners ? 'Delete this course and its learners’ progress' : 'Delete this course'}
+          confirmLabel={learners ? 'Delete for good' : 'Delete course'}
           danger
           busy={busy}
-          onCancel={() => setDeleting(false)}
-          onConfirm={() => void run(deleteCourseRequest)}
+          error={deleteError}
+          confirmText={learners ? course.title : undefined}
+          onCancel={() => {
+            setDeleting(false)
+            setDeleteError(null)
+          }}
+          onConfirm={() => void remove()}
         >
-          &quot;{course.title}&quot; and all its modules, lessons, files and resources will be
-          deleted. This cannot be undone. A course learners are enrolled in cannot be deleted -
-          archive it instead.
+          <p>
+            &quot;{course.title}&quot; and all its modules, lessons, files and resources will be
+            deleted. This cannot be undone.
+          </p>
+          {learners > 0 && (
+            <p className="font-medium text-red-800">
+              {learners} {learners === 1 ? 'learner is' : 'learners are'} enrolled: their
+              enrollment, progress, submissions, quiz results, final project and certificate go too.
+              To keep those, archive the course instead.
+            </p>
+          )}
         </ConfirmDialog>
       )}
     </div>

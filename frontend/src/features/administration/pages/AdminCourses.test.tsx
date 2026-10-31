@@ -98,7 +98,7 @@ describe('AdminCoursesPage', () => {
     await waitFor(() => expect(api.adminCoursesRequest).toHaveBeenCalledTimes(2))
   })
 
-  it('asks before deleting, and shows why the server refuses', async () => {
+  it('deletes a course with learners only once its title is typed', async () => {
     const live = {
       id: '2',
       slug: 'python',
@@ -106,17 +106,22 @@ describe('AdminCoursesPage', () => {
       status: 'published' as const,
       levelLabel: 'Beginner to advanced',
       moduleCount: 1,
-      lessonCount: 1,
+      lessonCount: 16,
       enrollmentCount: 3,
       updatedAt: '2026-10-30T00:00:00Z',
     }
     api.adminCoursesRequest.mockResolvedValue([live])
-    api.deleteCourseRequest.mockResolvedValue({
-      success: false,
-      message: 'Learners are enrolled in this course, so it cannot be deleted.',
-      field: null,
-      id: null,
-    })
+    api.deleteCourseRequest
+      .mockResolvedValueOnce({
+        success: false,
+        message: 'Type the course title exactly to delete it with its learners.',
+        field: 'confirmTitle',
+        id: null,
+      })
+      .mockResolvedValue({
+        ...OK,
+        message: "Course deleted, with 3 learners' enrollments and progress.",
+      })
     renderAdminPage(<AdminCoursesPage />)
 
     fireEvent.click(await screen.findByRole('button', { name: 'More for Python course' }))
@@ -124,13 +129,31 @@ describe('AdminCoursesPage', () => {
     expect(menu.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument()
     expect(menu.getByRole('menuitem', { name: 'Return to draft' })).toBeInTheDocument()
     fireEvent.click(menu.getByRole('menuitem', { name: 'Delete course' }))
-    expect(api.deleteCourseRequest).not.toHaveBeenCalled()
-    fireEvent.click(
-      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete course' }),
-    )
 
-    await waitFor(() => expect(api.deleteCourseRequest).toHaveBeenCalledWith('2'))
-    expect(await screen.findByText(/cannot be deleted/)).toBeInTheDocument()
+    const dialog = within(screen.getByRole('dialog'))
+    expect(dialog.getByText(/3 learners are enrolled/)).toBeInTheDocument()
+    const confirm = dialog.getByRole('button', { name: 'Delete for good' })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(dialog.getByLabelText(/to confirm/), { target: { value: 'Python' } })
+    expect(confirm).toBeDisabled()
+    fireEvent.change(dialog.getByLabelText(/to confirm/), {
+      target: { value: 'Python course' },
+    })
+    expect(confirm).toBeEnabled()
+
+    // A refusal is read in the dialog, where the decision is made.
+    fireEvent.click(confirm)
+    expect(await dialog.findByRole('alert')).toHaveTextContent('Type the course title')
+
+    fireEvent.click(confirm)
+    await waitFor(() =>
+      expect(api.deleteCourseRequest).toHaveBeenLastCalledWith('2', {
+        force: true,
+        confirmTitle: 'Python course',
+      }),
+    )
+    expect(await screen.findByText(/Course deleted, with 3 learners/)).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('creates a course as a draft', async () => {

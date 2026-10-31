@@ -666,12 +666,28 @@ class Mutation:
     def unpublish_course(self, info: strawberry.Info, id: strawberry.ID) -> AuthoringPayload:
         return _set_status(info, id, Course.Status.DRAFT, 'Course returned to draft.')
 
-    @strawberry.mutation(description='Delete a course nobody is enrolled in.')
-    def delete_course(self, info: strawberry.Info, id: strawberry.ID) -> AuthoringPayload:
+    @strawberry.mutation(
+        description=(
+            'Delete a course. One with learners needs `force` and its title typed out as '
+            '`confirmTitle`, and takes their enrollments and progress with it.'
+        )
+    )
+    def delete_course(
+        self,
+        info: strawberry.Info,
+        id: strawberry.ID,
+        force: bool = False,
+        confirm_title: str = '',
+    ) -> AuthoringPayload:
         try:
-            authoring.delete_course(info.context.user, id)
+            enrolled = authoring.delete_course(
+                info.context.user, id, force=force, confirm_title=confirm_title
+            )
         except LearningError as exc:
             return _failed(exc)
+        if enrolled:
+            noun = 'learner' if enrolled == 1 else 'learners'
+            return _done(f"Course deleted, with {enrolled} {noun}' enrollments and progress.")
         return _done('Course deleted.')
 
     @strawberry.mutation(description='Add a module at the end of a course.')

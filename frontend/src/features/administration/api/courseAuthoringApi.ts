@@ -330,8 +330,20 @@ export const archiveCourseRequest = (id: string) =>
 export const unpublishCourseRequest = (id: string) =>
   mutate('unpublishCourse', 'UnpublishCourse($id: ID!)', '(id: $id)', { id })
 
-export const deleteCourseRequest = (id: string) =>
-  mutate('deleteCourse', 'DeleteCourse($id: ID!)', '(id: $id)', { id })
+/**
+ * Delete a course. One with learners is refused unless `force`, with its title
+ * typed as `confirmTitle` - and then takes their enrollments and progress too.
+ */
+export const deleteCourseRequest = (
+  id: string,
+  { force = false, confirmTitle = '' }: { force?: boolean; confirmTitle?: string } = {},
+) =>
+  mutate(
+    'deleteCourse',
+    'DeleteCourse($id: ID!, $force: Boolean!, $confirmTitle: String!)',
+    '(id: $id, force: $force, confirmTitle: $confirmTitle)',
+    { id, force, confirmTitle },
+  )
 
 export const createModuleRequest = (courseId: string, input: ModuleInput) =>
   mutate(
