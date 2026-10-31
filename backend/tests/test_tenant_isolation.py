@@ -471,9 +471,10 @@ def test_user_a_cannot_discover_organization_b_via_listings(tenant_a, tenant_b):
         listed = response.json()['data'][field]
         for item in listed:
             rendered = json.dumps(item)
-            assert tenant_b['organization_id'] not in rendered
-            assert tenant_b['membership_id'] not in rendered
-            assert tenant_b['owner_role_id'] not in rendered
+            # Quoted, as JSON writes them: a bare "24" also matches inside "248".
+            assert f'"{tenant_b["organization_id"]}"' not in rendered
+            assert f'"{tenant_b["membership_id"]}"' not in rendered
+            assert f'"{tenant_b["owner_role_id"]}"' not in rendered
         _assert_no_leakage(response, tenant_b)
 
 
@@ -733,4 +734,4 @@ def test_membership_listing_never_includes_another_tenants_users(tenant_a, tenan
 
     assert [member['user']['id'] for member in members] == [tenant_a['user_id']]
     b_user_id = User.objects.get(email='bob@tenant-b.example').pk
-    assert str(b_user_id) not in json.dumps(members)
+    assert f'"{b_user_id}"' not in json.dumps(members)  # IDs are JSON strings: quoted
