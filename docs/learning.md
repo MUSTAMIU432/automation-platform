@@ -95,7 +95,13 @@ migration `learning.0002` gives it to administrators granted before Learning exi
    not report that to the page, so an "Open original resource" link (new tab,
    `noopener`) is always under the frame, a page that has not loaded after 20
    seconds is replaced by the fallback message, and the console's **Preview**
-   shows the author straight away - choose **Link only** for such a site. A
+   shows the author straight away - choose **Link only** for such a site.
+   **Hide the top of the page** (0-400 px, per resource) crops MUSTANET's frame
+   so a site's own header and menus sit above the visible area - the frame
+   moves up inside its box; the page itself is not, and cannot be, changed. It
+   is a fixed height (a site's header is often taller on phones) and needs
+   adjusting if the site redesigns; the card keeps "From <site>" and the link to
+   the original either way. A
    course's files can list resources under a lesson (`[[lessons.resources]]`);
    they are added as published, and the start-up `seed_python_course` adds ones
    an existing course lacks. To hide one of those for good, unpublish it rather

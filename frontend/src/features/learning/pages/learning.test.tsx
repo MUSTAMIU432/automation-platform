@@ -131,6 +131,7 @@ function course(enrolled: boolean): Course {
                 description: '',
                 url: 'https://archive.codewithharry.com/tutorial/python-objects-classes/',
                 kind: 'embed',
+                cropTop: 0,
               },
             ],
           },
@@ -437,6 +438,7 @@ describe('a lesson', () => {
       description: 'Classes and objects, step by step.',
       url: HARRY,
       kind: 'embed' as const,
+      cropTop: 0,
     }
 
     it('shows the page in a frame under the objectives, and keeps the lesson controls', async () => {
@@ -485,6 +487,15 @@ describe('a lesson', () => {
         'href',
         HARRY,
       )
+    })
+
+    it('hides the top of the page when the authors set a crop, without changing it', async () => {
+      api.lessonRequest.mockResolvedValue({ ...LESSON, resources: [{ ...RESOURCE, cropTop: 135 }] })
+      renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+      const frame = await screen.findByTitle(`${RESOURCE.title} (external resource)`)
+      expect(frame).toHaveStyle({ marginTop: '-135px', maxHeight: 'none' })
+      expect(frame).toHaveAttribute('src', HARRY)
     })
 
     it('shows a link-only resource as the fallback, with no frame', async () => {

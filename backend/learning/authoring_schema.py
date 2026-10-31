@@ -222,6 +222,7 @@ class AdminResourceType:
     kind: str
     display_order: int
     is_published: bool
+    crop_top: int
     created_at: str
     updated_at: str
 
@@ -235,6 +236,7 @@ class AdminResourceType:
             kind=resource.kind,
             display_order=resource.position,
             is_published=resource.is_published,
+            crop_top=resource.crop_top,
             created_at=resource.created_at.isoformat(),
             updated_at=resource.updated_at.isoformat(),
         )
@@ -469,6 +471,7 @@ class ResourceInput:
     kind: str = 'embed'
     display_order: int | None = None
     is_published: bool = False
+    crop_top: int = 0
 
     def to_service(self) -> authoring.ResourceInput:
         return authoring.ResourceInput(
@@ -478,6 +481,7 @@ class ResourceInput:
             kind=self.kind,
             display_order=self.display_order,
             is_published=self.is_published,
+            crop_top=self.crop_top,
         )
 
 

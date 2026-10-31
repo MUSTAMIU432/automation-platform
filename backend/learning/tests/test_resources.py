@@ -336,3 +336,28 @@ class TestOnTheCoursePage:
                 }
             ],
         }
+
+
+@pytest.mark.django_db
+class TestCroppingTheFrame:
+    LEARNER = 'query($id: ID!) { lesson(id: $id) { resources { cropTop } } }'
+
+    def test_a_manager_hides_the_top_of_the_page_and_learners_get_it(
+        self, gql, manager, learner, course
+    ):
+        result = add(gql, manager, course, isPublished=True, cropTop=135)
+
+        assert result['success'] is True
+        lesson = gql(self.LEARNER, {'id': course['lesson']}, learner)['lesson']
+        assert lesson['resources'] == [{'cropTop': 135}]
+
+    def test_the_whole_page_shows_unless_asked(self, gql, manager, learner, course):
+        add(gql, manager, course, isPublished=True)
+
+        lesson = gql(self.LEARNER, {'id': course['lesson']}, learner)['lesson']
+        assert lesson['resources'] == [{'cropTop': 0}]
+
+    @pytest.mark.parametrize('crop', [-1, 401, 5000])
+    def test_hiding_too_much_or_a_negative_amount_is_refused(self, gql, manager, course, crop):
+        assert add(gql, manager, course, cropTop=crop)['field'] == 'cropTop'
+        assert not LessonResource.objects.exists()

@@ -54,6 +54,7 @@ export function EmbeddedResourceViewer({
   timeoutMs?: number
 }) {
   const [state, setState] = useState<'loading' | 'loaded' | 'failed'>('loading')
+  const crop = Math.max(0, Math.min(400, resource.cropTop ?? 0))
 
   useEffect(() => {
     if (state !== 'loading') return
@@ -77,6 +78,10 @@ export function EmbeddedResourceViewer({
             Loading the resource…
           </output>
         )}
+        {/*
+          A crop hides the top of the page (a site's own header) by moving the frame up
+          inside this box - the page itself is not changed, and cannot be from here.
+        */}
         <iframe
           src={resource.url}
           title={`${resource.title} (external resource)`}
@@ -87,6 +92,16 @@ export function EmbeddedResourceViewer({
           allowFullScreen
           onLoad={() => setState('loaded')}
           onError={() => setState('failed')}
+          style={
+            crop
+              ? {
+                  // Taller by the crop, so the part on show keeps its usual height.
+                  marginTop: -crop,
+                  height: `calc(min(max(70vh, 26rem), 56rem) + ${crop}px)`,
+                  maxHeight: 'none',
+                }
+              : undefined
+          }
           className="block h-[70vh] max-h-[56rem] min-h-[26rem] w-full border-0"
         />
       </div>

@@ -151,6 +151,9 @@ class LessonResourceType:
     description: str
     url: str
     kind: str
+    crop_top: int = strawberry.field(
+        description="Pixels of the page's top the frame hides (a site's own header)."
+    )
 
     @staticmethod
     def from_model(resource: LessonResource) -> 'LessonResourceType':
@@ -160,6 +163,7 @@ class LessonResourceType:
             description=resource.description,
             url=resource.url,
             kind=resource.kind,
+            crop_top=resource.crop_top,
         )
 
 

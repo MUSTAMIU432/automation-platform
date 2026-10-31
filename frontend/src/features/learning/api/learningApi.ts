@@ -161,6 +161,8 @@ export interface LessonResource {
   description: string
   url: string
   kind: 'embed' | 'link'
+  /** Pixels of the page's top the frame hides (a site's own header); 0 shows it all. */
+  cropTop: number
 }
 
 /** A file the course's authors attached to a lesson: notes, slides, a worksheet. */
@@ -284,7 +286,7 @@ const COURSE = `
     id slug position title summary objectives project
     lessons {
       id slug title summary estimatedMinutes completed
-      resources { id title description url kind }
+      resources { id title description url kind cropTop }
     }
     exercises { ${EXERCISE_SUMMARY} }
     quiz { id title questionCount passPercentage bestPercentage passed }
@@ -299,7 +301,7 @@ const LESSON = `id slug title summary objectives estimatedMinutes blocks { ${BLO
   courseSlug courseTitle moduleId modulePosition moduleTitle previousLessonId nextLessonId
   completed exercises { ${EXERCISE_SUMMARY} } quizId
   materials { id title filename contentType size downloadUrl }
-  resources { id title description url kind }`
+  resources { id title description url kind cropTop }`
 const SUBMISSION = `id code status passedCount totalCount createdAt
   results { name hidden passed stdin call expected actual error }`
 const EXERCISE = `id slug title difficulty instructions { ${BLOCK} } starterCode

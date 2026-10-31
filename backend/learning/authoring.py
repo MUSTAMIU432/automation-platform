@@ -847,6 +847,8 @@ def readable_material(user: User | None, material_id: object) -> LessonMaterial 
 # --- external resources ---------------------------------------------------------------
 
 DESCRIPTION_MAX_LENGTH = 1000
+# Enough for a site's header and menu bars, not enough to hide most of a page.
+CROP_TOP_MAX = 400
 
 
 @dataclass(frozen=True)
@@ -858,6 +860,8 @@ class ResourceInput:
     # None: after the lesson's other resources.
     display_order: int | None = None
     is_published: bool = False
+    # Pixels of the page's top the frame hides; 0 shows the whole page.
+    crop_top: int = 0
 
 
 def resource_url(value: str) -> str:
@@ -887,6 +891,11 @@ def _write_resource(resource: LessonResource, data: ResourceInput) -> LessonReso
     elif resource.pk is None:
         top = resource.lesson.resources.aggregate(top=Max('position'))['top'] or 0
         resource.position = top + 1
+    if not 0 <= data.crop_top <= CROP_TOP_MAX:
+        raise LearningError(
+            f'Hide between 0 and {CROP_TOP_MAX} pixels of the top.', field='cropTop'
+        )
+    resource.crop_top = data.crop_top
     resource.is_published = data.is_published
     resource.save()
     return resource

@@ -252,6 +252,7 @@ describe('AdminLessonEditorPage external resources', () => {
     kind: 'embed' as const,
     displayOrder: 1,
     isPublished: false,
+    cropTop: 0,
     createdAt: '2026-10-31T00:00:00Z',
     updatedAt: '2026-10-31T00:00:00Z',
   }
@@ -286,6 +287,7 @@ describe('AdminLessonEditorPage external resources', () => {
         kind: 'embed',
         displayOrder: null,
         isPublished: true,
+        cropTop: 0,
       }),
     )
     expect(await screen.findByText('Resource added.')).toBeInTheDocument()

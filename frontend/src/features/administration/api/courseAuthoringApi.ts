@@ -100,6 +100,7 @@ export interface AdminResource {
   kind: 'embed' | 'link'
   displayOrder: number
   isPublished: boolean
+  cropTop: number
   createdAt: string
   updatedAt: string
 }
@@ -111,6 +112,7 @@ export interface ResourceInput {
   kind: 'embed' | 'link'
   displayOrder: number | null
   isPublished: boolean
+  cropTop: number
 }
 
 export interface AdminLesson {
@@ -258,7 +260,7 @@ export async function adminLessonRequest(id: string): Promise<AdminLesson | null
          estimatedMinutes body blocks { kind text language }
          materials { id title filename contentType size createdAt downloadUrl }
          resources {
-           id title description url kind displayOrder isPublished createdAt updatedAt
+           id title description url kind displayOrder isPublished cropTop createdAt updatedAt
          }
        }
      }`,

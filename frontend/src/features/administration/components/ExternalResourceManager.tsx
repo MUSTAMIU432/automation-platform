@@ -33,6 +33,7 @@ const EMPTY: ResourceInput = {
   kind: 'embed',
   displayOrder: null,
   isPublished: false,
+  cropTop: 0,
 }
 
 type Result = { tone: 'success' | 'error'; text: string } | null
@@ -45,6 +46,7 @@ function inputFrom(resource: AdminResource): ResourceInput {
     kind: resource.kind,
     displayOrder: resource.displayOrder,
     isPublished: resource.isPublished,
+    cropTop: resource.cropTop,
   }
 }
 
@@ -169,6 +171,26 @@ function ResourceForm({
             {fieldError('displayOrder')}
           </label>
         </div>
+        {form.kind === 'embed' && (
+          <label className="block text-sm font-semibold text-slate-700">
+            Hide the top of the page (pixels)
+            <input
+              type="number"
+              min={0}
+              max={400}
+              step={5}
+              value={form.cropTop}
+              onChange={(event) => set({ cropTop: Number(event.target.value) || 0 })}
+              className={`${controlClasses} mt-1 block w-32`}
+            />
+            <span className="mt-1 block text-xs font-normal text-slate-500">
+              To leave out the site&apos;s own header and menus, e.g. 135. MUSTANET only crops its
+              frame - the page is not changed. Preview after saving to check it on a narrow screen
+              too; 0 shows the whole page.
+            </span>
+            {fieldError('cropTop')}
+          </label>
+        )}
         <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
           <input
             type="checkbox"
@@ -246,6 +268,9 @@ export function ExternalResourceManager({
                     <span className="text-xs text-slate-500">
                       {resource.kind === 'embed' ? 'Embedded webpage' : 'Link only'} · order{' '}
                       {resource.displayOrder}
+                      {resource.kind === 'embed' && resource.cropTop > 0
+                        ? ` · top ${resource.cropTop}px hidden`
+                        : ''}
                     </span>
                   </div>
                   {resource.description && (

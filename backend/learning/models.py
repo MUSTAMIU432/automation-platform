@@ -198,6 +198,13 @@ class LessonResource(models.Model):
     url = models.URLField(max_length=2000)
     kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.EMBED)
     position = models.PositiveIntegerField(default=1, help_text='Display order in the lesson.')
+    crop_top = models.PositiveSmallIntegerField(
+        default=0,
+        help_text=(
+            "Pixels of the page's top hidden by MUSTANET's frame (a site's own header, say). "
+            'Only the frame is cropped; the page itself is never changed.'
+        ),
+    )
     is_published = models.BooleanField(default=False)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+'

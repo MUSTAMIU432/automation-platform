@@ -192,6 +192,9 @@ def check_resource(resource: dict, where: str) -> None:
         raise ContentError(f'{where}: {exc}') from None
     if resource.get('kind', LessonResource.Kind.EMBED) not in LessonResource.Kind.values:
         raise ContentError(f'{where}: unknown kind.')
+    crop_top = resource.get('crop_top', 0)
+    if not isinstance(crop_top, int) or not 0 <= crop_top <= 400:
+        raise ContentError(f'{where}: crop_top must be a whole number from 0 to 400.')
 
 
 def check_exercise(exercise: dict, where: str, lesson_slugs: set[str]) -> None:
@@ -415,6 +418,7 @@ def _add_resources(lesson: Lesson, resources_data: list[dict]) -> int:
             description=data.get('description', '').strip(),
             url=url,
             kind=data.get('kind', LessonResource.Kind.EMBED),
+            crop_top=data.get('crop_top', 0),
             position=top,
             is_published=True,
         )
