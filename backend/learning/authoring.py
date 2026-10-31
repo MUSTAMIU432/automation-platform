@@ -29,7 +29,7 @@ from django.utils.text import slugify
 from ideas import attachments as file_rules
 from ideas import storage
 from identity.models import User
-from learning import pdf_import, selectors
+from learning import pdf_import, pdf_import_v1, selectors
 from learning.content import ContentError, blocks_from, check_exercise, check_question
 from learning.models import (
     AnswerOption,
@@ -701,6 +701,36 @@ def write_notes_from_pdf(lesson: Lesson, data: bytes) -> int:
         logger.warning('PDF notes for lesson %s could not be saved', lesson.pk, exc_info=True)
         return 0
     return len(parts)
+
+
+def rebuild_first_converter_notes(lesson: Lesson, data: bytes) -> int:
+    """Replace notes the first PDF converter wrote, untouched since, with today's.
+
+    The first converter (`learning.pdf_import_v1`, frozen) made a whole course
+    guide one long lesson. A lesson whose notes are still exactly what it makes
+    from this PDF was never edited - any change by an administrator breaks the
+    match, and such a lesson is left alone. Those notes are cleared (with the
+    summary and objectives when they are the converter's too) and written again
+    by `write_notes_from_pdf`, so a guide becomes its lessons. Returns how many
+    lessons were written; 0 when the notes are not the first converter's.
+    """
+    if not lesson_has_notes(lesson):
+        return 0
+    first = pdf_import_v1.lesson_from_pdf(data, title=lesson.title)
+    if first is None or lesson.body.strip() != first.body.strip():
+        return 0
+    current = pdf_import.lessons_from_pdf(data, title=lesson.title)
+    if not current or (len(current) == 1 and current[0].body.strip() == first.body.strip()):
+        return 0  # today's converter makes the same notes: nothing to rebuild
+    with transaction.atomic():
+        lesson.body = PDF_PLACEHOLDER_BODY
+        if lesson.summary.strip() == first.summary.strip():
+            lesson.summary = ''
+        if list(lesson.objectives) == list(first.objectives):
+            lesson.objectives = []
+        lesson.save(update_fields=['body', 'summary', 'objectives'])
+        lesson.blocks.all().delete()
+        return write_notes_from_pdf(lesson, data)
 
 
 def _make_room_after(lesson: Lesson, count: int) -> None:

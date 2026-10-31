@@ -205,11 +205,85 @@ class TestForLessonsUploadedBefore:
         call_command('write_pdf_lesson_notes', stdout=again)
 
         assert 'Wrote notes for "What Python is"' in first.getvalue()
-        assert '1 written, 0 skipped' in first.getvalue()
-        assert '0 written, 0 skipped' in again.getvalue()
+        assert '1 written, 0 rebuilt, 0 skipped' in first.getvalue()
+        assert '0 written, 0 rebuilt, 0 skipped' in again.getvalue()
         lesson.refresh_from_db()
         assert lesson.body.startswith('## Section 1')
         assert lesson.objectives == [
             'Describe what Python is',
             'Install Python and check the version',
         ]
+
+
+@pytest.mark.django_db
+class TestNotesTheFirstConverterWrote:
+    """The first converter made a course guide one long lesson; those are rebuilt, nothing else."""
+
+    def _first_converter_lesson(self, client, gql, manager, ids, *, edit: str = '') -> Lesson:
+        from learning.pdf_import_v1 import lesson_from_pdf as first_converter
+
+        title = 'Beginner python course breakdown'
+        first = first_converter(course_guide_pdf(), title=title)
+        lesson_id = gql(
+            CREATE_LESSON,
+            {
+                'id': ids['module'],
+                'input': {
+                    'title': title,
+                    'body': first.body + edit,
+                    'summary': first.summary,
+                    'objectives': first.objectives,
+                    'estimatedMinutes': first.estimated_minutes,
+                },
+            },
+            manager,
+        )['createLesson']['id']
+        # Attaching the file now writes nothing: the lesson has notes.
+        assert (
+            upload(client, lesson_id, manager, content=course_guide_pdf()).json()['lessonsWritten']
+            == 0
+        )
+        return Lesson.objects.get(pk=lesson_id)
+
+    def test_untouched_ones_become_the_guides_lessons(self, client, gql, manager):
+        ids = build_course(gql, manager)
+        lesson = self._first_converter_lesson(client, gql, manager, ids)
+        # What the first converter made of it: the cover's lines as headings, one long page.
+        assert lesson.body.startswith('## PYTHON PROGRAMMING\n\n## Beginner Course Breakdown')
+
+        out, again = io.StringIO(), io.StringIO()
+        call_command('write_pdf_lesson_notes', stdout=out)
+        call_command('write_pdf_lesson_notes', stdout=again)
+
+        assert 'Rebuilt "Beginner python course breakdown"' in out.getvalue()
+        assert '0 written, 1 rebuilt, 0 skipped' in out.getvalue()
+        assert '0 written, 0 rebuilt, 0 skipped' in again.getvalue()
+        titles = list(
+            Lesson.objects.filter(module_id=ids['module'])
+            .order_by('position')
+            .values_list('title', flat=True)
+        )
+        assert titles == [
+            'Welcome',
+            'Beginner python course breakdown',
+            'Course Overview',
+            'Course Schedule',
+            'Week 1 - Introduction to Programming',
+            'Week 2 - Object-Oriented Programming',
+        ]
+        lesson.refresh_from_db()
+        assert lesson.body.startswith('Beginner Course Breakdown & Student Learning Guide')
+        assert lesson.summary == 'Beginner Course Breakdown & Student Learning Guide'
+
+    def test_ones_an_administrator_edited_are_left_alone(self, client, gql, manager):
+        ids = build_course(gql, manager)
+        lesson = self._first_converter_lesson(client, gql, manager, ids, edit='\n\nMy own note.')
+        before = lesson.body
+
+        out = io.StringIO()
+        call_command('write_pdf_lesson_notes', stdout=out)
+
+        assert '0 written, 0 rebuilt, 0 skipped' in out.getvalue()
+        lesson.refresh_from_db()
+        assert lesson.body == before
+        assert Lesson.objects.filter(module_id=ids['module']).count() == 2

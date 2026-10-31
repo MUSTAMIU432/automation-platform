@@ -75,8 +75,12 @@ migration `learning.0002` gives it to administrators granted before Learning exi
    ("notes written", "added as 16 lessons" or "file only"), and the notes can be
    edited like any others.
    PDF lessons uploaded before this were filled by `write_pdf_lesson_notes`, which
-   the backend runs in the background on every start (it skips lessons with
-   notes, so it soon has nothing to do; `WRITE_PDF_LESSON_NOTES=false` turns it off).
+   the backend runs in the background on every start (`WRITE_PDF_LESSON_NOTES=false`
+   turns it off). It also rebuilds notes the first converter wrote - which made a
+   whole course guide one long lesson - when they are still exactly what that
+   converter (`learning/pdf_import_v1.py`, frozen) makes from the lesson's PDF:
+   untouched since, so safe to replace, and the guide becomes its lessons. Notes
+   anybody edited no longer match and are left alone.
 5. **External resources** - a web page learners read inside a lesson, such as
    CodeWithHarry's "Python Objects and Classes" in the Python course's classes
    lesson. Added on the lesson page (title, description, address, type, display

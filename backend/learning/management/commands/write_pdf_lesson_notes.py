@@ -1,15 +1,21 @@
 from django.core.management.base import BaseCommand
 
 from ideas import storage
-from learning.authoring import lesson_has_notes, write_notes_from_pdf
+from learning.authoring import (
+    lesson_has_notes,
+    rebuild_first_converter_notes,
+    write_notes_from_pdf,
+)
 from learning.models import Lesson
 
 
 class Command(BaseCommand):
     help = (
-        'Give every lesson that has no notes but has a PDF attached the notes in that PDF - '
-        'for lessons uploaded before uploads did it themselves. Lessons with notes are never '
-        'touched, so this is safe to run at any time.'
+        'Give every lesson with a PDF attached the notes in that PDF when it has none - for '
+        'lessons uploaded before uploads did it themselves - and rebuild notes the first '
+        'converter wrote that nobody has edited since (a course guide then becomes its '
+        'lessons). Notes anybody wrote or edited are never touched, so this is safe to run '
+        'at any time.'
     )
 
     def handle(self, *args, **options):
@@ -18,11 +24,10 @@ class Command(BaseCommand):
             .distinct()
             .order_by('pk')
         )
-        written = skipped = 0
+        written = rebuilt = skipped = 0
         for lesson in lessons:
-            if lesson_has_notes(lesson):
-                continue
             material = lesson.materials.filter(content_type='application/pdf').first()
+            had_notes = lesson_has_notes(lesson)
             try:
                 with storage.open_object(material.storage_key) as handle:
                     data = handle.read()
@@ -30,6 +35,17 @@ class Command(BaseCommand):
                 self.stdout.write(f'Skipped "{lesson.title}": its PDF could not be read ({exc}).')
                 skipped += 1
                 continue
+
+            if had_notes:
+                # Only the first converter's untouched notes; everything else is left alone.
+                if count := rebuild_first_converter_notes(lesson, data):
+                    self.stdout.write(
+                        f'Rebuilt "{lesson.title}" from {material.filename}'
+                        + (f', and {count - 1} lessons after it.' if count > 1 else '.')
+                    )
+                    rebuilt += 1
+                continue
+
             if count := write_notes_from_pdf(lesson, data):
                 self.stdout.write(
                     f'Wrote notes for "{lesson.title}" from {material.filename}'
@@ -43,5 +59,7 @@ class Command(BaseCommand):
                 )
                 skipped += 1
         self.stdout.write(
-            self.style.SUCCESS(f'PDF lesson notes: {written} written, {skipped} skipped.')
+            self.style.SUCCESS(
+                f'PDF lesson notes: {written} written, {rebuilt} rebuilt, {skipped} skipped.'
+            )
         )
