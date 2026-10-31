@@ -25,6 +25,7 @@ import {
 } from '../components/AdminUi'
 import { BackLink } from '../components/BackLink'
 import { ConfirmDialog } from '../components/ConfirmDialog'
+import { ExternalResourceManager } from '../components/ExternalResourceManager'
 import { useAdminQuery } from '../hooks/useAdminQuery'
 
 const FORMAT_HELP = [
@@ -308,7 +309,7 @@ function Files({ lesson, onChanged }: { lesson: AdminLesson; onChanged: () => vo
   )
 }
 
-/** `/app/admin/courses/:courseId/lessons/:lessonId`: a lesson's notes and files. */
+/** `/app/admin/courses/:courseId/lessons/:lessonId`: a lesson's notes, files and external resources. */
 export function AdminLessonEditorPage() {
   const { courseId = '', lessonId = '' } = useParams()
   const lesson = useAdminQuery(
@@ -335,6 +336,9 @@ export function AdminLessonEditorPage() {
         </AdminCard>
         <AdminCard title="Files">
           <Files lesson={data} onChanged={lesson.reload} />
+        </AdminCard>
+        <AdminCard title="External resources">
+          <ExternalResourceManager lesson={data} onChanged={lesson.reload} />
         </AdminCard>
       </div>
     </>

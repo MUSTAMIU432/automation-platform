@@ -13,7 +13,7 @@ from django.db.models import Count
 
 from learning import authoring, selectors
 from learning.content import ContentError, blocks_from
-from learning.models import CodingExercise, Course, CourseModule, Lesson, Quiz
+from learning.models import CodingExercise, Course, CourseModule, Lesson, LessonResource, Quiz
 from learning.schema import ContentBlockType, _id, _module_quiz
 from learning.services import LearningError
 
@@ -213,6 +213,33 @@ class AdminCourseType:
         )
 
 
+@strawberry.type(description='An external resource of a lesson, as its authors manage it.')
+class AdminResourceType:
+    id: strawberry.ID
+    title: str
+    description: str
+    url: str
+    kind: str
+    display_order: int
+    is_published: bool
+    created_at: str
+    updated_at: str
+
+    @staticmethod
+    def from_model(resource: LessonResource) -> 'AdminResourceType':
+        return AdminResourceType(
+            id=_id(resource.pk),
+            title=resource.title,
+            description=resource.description,
+            url=resource.url,
+            kind=resource.kind,
+            display_order=resource.position,
+            is_published=resource.is_published,
+            created_at=resource.created_at.isoformat(),
+            updated_at=resource.updated_at.isoformat(),
+        )
+
+
 @strawberry.type(description='A lesson as its authors edit it: the notes as written, and files.')
 class AdminLessonType:
     id: strawberry.ID
@@ -227,6 +254,7 @@ class AdminLessonType:
     body: str
     blocks: list[ContentBlockType]
     materials: list[MaterialType]
+    resources: list[AdminResourceType]
 
     @staticmethod
     def build(lesson: Lesson) -> 'AdminLessonType':
@@ -246,6 +274,7 @@ class AdminLessonType:
                 for block in lesson.blocks.all()
             ],
             materials=[MaterialType.from_model(m) for m in lesson.materials.all()],
+            resources=[AdminResourceType.from_model(r) for r in lesson.resources.all()],
         )
 
 
@@ -432,6 +461,26 @@ class LessonInput:
         )
 
 
+@strawberry.input(description='An external web page for a lesson. `kind`: embed or link.')
+class ResourceInput:
+    title: str
+    url: str
+    description: str = ''
+    kind: str = 'embed'
+    display_order: int | None = None
+    is_published: bool = False
+
+    def to_service(self) -> authoring.ResourceInput:
+        return authoring.ResourceInput(
+            title=self.title,
+            url=self.url,
+            description=self.description,
+            kind=self.kind,
+            display_order=self.display_order,
+            is_published=self.is_published,
+        )
+
+
 @strawberry.input
 class ExerciseTestInput:
     name: str
@@ -546,7 +595,7 @@ class Query:
         lesson = (
             Lesson.objects.filter(pk=selectors.parse_id(id))
             .select_related('module__course')
-            .prefetch_related('blocks', 'materials')
+            .prefetch_related('blocks', 'materials', 'resources')
             .first()
         )
         return AdminLessonType.build(lesson) if lesson else None
@@ -795,6 +844,44 @@ class Mutation:
         except LearningError as exc:
             return _failed(exc)
         return _done('Quiz deleted.')
+
+    @strawberry.mutation(description='Add an external web page to a lesson.')
+    def create_lesson_resource(
+        self, info: strawberry.Info, lesson_id: strawberry.ID, input: ResourceInput
+    ) -> AuthoringPayload:
+        try:
+            resource = authoring.create_resource(info.context.user, lesson_id, input.to_service())
+        except LearningError as exc:
+            return _failed(exc)
+        return _done('Resource added.', resource.pk)
+
+    @strawberry.mutation
+    def update_lesson_resource(
+        self, info: strawberry.Info, id: strawberry.ID, input: ResourceInput
+    ) -> AuthoringPayload:
+        try:
+            resource = authoring.update_resource(info.context.user, id, input.to_service())
+        except LearningError as exc:
+            return _failed(exc)
+        return _done('Resource saved.', resource.pk)
+
+    @strawberry.mutation(description='Publish a resource to learners, or take it back.')
+    def set_lesson_resource_published(
+        self, info: strawberry.Info, id: strawberry.ID, published: bool
+    ) -> AuthoringPayload:
+        try:
+            resource = authoring.set_resource_published(info.context.user, id, published)
+        except LearningError as exc:
+            return _failed(exc)
+        return _done('Resource published.' if published else 'Resource unpublished.', resource.pk)
+
+    @strawberry.mutation
+    def delete_lesson_resource(self, info: strawberry.Info, id: strawberry.ID) -> AuthoringPayload:
+        try:
+            authoring.delete_resource(info.context.user, id)
+        except LearningError as exc:
+            return _failed(exc)
+        return _done('Resource deleted.')
 
     @strawberry.mutation(description='Delete a file from a lesson.')
     def delete_lesson_material(self, info: strawberry.Info, id: strawberry.ID) -> AuthoringPayload:

@@ -77,10 +77,29 @@ migration `learning.0002` gives it to administrators granted before Learning exi
    PDF lessons uploaded before this were filled by `write_pdf_lesson_notes`, which
    the backend runs in the background on every start (it skips lessons with
    notes, so it soon has nothing to do; `WRITE_PDF_LESSON_NOTES=false` turns it off).
-5. **Exercises** have instructions, starter code, a reference solution (never
+5. **External resources** - a web page learners read inside a lesson, such as
+   CodeWithHarry's "Python Objects and Classes" in the Python course's classes
+   lesson. Added on the lesson page (title, description, address, type, display
+   order, published) by course managers only; learners see published ones, after
+   the lesson's objectives and before its notes. The page loads in the learner's
+   browser straight from its own site, in a sandboxed frame that cannot navigate
+   MUSTANET or read its data; the server only stores the address and **never
+   fetches it** - no proxy, no copying. Addresses must be http or https with a
+   site and no sign-in details (`learning/resource_urls.py`, checked on the
+   server and again before rendering). Sites that forbid framing
+   (`X-Frame-Options`, CSP `frame-ancestors`) are not worked around: browsers do
+   not report that to the page, so an "Open original resource" link (new tab,
+   `noopener`) is always under the frame, a page that has not loaded after 20
+   seconds is replaced by the fallback message, and the console's **Preview**
+   shows the author straight away - choose **Link only** for such a site. A
+   course's files can list resources under a lesson (`[[lessons.resources]]`);
+   they are added as published, and the start-up `seed_python_course` adds ones
+   an existing course lacks. To hide one of those for good, unpublish it rather
+   than deleting it, or it is added again on the next start.
+6. **Exercises** have instructions, starter code, a reference solution (never
    sent to learners), hints, and tests. Each needs at least one visible test
    (shown as an example) and one hidden test.
-6. **Publish** from the course page. **Archive** removes a course from the catalog
+7. **Publish** from the course page. **Archive** removes a course from the catalog
    but keeps it open to the learners already enrolled. A course with learners
    cannot be deleted.
 

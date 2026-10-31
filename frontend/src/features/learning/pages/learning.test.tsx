@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,7 @@ import { LearningLayout } from './LearningLayout'
 import { LessonPage } from './LessonPage'
 import { QuizPage } from './QuizPage'
 import { RichText } from '../components/RichText'
+import { EMBED_TIMEOUT_MS, FALLBACK_MESSAGE } from '../components/externalResourceRules'
 
 vi.mock('../api/learningApi', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -272,6 +273,7 @@ const LESSON: Lesson = {
       downloadUrl: '/learning/materials/41/download/',
     },
   ],
+  resources: [],
 }
 
 describe('lesson text', () => {
@@ -404,6 +406,96 @@ describe('a lesson', () => {
       '/app/learn/courses/python/quizzes/31',
     )
     expect(screen.queryByText('name = value')).not.toBeInTheDocument()
+  })
+
+  describe('with an external resource', () => {
+    const HARRY = 'https://archive.codewithharry.com/tutorial/python-objects-classes/'
+    const RESOURCE = {
+      id: '61',
+      title: 'Python Objects and Classes - CodeWithHarry',
+      description: 'Classes and objects, step by step.',
+      url: HARRY,
+      kind: 'embed' as const,
+    }
+
+    it('shows the page in a frame under the objectives, and keeps the lesson controls', async () => {
+      api.lessonRequest.mockResolvedValue({ ...LESSON, resources: [RESOURCE] })
+      renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+      const card = within(await screen.findByRole('region', { name: RESOURCE.title }))
+      expect(card.getByText('Classes and objects, step by step.')).toBeInTheDocument()
+      expect(card.getByText('From archive.codewithharry.com')).toBeInTheDocument()
+      const frame = card.getByTitle(`${RESOURCE.title} (external resource)`)
+      expect(frame).toHaveAttribute('src', HARRY)
+      expect(frame).toHaveAttribute('referrerpolicy', 'no-referrer')
+      expect(frame.getAttribute('sandbox')).toContain('allow-scripts')
+      expect(frame.getAttribute('sandbox')).not.toContain('allow-top-navigation')
+      expect(card.getByText('Loading the resource…')).toBeInTheDocument()
+
+      fireEvent.load(frame)
+      expect(card.queryByText('Loading the resource…')).not.toBeInTheDocument()
+      const original = card.getByRole('link', { name: /Open original resource/ })
+      expect(original).toHaveAttribute('href', HARRY)
+      expect(original).toHaveAttribute('target', '_blank')
+      expect(original).toHaveAttribute('rel', 'noopener noreferrer')
+
+      // The objectives come first, and the lesson's own controls are all still there.
+      const objectives = screen.getByRole('region', { name: 'Learning objectives' })
+      expect(objectives.compareDocumentPosition(frame)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(screen.getByRole('button', { name: /Mark as completed/ })).toBeInTheDocument()
+      expect(screen.getAllByRole('link', { name: /Previous/ }).length).toBeGreaterThan(0)
+    })
+
+    it('offers the original in a new tab when the page does not load in time', async () => {
+      api.lessonRequest.mockResolvedValue({ ...LESSON, resources: [RESOURCE] })
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      try {
+        renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+        await screen.findByTitle(`${RESOURCE.title} (external resource)`)
+        await act(async () => {}) // let the viewer start its timer
+        act(() => vi.advanceTimersByTime(EMBED_TIMEOUT_MS))
+      } finally {
+        vi.useRealTimers()
+      }
+
+      expect(screen.getByText(FALLBACK_MESSAGE)).toBeInTheDocument()
+      expect(screen.queryByTitle(`${RESOURCE.title} (external resource)`)).toBeNull()
+      expect(screen.getByRole('link', { name: /Open original resource/ })).toHaveAttribute(
+        'href',
+        HARRY,
+      )
+    })
+
+    it('shows a link-only resource as the fallback, with no frame', async () => {
+      api.lessonRequest.mockResolvedValue({
+        ...LESSON,
+        resources: [{ ...RESOURCE, kind: 'link' as const }],
+      })
+      renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+      expect(await screen.findByText(FALLBACK_MESSAGE)).toBeInTheDocument()
+      expect(screen.queryByTitle(`${RESOURCE.title} (external resource)`)).toBeNull()
+    })
+
+    it('never frames or links an address that is not http(s)', async () => {
+      api.lessonRequest.mockResolvedValue({
+        ...LESSON,
+        resources: [{ ...RESOURCE, url: 'javascript:alert(1)' }],
+      })
+      renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+      expect(await screen.findByText(FALLBACK_MESSAGE)).toBeInTheDocument()
+      expect(screen.queryByTitle(`${RESOURCE.title} (external resource)`)).toBeNull()
+      expect(screen.queryByRole('link', { name: /Open original resource/ })).toBeNull()
+    })
+
+    it('leaves out the notes panel when a lesson is only a resource', async () => {
+      api.lessonRequest.mockResolvedValue({ ...LESSON, blocks: [], resources: [RESOURCE] })
+      renderAt('/l/12', '/l/:lessonId', <LessonPage />)
+
+      await screen.findByTitle(`${RESOURCE.title} (external resource)`)
+      expect(screen.queryByRole('heading', { level: 2, name: 'Variables' })).toBeNull()
+    })
   })
 
   it('copies a code example', async () => {

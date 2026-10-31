@@ -22,6 +22,7 @@ from learning.models import (
     Enrollment,
     ExerciseSubmission,
     Lesson,
+    LessonResource,
     Quiz,
 )
 
@@ -336,6 +337,31 @@ class LessonFileType:
     download_url: str
 
 
+@strawberry.type(
+    description=(
+        'An external web page that belongs to a lesson: shown in a frame (`embed`) or '
+        'linked (`link`). It loads in the browser from its own site; only published '
+        'resources are ever listed.'
+    )
+)
+class LessonResourceType:
+    id: strawberry.ID
+    title: str
+    description: str
+    url: str
+    kind: str
+
+    @staticmethod
+    def from_model(resource: LessonResource) -> 'LessonResourceType':
+        return LessonResourceType(
+            id=_id(resource.pk),
+            title=resource.title,
+            description=resource.description,
+            url=resource.url,
+            kind=resource.kind,
+        )
+
+
 @strawberry.type(description='One lesson to read.')
 class LessonType:
     id: strawberry.ID
@@ -356,6 +382,7 @@ class LessonType:
     exercises: list[ExerciseSummaryType]
     quiz_id: strawberry.ID | None
     materials: list[LessonFileType]
+    resources: list[LessonResourceType]
 
     @staticmethod
     def build(lesson: Lesson, user) -> 'LessonType':
@@ -399,6 +426,12 @@ class LessonType:
                     download_url=f'/learning/materials/{material.pk}/download/',
                 )
                 for material in lesson.materials.all()
+            ],
+            # Published only - for a course manager reading as a learner, too.
+            resources=[
+                LessonResourceType.from_model(resource)
+                for resource in lesson.resources.all()
+                if resource.is_published
             ],
         )
 
@@ -734,6 +767,13 @@ class Query:
     def lesson(self, info: strawberry.Info, id: strawberry.ID) -> LessonType | None:
         lesson = selectors.get_lesson(info.context.user, id)
         return LessonType.build(lesson, info.context.user) if lesson else None
+
+    @strawberry.field(description='One published external resource of a lesson you can open.')
+    def lesson_resource(
+        self, info: strawberry.Info, id: strawberry.ID
+    ) -> LessonResourceType | None:
+        resource = selectors.get_published_resource(info.context.user, id)
+        return LessonResourceType.from_model(resource) if resource else None
 
     @strawberry.field(description='One exercise of a course you are enrolled in, or null.')
     def exercise(self, info: strawberry.Info, id: strawberry.ID) -> ExerciseType | None:

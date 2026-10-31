@@ -27,6 +27,7 @@ import {
   type LessonFile,
 } from '../api/learningApi'
 import { ContentBlocks } from '../components/ContentBlocks'
+import { ExternalResourceCard } from '../components/ExternalResource'
 import { FilePreviewDialog } from '../components/FilePreviewDialog'
 import { Empty, ErrorNotice, Loading, Pill } from '../components/States'
 import { DIFFICULTY_CLASSES, glassPanel, primaryButton, secondaryButton } from '../components/ui'
@@ -401,9 +402,16 @@ export function LessonPage() {
                 </section>
               )}
 
-              <div className={`${glassPanel} p-6 sm:p-8`}>
-                <ContentBlocks blocks={data.blocks} reading />
-              </div>
+              {/* External pages the authors added, in their order, before the notes. */}
+              {(data.resources ?? []).map((resource) => (
+                <ExternalResourceCard key={resource.id} resource={resource} />
+              ))}
+
+              {data.blocks.length > 0 && (
+                <div className={`${glassPanel} p-6 sm:p-8`}>
+                  <ContentBlocks blocks={data.blocks} reading />
+                </div>
+              )}
             </>
           )}
         </div>

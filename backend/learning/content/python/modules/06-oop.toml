@@ -133,6 +133,13 @@ print(repr(mix))
 the code that recreates the object.
 '''
 
+# Read inside the lesson, after its objectives: the page loads from its own site.
+[[lessons.resources]]
+title = "Python Objects and Classes - CodeWithHarry"
+description = "Classes, objects, constructors and methods, explained step by step with runnable examples."
+url = "https://archive.codewithharry.com/tutorial/python-objects-classes/"
+kind = "embed"
+
 [[lessons]]
 slug = "inheritance-composition-design"
 title = "Inheritance, polymorphism, composition, dataclasses and SOLID"

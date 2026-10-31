@@ -457,3 +457,21 @@ export function CopyIcon(props: IconProps) {
     </Icon>
   )
 }
+
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 4h6v6M20 4l-9 9" />
+      <path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" />
+    </Icon>
+  )
+}
+
+export function GlobeIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5s-1 5.9-3.5 8.5c-2.5-2.6-3.5-5.4-3.5-8.5s1-5.9 3.5-8.5Z" />
+    </Icon>
+  )
+}

@@ -1,6 +1,12 @@
 from django.core.management.base import BaseCommand, CommandError
 
-from learning.content import CONTENT_ROOT, ContentError, read_course, sync_course
+from learning.content import (
+    CONTENT_ROOT,
+    ContentError,
+    add_missing_resources,
+    read_course,
+    sync_course,
+)
 from learning.models import Course
 
 COURSE_DIRECTORY = CONTENT_ROOT / 'python'
@@ -39,9 +45,12 @@ class Command(BaseCommand):
             slug = read_course(COURSE_DIRECTORY).course['slug']
             existing = Course.objects.filter(slug=slug).first()
             if existing is not None and not overwrite:
+                # Administrators own the course; only resources it lacks are added.
+                added = add_missing_resources(COURSE_DIRECTORY)
                 self.stdout.write(
                     f'{existing.title} is already loaded and is managed in the administration '
-                    'console. Nothing was changed (use --overwrite to reload it from the files).'
+                    'console. Nothing else was changed (use --overwrite to reload it from the '
+                    f'files). External resources added: {added}.'
                 )
                 return
             report = sync_course(COURSE_DIRECTORY, publish=publish, prune=prune)
@@ -53,7 +62,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f'{course.title} ({course.get_status_display().lower()}): {report.modules} '
                 f'modules, {report.lessons} lessons, {report.exercises} exercises, '
-                f'{report.questions} quiz questions.'
+                f'{report.questions} quiz questions, {report.resources} external resources.'
             )
         )
         for item in report.kept:

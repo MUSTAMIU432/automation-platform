@@ -145,6 +145,20 @@ export interface Lesson {
   exercises: ExerciseSummary[]
   quizId: string | null
   materials: LessonFile[]
+  /** External web pages for the lesson, in display order. Published ones only. */
+  resources: LessonResource[]
+}
+
+/**
+ * An external web page that belongs to a lesson: `embed` shows it in a frame,
+ * `link` offers it to open on its own site (for a site that refuses framing).
+ */
+export interface LessonResource {
+  id: string
+  title: string
+  description: string
+  url: string
+  kind: 'embed' | 'link'
 }
 
 /** A file the course's authors attached to a lesson: notes, slides, a worksheet. */
@@ -279,7 +293,8 @@ const BLOCK = 'kind text language'
 const LESSON = `id slug title summary objectives estimatedMinutes blocks { ${BLOCK} }
   courseSlug courseTitle moduleId modulePosition moduleTitle previousLessonId nextLessonId
   completed exercises { ${EXERCISE_SUMMARY} } quizId
-  materials { id title filename contentType size downloadUrl }`
+  materials { id title filename contentType size downloadUrl }
+  resources { id title description url kind }`
 const SUBMISSION = `id code status passedCount totalCount createdAt
   results { name hidden passed stdin call expected actual error }`
 const EXERCISE = `id slug title difficulty instructions { ${BLOCK} } starterCode

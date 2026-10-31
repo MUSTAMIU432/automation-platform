@@ -40,9 +40,11 @@ from learning.models import (
     Lesson,
     LessonContent,
     LessonMaterial,
+    LessonResource,
     Question,
     Quiz,
 )
+from learning.resource_urls import check_resource_url
 from learning.services import LearningError
 
 logger = logging.getLogger(__name__)
@@ -790,3 +792,80 @@ def readable_material(user: User | None, material_id: object) -> LessonMaterial 
     if material is None or selectors.get_lesson(user, material.lesson_id) is None:
         return None
     return material
+
+
+# --- external resources ---------------------------------------------------------------
+
+DESCRIPTION_MAX_LENGTH = 1000
+
+
+@dataclass(frozen=True)
+class ResourceInput:
+    title: str
+    url: str
+    description: str = ''
+    kind: str = LessonResource.Kind.EMBED
+    # None: after the lesson's other resources.
+    display_order: int | None = None
+    is_published: bool = False
+
+
+def resource_url(value: str) -> str:
+    """`value` as a safe web address (`learning.resource_urls`), or a `LearningError`."""
+    try:
+        return check_resource_url(value)
+    except ValueError as exc:
+        raise LearningError(str(exc), field='url') from None
+
+
+def _write_resource(resource: LessonResource, data: ResourceInput) -> LessonResource:
+    resource.title = _text(data.title, 'title', 'A title')
+    resource.description = (data.description or '').strip()
+    if len(resource.description) > DESCRIPTION_MAX_LENGTH:
+        raise LearningError(
+            f'The description must be {DESCRIPTION_MAX_LENGTH} characters or fewer.',
+            field='description',
+        )
+    resource.url = resource_url(data.url)
+    if data.kind not in LessonResource.Kind.values:
+        raise LearningError('Choose how the page is shown.', field='kind')
+    resource.kind = data.kind
+    if data.display_order is not None:
+        if not 1 <= data.display_order <= 999:
+            raise LearningError('Display order must be between 1 and 999.', field='displayOrder')
+        resource.position = data.display_order
+    elif resource.pk is None:
+        top = resource.lesson.resources.aggregate(top=Max('position'))['top'] or 0
+        resource.position = top + 1
+    resource.is_published = data.is_published
+    resource.save()
+    return resource
+
+
+def create_resource(user: User | None, lesson_id: object, data: ResourceInput) -> LessonResource:
+    user = _require_manager(user)
+    lesson = _get(Lesson, lesson_id, 'lesson')
+    return _write_resource(LessonResource(lesson=lesson, created_by=user), data)
+
+
+def update_resource(user: User | None, resource_id: object, data: ResourceInput) -> LessonResource:
+    _require_manager(user)
+    return _write_resource(_get(LessonResource, resource_id, 'resource'), data)
+
+
+def set_resource_published(
+    user: User | None, resource_id: object, published: bool
+) -> LessonResource:
+    _require_manager(user)
+    resource = _get(LessonResource, resource_id, 'resource')
+    resource.is_published = published
+    resource.save(update_fields=['is_published', 'updated_at'])
+    return resource
+
+
+def delete_resource(user: User | None, resource_id: object) -> Lesson:
+    _require_manager(user)
+    resource = _get(LessonResource, resource_id, 'resource')
+    lesson = resource.lesson
+    resource.delete()
+    return lesson

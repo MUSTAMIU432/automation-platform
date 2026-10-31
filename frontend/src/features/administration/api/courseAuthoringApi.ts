@@ -91,6 +91,28 @@ export interface LessonMaterial {
   downloadUrl: string
 }
 
+/** An external web page of a lesson, as its authors manage it. */
+export interface AdminResource {
+  id: string
+  title: string
+  description: string
+  url: string
+  kind: 'embed' | 'link'
+  displayOrder: number
+  isPublished: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ResourceInput {
+  title: string
+  url: string
+  description: string
+  kind: 'embed' | 'link'
+  displayOrder: number | null
+  isPublished: boolean
+}
+
 export interface AdminLesson {
   id: string
   courseId: string
@@ -104,6 +126,7 @@ export interface AdminLesson {
   body: string
   blocks: ContentBlock[]
   materials: LessonMaterial[]
+  resources: AdminResource[]
 }
 
 export interface AdminTest {
@@ -234,6 +257,9 @@ export async function adminLessonRequest(id: string): Promise<AdminLesson | null
          id courseId courseTitle moduleId moduleTitle title summary objectives
          estimatedMinutes body blocks { kind text language }
          materials { id title filename contentType size createdAt downloadUrl }
+         resources {
+           id title description url kind displayOrder isPublished createdAt updatedAt
+         }
        }
      }`,
     { id },
@@ -419,6 +445,33 @@ export const deleteQuizRequest = (moduleId: string) =>
 
 export const deleteLessonMaterialRequest = (id: string) =>
   mutate('deleteLessonMaterial', 'DeleteMaterial($id: ID!)', '(id: $id)', { id })
+
+export const createLessonResourceRequest = (lessonId: string, input: ResourceInput) =>
+  mutate(
+    'createLessonResource',
+    'CreateLessonResource($lessonId: ID!, $input: ResourceInput!)',
+    '(lessonId: $lessonId, input: $input)',
+    { lessonId, input },
+  )
+
+export const updateLessonResourceRequest = (id: string, input: ResourceInput) =>
+  mutate(
+    'updateLessonResource',
+    'UpdateLessonResource($id: ID!, $input: ResourceInput!)',
+    '(id: $id, input: $input)',
+    { id, input },
+  )
+
+export const setLessonResourcePublishedRequest = (id: string, published: boolean) =>
+  mutate(
+    'setLessonResourcePublished',
+    'SetLessonResourcePublished($id: ID!, $published: Boolean!)',
+    '(id: $id, published: $published)',
+    { id, published },
+  )
+
+export const deleteLessonResourceRequest = (id: string) =>
+  mutate('deleteLessonResource', 'DeleteLessonResource($id: ID!)', '(id: $id)', { id })
 
 /** Upload a file to a lesson. Multipart, outside GraphQL - like an idea's attachments. */
 export async function uploadLessonMaterialRequest(

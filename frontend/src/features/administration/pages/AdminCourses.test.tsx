@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { READ_ONLY_ADMIN, renderAdminPage } from '../../../test/renderAdmin'
@@ -25,6 +25,7 @@ const LESSON: AdminLesson = {
   body: '## Hello',
   blocks: [],
   materials: [],
+  resources: [],
 }
 
 beforeEach(() => {
@@ -143,6 +144,102 @@ describe('AdminLessonEditorPage', () => {
       expect(api.uploadLessonMaterialRequest).toHaveBeenCalledWith('7', file, 'Week 1'),
     )
     expect(await screen.findByText('File uploaded.')).toBeInTheDocument()
+  })
+})
+
+describe('AdminLessonEditorPage external resources', () => {
+  const HARRY = 'https://archive.codewithharry.com/tutorial/python-objects-classes/'
+  const RESOURCE = {
+    id: '9',
+    title: 'Python Objects and Classes - CodeWithHarry',
+    description: 'Classes and objects.',
+    url: HARRY,
+    kind: 'embed' as const,
+    displayOrder: 1,
+    isPublished: false,
+    createdAt: '2026-10-31T00:00:00Z',
+    updatedAt: '2026-10-31T00:00:00Z',
+  }
+
+  function renderEditor() {
+    return renderAdminPage(<AdminLessonEditorPage />, {
+      path: '/courses/1/lessons/7',
+      pattern: '/courses/:courseId/lessons/:lessonId',
+    })
+  }
+
+  it('adds a web page to the lesson, saying where it will show', async () => {
+    api.adminLessonRequest.mockResolvedValue(LESSON)
+    api.createLessonResourceRequest.mockResolvedValue({ ...OK, message: 'Resource added.' })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add external resource' }))
+    const form = within(screen.getByRole('form', { name: 'External resource' }))
+    expect(form.getByText(/Python › Basics › Variables/)).toBeInTheDocument()
+    fireEvent.change(form.getByLabelText('Resource title'), {
+      target: { value: RESOURCE.title },
+    })
+    fireEvent.change(form.getByLabelText('Web address'), { target: { value: HARRY } })
+    fireEvent.click(form.getByLabelText(/Published/))
+    fireEvent.click(form.getByRole('button', { name: 'Add resource' }))
+
+    await waitFor(() =>
+      expect(api.createLessonResourceRequest).toHaveBeenCalledWith('7', {
+        title: RESOURCE.title,
+        url: HARRY,
+        description: '',
+        kind: 'embed',
+        displayOrder: null,
+        isPublished: true,
+      }),
+    )
+    expect(await screen.findByText('Resource added.')).toBeInTheDocument()
+  })
+
+  it('shows the server refusing an address beside the field', async () => {
+    api.adminLessonRequest.mockResolvedValue(LESSON)
+    api.createLessonResourceRequest.mockResolvedValue({
+      success: false,
+      message: 'Use a web address that starts with https:// or http://.',
+      field: 'url',
+      id: null,
+    })
+    renderEditor()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Add external resource' }))
+    const form = within(screen.getByRole('form', { name: 'External resource' }))
+    fireEvent.change(form.getByLabelText('Resource title'), { target: { value: 'Bad' } })
+    fireEvent.change(form.getByLabelText('Web address'), {
+      target: { value: 'javascript:alert(1)' },
+    })
+    fireEvent.click(form.getByRole('button', { name: 'Add resource' }))
+
+    expect(await form.findByRole('alert')).toHaveTextContent('starts with https://')
+  })
+
+  it('previews, publishes and deletes a resource', async () => {
+    api.adminLessonRequest.mockResolvedValue({ ...LESSON, resources: [RESOURCE] })
+    api.setLessonResourcePublishedRequest.mockResolvedValue({
+      ...OK,
+      message: 'Resource published.',
+    })
+    api.deleteLessonResourceRequest.mockResolvedValue({ ...OK, message: 'Resource deleted.' })
+    renderEditor()
+
+    expect(await screen.findByText(RESOURCE.title)).toBeInTheDocument()
+    expect(screen.getByText('Draft')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }))
+    expect(screen.getByTitle(`${RESOURCE.title} (external resource)`)).toHaveAttribute('src', HARRY)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Publish' }))
+    await waitFor(() =>
+      expect(api.setLessonResourcePublishedRequest).toHaveBeenCalledWith('9', true),
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(api.deleteLessonResourceRequest).toHaveBeenCalledWith('9'))
   })
 })
 

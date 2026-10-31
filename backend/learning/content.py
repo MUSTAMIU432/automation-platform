@@ -21,7 +21,14 @@ elements and never an author's HTML:
     print("hi")
     ```
 
-Inside text, `code` and **bold** are the only inline markup.
+Inside text, `code`, **bold** and *italic* are the only inline markup.
+
+A lesson may list external web pages to read inside it, each a
+`[[lessons.resources]]` table with `title`, `url` (http or https only),
+`description` and `kind` (`embed`, the default, or `link`). They are added as
+published, and only ever added: one already on the lesson (matched by address)
+is left as it is, and `add_missing_resources` gives an already loaded course
+the ones it lacks without touching anything else.
 
 Everything is validated before anything is written, and the write is one
 transaction - a file with a mistake changes nothing.
@@ -43,9 +50,11 @@ from learning.models import (
     ExerciseTestCase,
     Lesson,
     LessonContent,
+    LessonResource,
     Question,
     Quiz,
 )
+from learning.resource_urls import check_resource_url
 
 CONTENT_ROOT = Path(__file__).resolve().parent / 'content'
 
@@ -169,7 +178,20 @@ def check_lessons(lessons: list, where: str) -> set[str]:
             raise ContentError(f'{lesson_where}: the slug is used twice.')
         slugs.add(lesson['slug'])
         _blocks(lesson['body'], lesson_where)
+        for number, resource in enumerate(lesson.get('resources', []), start=1):
+            check_resource(resource, f'{lesson_where} resource {number}')
     return slugs
+
+
+def check_resource(resource: dict, where: str) -> None:
+    """An external web page listed under a lesson: a title, a safe address, a known kind."""
+    _require(resource, 'title', where)
+    try:
+        check_resource_url(_require(resource, 'url', where))
+    except ValueError as exc:
+        raise ContentError(f'{where}: {exc}') from None
+    if resource.get('kind', LessonResource.Kind.EMBED) not in LessonResource.Kind.values:
+        raise ContentError(f'{where}: unknown kind.')
 
 
 def check_exercise(exercise: dict, where: str, lesson_slugs: set[str]) -> None:
@@ -269,6 +291,7 @@ class SyncReport:
     lessons: int = 0
     exercises: int = 0
     questions: int = 0
+    resources: int = 0
     kept: list[str] = field(default_factory=list)
     pruned: list[str] = field(default_factory=list)
 
@@ -366,9 +389,62 @@ def _sync_lessons(module, lessons_data, report, prune) -> dict[str, Lesson]:
             )
             for index, block in enumerate(parse_blocks(data['body']), start=1)
         )
+        report.resources += _add_resources(lesson, data.get('resources', []))
         lessons[lesson.slug] = lesson
         report.lessons += 1
     return lessons
+
+
+def _add_resources(lesson: Lesson, resources_data: list[dict]) -> int:
+    """Add the files' resources this lesson does not have yet (matched by address).
+
+    Only ever adds: a resource already there - whoever made it, however it was
+    edited, published or not - is left exactly as it is.
+    """
+    have = set(lesson.resources.values_list('url', flat=True))
+    top = max(lesson.resources.values_list('position', flat=True), default=0)
+    added = 0
+    for data in resources_data:
+        url = data['url'].strip()
+        if url in have:
+            continue
+        top += 1
+        LessonResource.objects.create(
+            lesson=lesson,
+            title=data['title'].strip(),
+            description=data.get('description', '').strip(),
+            url=url,
+            kind=data.get('kind', LessonResource.Kind.EMBED),
+            position=top,
+            is_published=True,
+        )
+        have.add(url)
+        added += 1
+    return added
+
+
+@transaction.atomic
+def add_missing_resources(directory: Path) -> int:
+    """Give an already loaded course the external resources its files list and it lacks.
+
+    For a course administrators now own: nothing else in it is touched. Returns
+    how many were added (0 when the course is not loaded at all).
+    """
+    files = read_course(directory)
+    course = Course.objects.filter(slug=files.course['slug']).first()
+    if course is None:
+        return 0
+    added = 0
+    for _, module_data in files.modules:
+        for data in module_data['lessons']:
+            if not data.get('resources'):
+                continue
+            lesson = Lesson.objects.filter(
+                module__course=course, module__slug=module_data['slug'], slug=data['slug']
+            ).first()
+            if lesson is not None:
+                added += _add_resources(lesson, data['resources'])
+    return added
 
 
 def _sync_exercises(module, exercises_data, lessons, report, prune) -> None:

@@ -177,6 +177,41 @@ class LessonMaterial(models.Model):
         return self.title
 
 
+class LessonResource(models.Model):
+    """
+    An external web page that belongs to a lesson - shown inside it in a frame, or
+    linked from it when the site does not allow framing.
+
+    The page loads in the learner's browser straight from its own site: the server
+    stores the address and never fetches it (no proxy, no copying of content). Only
+    http and https addresses are accepted (`learning.authoring`), and learners see a
+    resource only once it is published.
+    """
+
+    class Kind(models.TextChoices):
+        EMBED = 'embed', 'Embedded webpage'
+        LINK = 'link', 'Link to the page'
+
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='resources')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    url = models.URLField(max_length=2000)
+    kind = models.CharField(max_length=10, choices=Kind.choices, default=Kind.EMBED)
+    position = models.PositiveIntegerField(default=1, help_text='Display order in the lesson.')
+    is_published = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='+'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering: ClassVar = ['lesson', 'position', 'pk']
+
+    def __str__(self) -> str:
+        return self.title
+
+
 class CodingExercise(models.Model):
     class Difficulty(models.TextChoices):
         EASY = 'easy', 'Easy'

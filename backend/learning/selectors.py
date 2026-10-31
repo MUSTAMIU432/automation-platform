@@ -35,6 +35,7 @@ from learning.models import (
     ExerciseSubmission,
     Lesson,
     LessonProgress,
+    LessonResource,
     Question,
     Quiz,
 )
@@ -115,7 +116,20 @@ def get_lesson(user: User | None, lesson_id: object) -> Lesson | None:
     return (
         Lesson.objects.filter(pk=parse_id(lesson_id), module__course__in=_readable_course_ids(user))
         .select_related('module__course')
-        .prefetch_related('blocks', 'exercises', 'materials')
+        .prefetch_related('blocks', 'exercises', 'materials', 'resources')
+        .first()
+    )
+
+
+def get_published_resource(user: User | None, resource_id: object) -> LessonResource | None:
+    """A published external resource of a lesson `user` may open; None otherwise."""
+    return (
+        LessonResource.objects.filter(
+            pk=parse_id(resource_id),
+            is_published=True,
+            lesson__module__course__in=_readable_course_ids(user),
+        )
+        .select_related('lesson')
         .first()
     )
 
