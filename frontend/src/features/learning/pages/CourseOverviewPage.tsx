@@ -1,5 +1,5 @@
-import { useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useState, type FormEvent, type ReactNode } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import {
   ArrowRightIcon,
@@ -42,18 +42,63 @@ function Notice({ outcome }: { outcome: Outcome | null }) {
   )
 }
 
+/**
+ * One entry of the curriculum: a link to it when the reader can open it, and
+ * otherwise a button that enrolls them and then opens it - so a lesson is never
+ * a dead row of text.
+ */
+function CurriculumRow({
+  to,
+  canOpen,
+  onLocked,
+  indented = false,
+  children,
+}: {
+  to: string
+  canOpen: boolean
+  onLocked: (to: string) => void
+  indented?: boolean
+  children: ReactNode
+}) {
+  const classes = `flex w-full items-center gap-3 py-3 pr-4 text-left text-sm hover:bg-white focus:outline-none focus-visible:bg-white ${
+    indented ? 'pl-11' : 'pl-4'
+  }`
+  if (canOpen) {
+    return (
+      <Link to={to} className={classes}>
+        {children}
+      </Link>
+    )
+  }
+  return (
+    <button type="button" onClick={() => onLocked(to)} className={classes}>
+      {children}
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap text-slate-600">
+        Enroll to open
+      </span>
+    </button>
+  )
+}
+
 function ModuleCard({
   module,
   slug,
   enrolled,
+  canOpen,
+  onLocked,
 }: {
   module: CourseModule
   slug: string
   enrolled: boolean
+  /** Enrolled, or a course manager (who opens any lesson without enrolling). */
+  canOpen: boolean
+  /** A row the reader cannot open yet: enroll, then open it. */
+  onLocked: (to: string) => void
 }) {
   const learnBase = useLearnBase()
   const done = module.lessons.filter((lesson) => lesson.completed).length
   const base = `${learnBase}/courses/${slug}`
+  const open = { canOpen, onLocked }
   return (
     <details className={`${glassPanel} group p-0 [&_summary::-webkit-details-marker]:hidden`}>
       <summary className="flex cursor-pointer list-none items-start gap-4 rounded-3xl p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300">
@@ -96,111 +141,66 @@ function ModuleCard({
         <ol className="divide-y divide-slate-900/5 overflow-hidden rounded-2xl bg-white/60 ring-1 ring-slate-900/5">
           {module.lessons.map((lesson) => (
             <li key={lesson.id}>
-              {enrolled ? (
-                <Link
-                  to={`${base}/lessons/${lesson.id}`}
-                  className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-white focus:outline-none focus-visible:bg-white"
-                >
-                  <DocumentIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1 text-slate-800">{lesson.title}</span>
-                  <span className="text-xs text-slate-400">{lesson.estimatedMinutes} min</span>
-                  {lesson.completed && (
-                    <span className="inline-flex text-emerald-600">
-                      <CheckCircleIcon className="h-4 w-4" />
-                      <span className="sr-only">Completed</span>
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <span className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700">
-                  <DocumentIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1">{lesson.title}</span>
-                  <span className="text-xs text-slate-400">{lesson.estimatedMinutes} min</span>
-                </span>
-              )}
-              {/* Its external pages, under it: read inside the lesson, after its objectives. */}
-              {(lesson.resources ?? []).map((resource) =>
-                enrolled ? (
-                  <Link
-                    key={resource.id}
-                    to={`${base}/lessons/${lesson.id}#resource-${resource.id}`}
-                    className="flex items-center gap-3 py-2.5 pr-4 pl-11 text-sm hover:bg-white focus:outline-none focus-visible:bg-white"
-                  >
-                    <GlobeIcon className="h-4 w-4 shrink-0 text-brand-600" />
-                    <span className="flex-1 text-slate-700">{resource.title}</span>
-                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100">
-                      External resource
-                    </span>
-                  </Link>
-                ) : (
-                  <span
-                    key={resource.id}
-                    className="flex items-center gap-3 py-2.5 pr-4 pl-11 text-sm text-slate-600"
-                  >
-                    <GlobeIcon className="h-4 w-4 shrink-0 text-brand-600" />
-                    <span className="flex-1">{resource.title}</span>
-                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100">
-                      External resource
-                    </span>
+              <CurriculumRow to={`${base}/lessons/${lesson.id}`} {...open}>
+                <DocumentIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="flex-1 text-slate-800">{lesson.title}</span>
+                <span className="text-xs text-slate-400">{lesson.estimatedMinutes} min</span>
+                {lesson.completed && (
+                  <span className="inline-flex text-emerald-600">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    <span className="sr-only">Completed</span>
                   </span>
-                ),
-              )}
+                )}
+              </CurriculumRow>
+              {/* Its external pages, under it: read inside the lesson, after its objectives. */}
+              {(lesson.resources ?? []).map((resource) => (
+                <CurriculumRow
+                  key={resource.id}
+                  to={`${base}/lessons/${lesson.id}#resource-${resource.id}`}
+                  indented
+                  {...open}
+                >
+                  <GlobeIcon className="h-4 w-4 shrink-0 text-brand-600" />
+                  <span className="flex-1 text-slate-700">{resource.title}</span>
+                  <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100">
+                    External resource
+                  </span>
+                </CurriculumRow>
+              ))}
             </li>
           ))}
           {module.exercises.map((exercise) => (
             <li key={exercise.id}>
-              {enrolled ? (
-                <Link
-                  to={`${base}/exercises/${exercise.id}`}
-                  className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-white focus:outline-none focus-visible:bg-white"
-                >
-                  <CodeIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1 text-slate-800">Exercise: {exercise.title}</span>
-                  <Pill className={DIFFICULTY_CLASSES[exercise.difficulty]}>
-                    {exercise.difficulty}
-                  </Pill>
-                  {exercise.passed && (
-                    <span className="inline-flex text-emerald-600">
-                      <CheckCircleIcon className="h-4 w-4" />
-                      <span className="sr-only">Passed</span>
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <span className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700">
-                  <CodeIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1">Exercise: {exercise.title}</span>
-                </span>
-              )}
+              <CurriculumRow to={`${base}/exercises/${exercise.id}`} {...open}>
+                <CodeIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="flex-1 text-slate-800">Exercise: {exercise.title}</span>
+                <Pill className={DIFFICULTY_CLASSES[exercise.difficulty]}>
+                  {exercise.difficulty}
+                </Pill>
+                {exercise.passed && (
+                  <span className="inline-flex text-emerald-600">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    <span className="sr-only">Passed</span>
+                  </span>
+                )}
+              </CurriculumRow>
             </li>
           ))}
           {module.quiz && (
             <li>
-              {enrolled ? (
-                <Link
-                  to={`${base}/quizzes/${module.quiz.id}`}
-                  className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-white focus:outline-none focus-visible:bg-white"
-                >
-                  <ChecklistIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1 text-slate-800">Quiz: {module.quiz.title}</span>
-                  {module.quiz.bestPercentage !== null && (
-                    <span className="text-xs text-slate-500">
-                      Best {module.quiz.bestPercentage}%
-                    </span>
-                  )}
-                  {module.quiz.passed && (
-                    <span className="inline-flex text-emerald-600">
-                      <CheckCircleIcon className="h-4 w-4" />
-                      <span className="sr-only">Passed</span>
-                    </span>
-                  )}
-                </Link>
-              ) : (
-                <span className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700">
-                  <ChecklistIcon className="h-4 w-4 shrink-0 text-slate-400" />
-                  <span className="flex-1">Quiz: {module.quiz.title}</span>
-                </span>
-              )}
+              <CurriculumRow to={`${base}/quizzes/${module.quiz.id}`} {...open}>
+                <ChecklistIcon className="h-4 w-4 shrink-0 text-slate-400" />
+                <span className="flex-1 text-slate-800">Quiz: {module.quiz.title}</span>
+                {module.quiz.bestPercentage !== null && (
+                  <span className="text-xs text-slate-500">Best {module.quiz.bestPercentage}%</span>
+                )}
+                {module.quiz.passed && (
+                  <span className="inline-flex text-emerald-600">
+                    <CheckCircleIcon className="h-4 w-4" />
+                    <span className="sr-only">Passed</span>
+                  </span>
+                )}
+              </CurriculumRow>
             </li>
           )}
         </ol>
@@ -346,6 +346,7 @@ function CapstoneSection({ course, onSaved }: { course: Course; onSaved: () => v
 /** `/app/learn/courses/:courseSlug`: what the course teaches, its curriculum and your progress. */
 export function CourseOverviewPage() {
   const learnBase = useLearnBase()
+  const navigate = useNavigate()
   const { courseSlug = '' } = useParams()
   const course = useLearningQuery(
     `course:${courseSlug}`,
@@ -362,6 +363,22 @@ export function CourseOverviewPage() {
       const result = await action()
       setOutcome(result)
       if (result.success) course.reload()
+    } catch {
+      setOutcome({ success: false, message: 'We could not reach the server.', field: null })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** From a curriculum row: enroll, then open what was clicked. */
+  async function enrollAndOpen(to: string) {
+    if (!course.data) return
+    setBusy(true)
+    setOutcome(null)
+    try {
+      const result = await enrollRequest(course.data.summary.id)
+      if (result.success) navigate(to)
+      else setOutcome(result)
     } catch {
       setOutcome({ success: false, message: 'We could not reach the server.', field: null })
     } finally {
@@ -422,13 +439,17 @@ export function CourseOverviewPage() {
           </div>
         )}
         <div className="mt-6 flex flex-wrap gap-3">
-          {data.enrollment ? (
+          {data.enrollment || data.canManage ? (
             nextLesson && (
               <Link
                 to={`${learnBase}/courses/${courseSlug}/lessons/${nextLesson}`}
                 className="inline-flex items-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-forest hover:bg-mint/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-mint"
               >
-                {progress?.completedLessons ? 'Continue learning' : 'Start the first lesson'}
+                {!data.enrollment
+                  ? 'Open the first lesson'
+                  : progress?.completedLessons
+                    ? 'Continue learning'
+                    : 'Start the first lesson'}
                 <ArrowRightIcon className="h-4 w-4" />
               </Link>
             )
@@ -465,6 +486,8 @@ export function CourseOverviewPage() {
                 module={module}
                 slug={courseSlug}
                 enrolled={data.enrollment !== null}
+                canOpen={data.enrollment !== null || data.canManage}
+                onLocked={(to) => void enrollAndOpen(to)}
               />
             ))}
           </section>

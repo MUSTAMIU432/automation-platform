@@ -211,6 +211,40 @@ describe('the catalog', () => {
 })
 
 describe('the course overview', () => {
+  it('lets a course manager open every lesson without enrolling', async () => {
+    api.courseRequest.mockResolvedValue({ ...course(false), canManage: true })
+    renderAt('/learn/courses/python', '/learn/courses/:courseSlug', <CourseOverviewPage />)
+
+    expect(await screen.findByRole('link', { name: /Open the first lesson/ })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python/lessons/11',
+    )
+    expect(screen.getByRole('link', { name: /^Variables/ })).toHaveAttribute(
+      'href',
+      '/app/learn/courses/python/lessons/12',
+    )
+    expect(screen.queryByText('Enroll to open')).not.toBeInTheDocument()
+  })
+
+  it('enrolls a learner who clicks a lesson, and opens that lesson', async () => {
+    api.courseRequest.mockResolvedValue(course(false))
+    api.enrollRequest.mockResolvedValue({ ...OK, message: 'You are enrolled.' })
+    render(
+      <MemoryRouter initialEntries={['/learn/courses/python']}>
+        <Routes>
+          <Route path="/learn/courses/:courseSlug" element={<CourseOverviewPage />} />
+          <Route path="/app/learn/courses/python/lessons/:id" element={<p>The lesson</p>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const variables = await screen.findByRole('button', { name: /^Variables.*Enroll to open/ })
+    fireEvent.click(variables)
+
+    await waitFor(() => expect(api.enrollRequest).toHaveBeenCalledWith('1'))
+    expect(await screen.findByText('The lesson')).toBeInTheDocument()
+  })
+
   it('shows a lesson’s external resource in the curriculum', async () => {
     api.courseRequest.mockResolvedValue(course(true))
     renderAt('/learn/courses/python', '/learn/courses/:courseSlug', <CourseOverviewPage />)
