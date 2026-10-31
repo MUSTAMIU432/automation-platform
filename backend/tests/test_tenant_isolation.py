@@ -280,11 +280,13 @@ def _assert_no_leakage(response, tenant, *, secret_strings=()):
     response body - not just in the field under test.
     """
     body = response.content.decode()
+    # IDs travel as JSON strings ("id": "29"), so they are looked for quoted: a bare
+    # "29" would also match inside an unrelated "229" and fail at random.
     forbidden = [
-        tenant['organization_id'],
-        tenant['membership_id'],
-        tenant['owner_role_id'],
-        tenant['user_id'],
+        f'"{tenant["organization_id"]}"',
+        f'"{tenant["membership_id"]}"',
+        f'"{tenant["owner_role_id"]}"',
+        f'"{tenant["user_id"]}"',
         tenant['organization_name'],
         *secret_strings,
     ]
