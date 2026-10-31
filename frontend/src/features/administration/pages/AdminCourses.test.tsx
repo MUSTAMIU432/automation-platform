@@ -61,6 +61,78 @@ describe('AdminCoursesPage', () => {
     expect(screen.getByText('Hidden from learners until published')).toBeInTheDocument()
   })
 
+  it('manages a course from its ⋮ menu', async () => {
+    const draft = {
+      id: '1',
+      slug: 'new',
+      title: 'new',
+      status: 'draft' as const,
+      levelLabel: 'Beginner to advanced',
+      moduleCount: 1,
+      lessonCount: 2,
+      enrollmentCount: 0,
+      updatedAt: '2026-10-31T00:00:00Z',
+    }
+    api.adminCoursesRequest.mockResolvedValue([draft])
+    api.publishCourseRequest.mockResolvedValue({ ...OK, message: 'Course published.' })
+    renderAdminPage(<AdminCoursesPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'More for new' }))
+    const menu = within(screen.getByRole('menu', { name: 'Manage new' }))
+    expect(menu.getByRole('menuitem', { name: 'Edit course' })).toHaveAttribute(
+      'href',
+      '/app/admin/courses/1',
+    )
+    expect(menu.getByRole('menuitem', { name: 'View as learner' })).toHaveAttribute(
+      'href',
+      '/app/admin/learn/courses/new',
+    )
+    // A draft can be published; it is not published, so it cannot be archived or unpublished.
+    expect(menu.queryByRole('menuitem', { name: 'Archive' })).toBeNull()
+    expect(menu.queryByRole('menuitem', { name: 'Return to draft' })).toBeNull()
+
+    fireEvent.click(menu.getByRole('menuitem', { name: 'Publish' }))
+
+    await waitFor(() => expect(api.publishCourseRequest).toHaveBeenCalledWith('1'))
+    expect(await screen.findByText('Course published.')).toBeInTheDocument()
+    await waitFor(() => expect(api.adminCoursesRequest).toHaveBeenCalledTimes(2))
+  })
+
+  it('asks before deleting, and shows why the server refuses', async () => {
+    const live = {
+      id: '2',
+      slug: 'python',
+      title: 'Python course',
+      status: 'published' as const,
+      levelLabel: 'Beginner to advanced',
+      moduleCount: 1,
+      lessonCount: 1,
+      enrollmentCount: 3,
+      updatedAt: '2026-10-30T00:00:00Z',
+    }
+    api.adminCoursesRequest.mockResolvedValue([live])
+    api.deleteCourseRequest.mockResolvedValue({
+      success: false,
+      message: 'Learners are enrolled in this course, so it cannot be deleted.',
+      field: null,
+      id: null,
+    })
+    renderAdminPage(<AdminCoursesPage />)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'More for Python course' }))
+    const menu = within(screen.getByRole('menu'))
+    expect(menu.getByRole('menuitem', { name: 'Archive' })).toBeInTheDocument()
+    expect(menu.getByRole('menuitem', { name: 'Return to draft' })).toBeInTheDocument()
+    fireEvent.click(menu.getByRole('menuitem', { name: 'Delete course' }))
+    expect(api.deleteCourseRequest).not.toHaveBeenCalled()
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete course' }),
+    )
+
+    await waitFor(() => expect(api.deleteCourseRequest).toHaveBeenCalledWith('2'))
+    expect(await screen.findByText(/cannot be deleted/)).toBeInTheDocument()
+  })
+
   it('creates a course as a draft', async () => {
     api.adminCoursesRequest.mockResolvedValue([])
     api.createCourseRequest.mockResolvedValue(OK)

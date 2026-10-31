@@ -12,6 +12,7 @@ import {
   controlClasses,
   primaryButtonClasses,
 } from '../components/AdminUi'
+import { CourseCardMenu } from '../components/CourseCardMenu'
 import { CourseStatusBadge } from '../components/CourseStatusBadge'
 import { useAdminCapabilities } from '../context/useAdminCapabilities'
 import { useAdminQuery } from '../hooks/useAdminQuery'
@@ -19,7 +20,8 @@ import { useAdminQuery } from '../hooks/useAdminQuery'
 /**
  * `/app/admin/courses`: every course, whatever its status, for the people who
  * write them. A new course starts as a draft - learners see nothing until it is
- * published from its own page.
+ * published. Each card's ⋮ menu edits it, opens it as a learner, publishes,
+ * returns to draft, archives or deletes it.
  */
 export function AdminCoursesPage() {
   const { capabilities } = useAdminCapabilities()
@@ -32,6 +34,8 @@ export function AdminCoursesPage() {
   const [title, setTitle] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // What the last ⋮ menu action came to (published, deleted, refused...).
+  const [outcome, setOutcome] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
 
   async function create(event: FormEvent) {
     event.preventDefault()
@@ -100,6 +104,7 @@ export function AdminCoursesPage() {
           )}
         </AdminCard>
 
+        {outcome && <Notice tone={outcome.tone}>{outcome.text}</Notice>}
         {courses.error && <ErrorState message={courses.error} onRetry={courses.reload} />}
         {courses.loading && !courses.data && <LoadingState label="Loading courses…" />}
         {courses.data && courses.data.length === 0 && (
@@ -119,10 +124,10 @@ export function AdminCoursesPage() {
         {courses.data && courses.data.length > 0 && (
           <ul className="grid gap-4 md:grid-cols-2">
             {courses.data.map((course) => (
-              <li key={course.id}>
+              <li key={course.id} className="relative">
                 <Link
                   to={`/app/admin/courses/${course.id}`}
-                  className="block rounded-2xl border border-white/80 bg-white/70 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_45px_-32px_rgba(8,75,56,0.5)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
+                  className="block h-full rounded-2xl border border-white/80 bg-white/70 p-5 pr-14 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_20px_45px_-32px_rgba(8,75,56,0.5)] ring-1 ring-slate-900/[0.04] backdrop-blur-xl hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-300"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="font-semibold text-slate-900">{course.title}</h2>
@@ -141,6 +146,19 @@ export function AdminCoursesPage() {
                     Updated {new Date(course.updatedAt).toLocaleString()}
                   </p>
                 </Link>
+                {/* Beside the card's link, not inside it: a button cannot sit in a link. */}
+                <div className="absolute top-3.5 right-3">
+                  <CourseCardMenu
+                    course={course}
+                    onDone={(result) => {
+                      setOutcome({
+                        tone: result.success ? 'success' : 'error',
+                        text: result.message,
+                      })
+                      if (result.success) courses.reload()
+                    }}
+                  />
+                </div>
               </li>
             ))}
           </ul>
