@@ -115,6 +115,7 @@ function course(enrolled: boolean): Course {
             summary: '',
             estimatedMinutes: 20,
             completed: true,
+            resources: [],
           },
           {
             id: '12',
@@ -123,6 +124,15 @@ function course(enrolled: boolean): Course {
             summary: '',
             estimatedMinutes: 25,
             completed: false,
+            resources: [
+              {
+                id: '61',
+                title: 'Python Objects and Classes - CodeWithHarry',
+                description: '',
+                url: 'https://archive.codewithharry.com/tutorial/python-objects-classes/',
+                kind: 'embed',
+              },
+            ],
           },
         ],
         exercises: [
@@ -200,6 +210,17 @@ describe('the catalog', () => {
 })
 
 describe('the course overview', () => {
+  it('shows a lesson’s external resource in the curriculum', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    renderAt('/learn/courses/python', '/learn/courses/:courseSlug', <CourseOverviewPage />)
+
+    const resource = await screen.findByRole('link', {
+      name: /Python Objects and Classes - CodeWithHarry/,
+    })
+    expect(resource).toHaveAttribute('href', '/app/learn/courses/python/lessons/12#resource-61')
+    expect(resource).toHaveTextContent('External resource')
+  })
+
   it('lets a visitor enroll', async () => {
     api.courseRequest.mockResolvedValueOnce(course(false)).mockResolvedValue(course(true))
     api.enrollRequest.mockResolvedValue({ ...OK, message: 'You are enrolled.' })
@@ -859,6 +880,16 @@ describe('the learning menu and course contents', () => {
         { name: 'Search lessons' },
       ),
     ).toBeInTheDocument()
+  })
+
+  it('lists a lesson’s external resource under it, opening the lesson at it', async () => {
+    api.courseRequest.mockResolvedValue(course(true))
+    renderLearning('/app/learn/courses/python/lessons/11')
+
+    const [contents] = await screen.findAllByRole('navigation', { name: 'Course contents' })
+    expect(
+      within(contents).getByRole('link', { name: /Python Objects and Classes - CodeWithHarry/ }),
+    ).toHaveAttribute('href', '/app/learn/courses/python/lessons/12#resource-61')
   })
 
   it('finds a lesson by name from the contents', async () => {

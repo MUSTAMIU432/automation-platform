@@ -138,6 +138,31 @@ class CourseSummaryType:
         )
 
 
+@strawberry.type(
+    description=(
+        'An external web page that belongs to a lesson: shown in a frame (`embed`) or '
+        'linked (`link`). It loads in the browser from its own site; only published '
+        'resources are ever listed.'
+    )
+)
+class LessonResourceType:
+    id: strawberry.ID
+    title: str
+    description: str
+    url: str
+    kind: str
+
+    @staticmethod
+    def from_model(resource: LessonResource) -> 'LessonResourceType':
+        return LessonResourceType(
+            id=_id(resource.pk),
+            title=resource.title,
+            description=resource.description,
+            url=resource.url,
+            kind=resource.kind,
+        )
+
+
 @strawberry.type
 class LessonSummaryType:
     id: strawberry.ID
@@ -146,6 +171,7 @@ class LessonSummaryType:
     summary: str
     estimated_minutes: int
     completed: bool
+    resources: list[LessonResourceType]
 
 
 @strawberry.type
@@ -215,6 +241,11 @@ class CourseModuleType:
                     summary=lesson.summary,
                     estimated_minutes=lesson.estimated_minutes,
                     completed=bool(progress) and lesson.pk in progress.completed_lesson_ids,
+                    resources=[
+                        LessonResourceType.from_model(resource)
+                        for resource in lesson.resources.all()
+                        if resource.is_published
+                    ],
                 )
                 for lesson in module.lessons.all()
             ],
@@ -335,31 +366,6 @@ class LessonFileType:
     content_type: str
     size: int
     download_url: str
-
-
-@strawberry.type(
-    description=(
-        'An external web page that belongs to a lesson: shown in a frame (`embed`) or '
-        'linked (`link`). It loads in the browser from its own site; only published '
-        'resources are ever listed.'
-    )
-)
-class LessonResourceType:
-    id: strawberry.ID
-    title: str
-    description: str
-    url: str
-    kind: str
-
-    @staticmethod
-    def from_model(resource: LessonResource) -> 'LessonResourceType':
-        return LessonResourceType(
-            id=_id(resource.pk),
-            title=resource.title,
-            description=resource.description,
-            url=resource.url,
-            kind=resource.kind,
-        )
 
 
 @strawberry.type(description='One lesson to read.')

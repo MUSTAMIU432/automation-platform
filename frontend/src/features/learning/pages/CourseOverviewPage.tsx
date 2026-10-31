@@ -8,6 +8,7 @@ import {
   ClockIcon,
   CodeIcon,
   DocumentIcon,
+  GlobeIcon,
 } from '../../../components/AppIcons'
 import {
   completeCourseRequest,
@@ -116,6 +117,33 @@ function ModuleCard({
                   <span className="flex-1">{lesson.title}</span>
                   <span className="text-xs text-slate-400">{lesson.estimatedMinutes} min</span>
                 </span>
+              )}
+              {/* Its external pages, under it: read inside the lesson, after its objectives. */}
+              {(lesson.resources ?? []).map((resource) =>
+                enrolled ? (
+                  <Link
+                    key={resource.id}
+                    to={`${base}/lessons/${lesson.id}#resource-${resource.id}`}
+                    className="flex items-center gap-3 py-2.5 pr-4 pl-11 text-sm hover:bg-white focus:outline-none focus-visible:bg-white"
+                  >
+                    <GlobeIcon className="h-4 w-4 shrink-0 text-brand-600" />
+                    <span className="flex-1 text-slate-700">{resource.title}</span>
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100">
+                      External resource
+                    </span>
+                  </Link>
+                ) : (
+                  <span
+                    key={resource.id}
+                    className="flex items-center gap-3 py-2.5 pr-4 pl-11 text-sm text-slate-600"
+                  >
+                    <GlobeIcon className="h-4 w-4 shrink-0 text-brand-600" />
+                    <span className="flex-1">{resource.title}</span>
+                    <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 ring-1 ring-brand-100">
+                      External resource
+                    </span>
+                  </span>
+                ),
               )}
             </li>
           ))}

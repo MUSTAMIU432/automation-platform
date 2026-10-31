@@ -81,7 +81,12 @@ def _curriculum():
     return Prefetch(
         'modules',
         queryset=CourseModule.objects.order_by('position').prefetch_related(
-            Prefetch('lessons', queryset=Lesson.objects.order_by('position')),
+            Prefetch(
+                'lessons',
+                queryset=Lesson.objects.order_by('position').prefetch_related(
+                    Prefetch('resources', queryset=LessonResource.objects.filter(is_published=True))
+                ),
+            ),
             Prefetch('exercises', queryset=CodingExercise.objects.order_by('position')),
             Prefetch(
                 'quiz',

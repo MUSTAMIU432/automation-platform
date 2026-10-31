@@ -113,7 +113,10 @@ export function ExternalResourceCard({ resource }: { resource: LessonResource })
           <GlobeIcon className="h-5 w-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id={`resource-${resource.id}`} className="font-semibold text-slate-900">
+          <h2
+            id={`resource-${resource.id}`}
+            className="scroll-mt-[calc(var(--app-chrome-height,0px)+2rem)] font-semibold text-slate-900"
+          >
             {resource.title}
           </h2>
           {resource.description && (

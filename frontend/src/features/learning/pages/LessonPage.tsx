@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 
 import {
   ArrowLeftIcon,
@@ -201,6 +201,13 @@ export function LessonPage() {
   // Kept per lesson: moving to the next one opens it on its reading.
   const [tab, setTab] = useState<{ lessonId: string; tab: Tab }>({ lessonId, tab: 'lesson' })
   const activeTab = tab.lessonId === lessonId ? tab.tab : 'lesson'
+  const { hash } = useLocation()
+
+  // From the course page or the outline, `#resource-<id>` opens the lesson at that resource.
+  useEffect(() => {
+    if (!hash.startsWith('#resource-') || !lesson.data) return
+    document.getElementById(hash.slice(1))?.scrollIntoView?.({ block: 'start' })
+  }, [hash, lesson.data])
 
   async function complete() {
     setBusy(true)

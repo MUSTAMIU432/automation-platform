@@ -312,3 +312,27 @@ class TestFromTheCourseFiles:
         assert resource.lesson.module.title == 'Object-Oriented Programming'
         assert resource.lesson.title == 'Classes, objects, encapsulation and properties'
         assert resource.is_published is True
+
+
+@pytest.mark.django_db
+class TestOnTheCoursePage:
+    COURSE = """query($slug: String!) { course(slug: $slug) { modules { lessons {
+      title resources { title url kind }
+    } } } }"""
+
+    def test_the_course_lists_each_lessons_published_resources(self, gql, manager, learner, course):
+        add(gql, manager, course, isPublished=True)
+        add(gql, manager, course, title='Draft page', url='https://example.org/draft')
+
+        modules = gql(self.COURSE, {'slug': 'data-with-python'}, learner)['course']['modules']
+
+        assert modules[0]['lessons'][0] == {
+            'title': 'Welcome',
+            'resources': [
+                {
+                    'title': 'Python Objects and Classes - CodeWithHarry',
+                    'url': HARRY,
+                    'kind': 'embed',
+                }
+            ],
+        }

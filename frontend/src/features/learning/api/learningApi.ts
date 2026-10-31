@@ -67,6 +67,8 @@ export interface LessonSummary {
   summary: string
   estimatedMinutes: number
   completed: boolean
+  /** The lesson's published external web pages, so the course page can show them. */
+  resources: LessonResource[]
 }
 
 export interface ExerciseSummary {
@@ -280,7 +282,10 @@ const COURSE = `
   audience outcomes canManage
   modules {
     id slug position title summary objectives project
-    lessons { id slug title summary estimatedMinutes completed }
+    lessons {
+      id slug title summary estimatedMinutes completed
+      resources { id title description url kind }
+    }
     exercises { ${EXERCISE_SUMMARY} }
     quiz { id title questionCount passPercentage bestPercentage passed }
   }

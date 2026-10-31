@@ -8,6 +8,7 @@ import {
   ChevronDownIcon,
   CodeIcon,
   DocumentIcon,
+  GlobeIcon,
   PanelCollapseIcon,
   PanelExpandIcon,
   PlayIcon,
@@ -136,7 +137,11 @@ export function CourseOutline({
   const modules = course.modules
     .map((module) => ({
       module,
-      lessons: module.lessons.filter((lesson) => matches(lesson.title)),
+      lessons: module.lessons.filter(
+        (lesson) =>
+          matches(lesson.title) ||
+          (lesson.resources ?? []).some((resource) => matches(resource.title)),
+      ),
       exercises: module.exercises.filter((exercise) => matches(exercise.title)),
       quiz: module.quiz && matches('Module quiz') ? module.quiz : null,
     }))
@@ -314,6 +319,18 @@ export function CourseOutline({
                         title={lesson.title}
                         detail={`${lesson.estimatedMinutes} min`}
                       />
+                      {(lesson.resources ?? []).map((resource) => (
+                        <div key={resource.id} className="pl-4">
+                          <OutlineItem
+                            to={`${lessonPath(lesson.id)}#resource-${resource.id}`}
+                            current={false}
+                            done={lesson.completed}
+                            Icon={GlobeIcon}
+                            title={resource.title}
+                            detail="External resource"
+                          />
+                        </div>
+                      ))}
                     </li>
                   ))}
                   {exercises.map((exercise) => (
